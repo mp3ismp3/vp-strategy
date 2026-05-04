@@ -272,6 +272,8 @@ def main():
         send_telegram(msg)
         print(msg)
     else:
+        msg = f"📊 VP Scanner — {today}\n\nScanned {len(cfg['symbols'])} symbols.\n✅ No signals today."
+        send_telegram(msg)
         print("No signals today.")
 
     save_state(state)
