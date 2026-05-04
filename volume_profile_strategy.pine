@@ -1,0 +1,235 @@
+// This Pine Script™ code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+
+//@version=6
+strategy('Institutional VP Strategy', 'iVP', overlay = true, max_bars_back = 5000,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 100,
+     commission_value = 0.04, calc_on_every_tick = false)
+
+//------------------------------------------------------------------------------
+// Inputs
+//-----------------------------------------------------------------------------{
+
+stGR = 'Strategy'
+vpGR = 'Volume Profile'
+flGR = 'Risk Management'
+
+vpLN   = input.int(60, 'VP Lookback', minval = 20, maxval = 500, step = 10, group = vpGR)
+vpVA   = input.float(68, 'Value Area %', minval = 50, maxval = 90, group = vpGR) / 100
+atrLen = input.int(14, 'ATR Length', group = stGR)
+maxSL  = input.float(3.0, 'Max SL (ATR)', minval = 1.0, step = 0.5, group = flGR)
+cooldown = input.int(3, 'Cooldown Bars', minval = 0, maxval = 20, group = flGR,
+     tooltip = 'Minimum bars between trades to avoid overtrading.')
+longOnly = input.bool(false, 'Long Only', group = flGR)
+
+//-----------------------------------------------------------------------------}
+// Core: Rolling VWAP as POC proxy + Volume-Weighted StdDev for VA
+//-----------------------------------------------------------------------------{
+
+float sumPV  = math.sum(hlc3 * volume, vpLN)
+float sumV   = math.sum(volume, vpLN)
+float poc    = sumV > 0 ? sumPV / sumV : na
+
+float sumPV2 = math.sum(hlc3 * hlc3 * volume, vpLN)
+float vwVar  = sumV > 0 ? sumPV2 / sumV - poc * poc : na
+float vwStd  = not na(vwVar) and vwVar > 0 ? math.sqrt(vwVar) : na
+
+// k mapping: VA% → standard deviations
+float k = vpVA <= 0.5 ? vpVA * 1.35 :
+     vpVA <= 0.68 ? 0.67 + (vpVA - 0.5) * 1.83 :
+     vpVA <= 0.80 ? 1.0 + (vpVA - 0.68) * 2.33 :
+     vpVA <= 0.95 ? 1.28 + (vpVA - 0.80) * 2.47 : 2.0
+
+float vaH = not na(poc) and not na(vwStd) ? poc + k * vwStd : na
+float vaL = not na(poc) and not na(vwStd) ? poc - k * vwStd : na
+
+float pHST = ta.highest(high, vpLN)
+float pLST = ta.lowest(low, vpLN)
+vaH := not na(vaH) ? math.min(vaH, pHST) : na
+vaL := not na(vaL) ? math.max(vaL, pLST) : na
+
+float atr = ta.atr(atrLen)
+
+//-----------------------------------------------------------------------------}
+// Institutional Signal Logic
+//
+// 機構 VP 交易的三個核心原則：
+// 1. Market State（市場狀態）：價格在 VA 內 = 平衡，VA 外 = 失衡
+// 2. Auction Theory（拍賣理論）：失衡後回歸 VA = 均值回歸機會
+// 3. Volume Confirmation（量能確認）：突破/回歸需要成交量驗證
+//-----------------------------------------------------------------------------{
+
+// === Market State Detection ===
+bool inVA     = close > vaL and close < vaH          // 在 Value Area 內（平衡）
+bool aboveVA  = close > vaH                           // 在 VA 上方（失衡偏多）
+bool belowVA  = close < vaL                           // 在 VA 下方（失衡偏空）
+
+// === Volume Context ===
+float volSMA  = ta.sma(volume, 21)
+float volRatio = volSMA > 0 ? volume / volSMA : 0
+bool  highVol  = volRatio > 1.2                        // 放量（>120% 均量）
+bool  lowVol   = volRatio < 0.8                        // 縮量
+bool  climaxVol = volRatio > 2.5                       // 爆量（可能是衰竭）
+
+// === Price Action Context ===
+float bodySize = math.abs(close - open)
+float wickUp   = high - math.max(close, open)
+float wickDn   = math.min(close, open) - low
+float totalRange = high - low
+bool  bullClose = close > open
+bool  bearClose = close < open
+
+// Rejection wicks: 長影線代表該方向被拒絕
+bool bullRejection = totalRange > 0 and wickDn > bodySize * 1.5 and wickDn > wickUp * 2 and bullClose
+bool bearRejection = totalRange > 0 and wickUp > bodySize * 1.5 and wickUp > wickDn * 2 and bearClose
+
+// === POC Slope: 判斷 VP 結構是否在移動 ===
+float pocSlope = poc - poc[5]
+bool  pocRising  = pocSlope > atr * 0.1
+bool  pocFalling = pocSlope < -atr * 0.1
+
+// === Cooldown: 避免連續交易 ===
+var int lastTradeBar = 0
+bool cooledDown = bar_index - lastTradeBar > cooldown
+
+//-----------------------------------------------------------------------------}
+// Signal 1: VA Rejection (均值回歸)
+//
+// 邏輯：價格試探 VA 邊界但被拒絕 → 回歸 POC
+// 機構觀點：VA 邊界是「公允價值」的邊緣，
+//          被拒絕代表市場不接受更極端的定價
+//-----------------------------------------------------------------------------{
+
+// Long: 價格下探 VAL 被拒絕（長下影線 + 收陽 + 放量）
+bool sig1_long = close > vaL and close < poc and
+     bullRejection and highVol and
+     low <= vaL + atr * 0.3 and
+     not pocFalling and cooledDown
+
+// Short: 價格上探 VAH 被拒絕（長上影線 + 收陰 + 放量）
+bool sig1_short = close < vaH and close > poc and
+     bearRejection and highVol and
+     high >= vaH - atr * 0.3 and
+     not pocRising and cooledDown and not longOnly
+
+//-----------------------------------------------------------------------------}
+// Signal 2: Failed Auction (失敗拍賣)
+//
+// 邏輯：價格突破 VA 但無法維持 → 快速回歸
+// 機構觀點：突破後縮量回落 = 假突破，
+//          機構在利用散戶的突破追單來出貨/建倉
+//-----------------------------------------------------------------------------{
+
+// Long: 前一天跌破 VAL，今天放量收回 VA 內
+bool brokeBelow = low[1] < vaL[1] and close[1] < vaL[1]
+bool sig2_long  = brokeBelow and close > vaL and bullClose and
+     highVol and cooledDown
+
+// Short: 前一天突破 VAH，今天放量壓回 VA 內
+bool brokeAbove = high[1] > vaH[1] and close[1] > vaH[1]
+bool sig2_short = brokeAbove and close < vaH and bearClose and
+     highVol and cooledDown and not longOnly
+
+//-----------------------------------------------------------------------------}
+// Signal 3: VA Breakout + Retest (突破回踩)
+//
+// 邏輯：價格突破 VA → 回踩 VA 邊界 → 邊界從阻力變支撐
+// 機構觀點：這是最經典的機構建倉模式，
+//          突破確認新方向，回踩提供低風險進場點
+//-----------------------------------------------------------------------------{
+
+// 追蹤是否已經突破 VA
+var bool confirmedBreakAbove = false
+var bool confirmedBreakBelow = false
+
+if close > vaH and close[1] > vaH[1] and highVol[1]
+    confirmedBreakAbove := true
+    confirmedBreakBelow := false
+if close < vaL and close[1] < vaL[1] and highVol[1]
+    confirmedBreakBelow := true
+    confirmedBreakAbove := false
+if inVA
+    confirmedBreakAbove := false
+    confirmedBreakBelow := false
+
+// Long: 已確認向上突破 → 回踩 VAH（原阻力變支撐）→ 反彈
+bool sig3_long = confirmedBreakAbove and
+     low <= vaH + atr * 0.3 and close > vaH and
+     bullClose and not lowVol and cooledDown
+
+// Short: 已確認向下突破 → 回踩 VAL（原支撐變阻力）→ 續跌
+bool sig3_short = confirmedBreakBelow and
+     high >= vaL - atr * 0.3 and close < vaL and
+     bearClose and not lowVol and cooledDown and not longOnly
+
+//-----------------------------------------------------------------------------}
+// Execution
+//-----------------------------------------------------------------------------{
+
+bool goLong  = strategy.position_size == 0 and bar_index >= vpLN and not na(atr) and
+     (sig1_long or sig2_long or sig3_long)
+bool goShort = strategy.position_size == 0 and bar_index >= vpLN and not na(atr) and
+     (sig1_short or sig2_short or sig3_short)
+
+// 動態止盈止損：根據信號類型調整
+if goLong
+    lastTradeBar := bar_index
+
+    string sigName = sig1_long ? 'VA Rejection' : sig2_long ? 'Failed Auction' : 'Breakout Retest'
+    alert(syminfo.ticker + ' LONG (' + sigName + ') @ ' + str.tostring(close, format.mintick) + ' | TP: ' + str.tostring(sig3_long ? poc + 2 * (vaH - poc) : vaH, format.mintick) + ' | SL: ' + str.tostring(sig1_long ? math.max(vaL - atr * 0.5, close - atr * maxSL) : sig2_long ? math.max(low[1] - atr * 0.3, close - atr * maxSL) : math.max(vaH - atr * 0.5, close - atr * maxSL), format.mintick), alert.freq_once_per_bar)
+
+    float tp = sig3_long ? poc + 2 * (vaH - poc) :  // 突破回踩：目標更遠
+               vaH                                    // VA 內信號：目標 VAH
+    float sl = sig1_long ? math.max(vaL - atr * 0.5, close - atr * maxSL) :
+               sig2_long ? math.max(low[1] - atr * 0.3, close - atr * maxSL) :
+               math.max(vaH - atr * 0.5, close - atr * maxSL)
+
+    strategy.entry('Long', strategy.long)
+    strategy.exit('L Exit', 'Long', limit = tp, stop = sl)
+
+if goShort
+    lastTradeBar := bar_index
+
+    string sigName = sig1_short ? 'VA Rejection' : sig2_short ? 'Failed Auction' : 'Breakout Retest'
+    alert(syminfo.ticker + ' SHORT (' + sigName + ') @ ' + str.tostring(close, format.mintick) + ' | TP: ' + str.tostring(sig3_short ? poc - 2 * (poc - vaL) : vaL, format.mintick) + ' | SL: ' + str.tostring(sig1_short ? math.min(vaH + atr * 0.5, close + atr * maxSL) : sig2_short ? math.min(high[1] + atr * 0.3, close + atr * maxSL) : math.min(vaL + atr * 0.5, close + atr * maxSL), format.mintick), alert.freq_once_per_bar)
+
+    float tp = sig3_short ? poc - 2 * (poc - vaL) :
+               vaL
+    float sl = sig1_short ? math.min(vaH + atr * 0.5, close + atr * maxSL) :
+               sig2_short ? math.min(high[1] + atr * 0.3, close + atr * maxSL) :
+               math.min(vaL + atr * 0.5, close + atr * maxSL)
+
+    strategy.entry('Short', strategy.short)
+    strategy.exit('S Exit', 'Short', limit = tp, stop = sl)
+
+// Climax volume exit: 爆量可能是趨勢衰竭，提前出場
+if climaxVol and strategy.position_size != 0
+    strategy.close_all('Climax Vol')
+    lastTradeBar := bar_index
+    alert(syminfo.ticker + ' CLIMAX VOL EXIT @ ' + str.tostring(close, format.mintick) + ' | Vol Ratio: ' + str.tostring(volRatio, '#.#') + 'x', alert.freq_once_per_bar)
+
+//-----------------------------------------------------------------------------}
+// Plots
+//-----------------------------------------------------------------------------{
+
+pPOC = plot(poc, 'POC', color.new(#f44336, 20), 2)
+pVAH = plot(vaH, 'VAH', color.new(#2962ff, 20), 1)
+pVAL = plot(vaL, 'VAL', color.new(#2962ff, 20), 1)
+fill(pVAH, pVAL, color.new(#2962ff, 93), title = 'Value Area')
+
+// Signal markers with labels
+plotshape(sig1_long  and goLong, 'VA Reject L',   shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.small, text = 'REJ')
+plotshape(sig2_long  and goLong, 'Failed Auc L',  shape.triangleup,   location.belowbar, color.new(#00bcd4, 0), size = size.small, text = 'FA')
+plotshape(sig3_long  and goLong, 'Retest L',      shape.triangleup,   location.belowbar, color.new(#4caf50, 0), size = size.small, text = 'RT')
+plotshape(sig1_short and goShort, 'VA Reject S',  shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.small, text = 'REJ')
+plotshape(sig2_short and goShort, 'Failed Auc S', shape.triangledown, location.abovebar, color.new(#ff9800, 0), size = size.small, text = 'FA')
+plotshape(sig3_short and goShort, 'Retest S',     shape.triangledown, location.abovebar, color.new(#e91e63, 0), size = size.small, text = 'RT')
+
+bool wasLong  = strategy.position_size[1] > 0 and strategy.position_size <= 0
+bool wasShort = strategy.position_size[1] < 0 and strategy.position_size >= 0
+plotshape(wasLong,  'Exit L', shape.xcross, location.abovebar, color.new(#26a69a, 0), size = size.tiny, text = '✕')
+plotshape(wasShort, 'Exit S', shape.xcross, location.belowbar, color.new(#ef5350, 0), size = size.tiny, text = '✕')
+
+// Volume ratio background
+bgcolor(climaxVol ? color.new(#ff5722, 90) : na, title = 'Climax Volume')
+
+//-----------------------------------------------------------------------------}
