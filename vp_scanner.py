@@ -27,7 +27,7 @@ from pathlib import Path
 # ─── Config ──────────────────────────────────────────────────────────────────
 
 CONFIG = {
-    "symbols": ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL"],
+    "symbols": ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "NOW", "CRWV"],
     "vp_lookback": 60,
     "va_pct": 0.68,
     "atr_len": 14,
