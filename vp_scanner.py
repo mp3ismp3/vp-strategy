@@ -243,53 +243,69 @@ def send_telegram(message):
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 
+def scan_symbol(symbol, cfg, lookbacks, state, today):
+    """Download once, detect signals for multiple lookbacks."""
+    results = {lb: [] for lb in lookbacks}
+    try:
+        df = yf.download(symbol, period="1y", interval="1d", progress=False)
+        if df.empty:
+            return results
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        for lb in lookbacks:
+            if len(df) < lb + 5:
+                continue
+            cooldown_key = f"{symbol}_{lb}"
+            if not check_cooldown(cooldown_key, state, cfg["cooldown_bars"]):
+                continue
+            cfg_copy = dict(cfg, vp_lookback=lb)
+            for sig in detect_signals(df, cfg_copy):
+                direction, name, price, tp, sl = sig
+                results[lb].append((symbol, direction, name, price, tp, sl))
+                state[cooldown_key] = today
+    except Exception as e:
+        print(f"Error scanning {symbol}: {e}")
+    return results
+
+
+def format_signals(signals, lookback):
+    """Format signals into a message block."""
+    if not signals:
+        return f"\n<b>📏 {lookback}D Lookback</b>\n✅ No signals\n"
+
+    lines = [f"\n<b>📏 {lookback}D Lookback</b>\n"]
+    for symbol, direction, name, price, tp, sl in signals:
+        emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "⚠️"
+        lines.append(f"{emoji} <b>{symbol}</b> {direction} ({name})")
+        if direction == "WARNING":
+            lines.append(f"   Price: {price:.2f} | Vol Ratio: {sl:.1f}x\n")
+        else:
+            lines.append(f"   Entry: {price:.2f} | TP: {tp:.2f} | SL: {sl:.2f}\n")
+    return "\n".join(lines)
+
+
 def main():
     cfg = CONFIG
     state = load_state()
     today = datetime.now().strftime("%Y-%m-%d")
-    all_signals = []
+    lookbacks = [60, 120]
 
-    print(f"[{today}] Scanning {len(cfg['symbols'])} symbols...")
+    print(f"[{today}] Scanning {len(cfg['symbols'])} symbols (60D + 120D)...")
 
+    sig = {lb: [] for lb in lookbacks}
     for symbol in cfg["symbols"]:
-        try:
-            df = yf.download(symbol, period="6mo", interval="1d", progress=False)
-            if df.empty or len(df) < cfg["vp_lookback"] + 5:
-                continue
+        res = scan_symbol(symbol, cfg, lookbacks, state, today)
+        for lb in lookbacks:
+            sig[lb].extend(res[lb])
 
-            # Flatten MultiIndex columns if present
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
+    msg = f"<b>📊 VP Signals — {today}</b>\n"
+    msg += f"Scanned {len(cfg['symbols'])} symbols\n"
+    for lb in lookbacks:
+        msg += format_signals(sig[lb], lb)
 
-            if not check_cooldown(symbol, state, cfg["cooldown_bars"]):
-                continue
-
-            signals = detect_signals(df, cfg)
-            for sig in signals:
-                direction, name, price, tp, sl = sig
-                all_signals.append((symbol, direction, name, price, tp, sl))
-                state[symbol] = today
-
-        except Exception as e:
-            print(f"Error scanning {symbol}: {e}")
-
-    # Send alerts
-    if all_signals:
-        lines = [f"<b>📊 VP Signals — {today}</b>\n"]
-        for symbol, direction, name, price, tp, sl in all_signals:
-            emoji = "🟢" if direction == "LONG" else "🔴" if direction == "SHORT" else "⚠️"
-            lines.append(f"{emoji} <b>{symbol}</b> {direction} ({name})")
-            if direction == "WARNING":
-                lines.append(f"   Price: {price:.2f} | Vol Ratio: {sl:.1f}x\n")
-            else:
-                lines.append(f"   Entry: {price:.2f} | TP: {tp:.2f} | SL: {sl:.2f}\n")
-        msg = "\n".join(lines)
-        send_telegram(msg)
-        print(msg)
-    else:
-        msg = f"📊 VP Scanner — {today}\n\nScanned {len(cfg['symbols'])} symbols.\n✅ No signals today."
-        send_telegram(msg)
-        print("No signals today.")
+    send_telegram(msg)
+    print(msg)
 
     save_state(state)
 
