@@ -27,7 +27,22 @@ from pathlib import Path
 # ─── Config ──────────────────────────────────────────────────────────────────
 
 CONFIG = {
-    "symbols": ["SPY", "QQQ", "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "NOW", "CRWV"],
+    "symbols": [
+        # Mega Cap Tech
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
+        # Semiconductor / AI Chips
+        "AVGO", "AMD", "INTC", "QCOM", "MU", "MRVL", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON",
+        # AI / Cloud / Software
+        "NOW", "CRWV", "PLTR", "AI", "SNOW", "DDOG", "NET", "MDB", "PANW", "CRWD", "ZS", "FTNT",
+        # Cloud Infrastructure
+        "CRM", "ORCL", "IBM", "ADBE", "INTU", "WDAY", "TEAM", "HUBS",
+        # AI Hardware / Robotics
+        "DELL", "HPE", "SMCI", "VRT", "ANET",
+        # ETFs
+        "SPY", "QQQ",
+        # Misc Tech / AI Adjacent
+        "UBER", "SQ", "SHOP", "COIN",
+    ],
     "vp_lookback": 60,
     "va_pct": 0.68,
     "atr_len": 14,
