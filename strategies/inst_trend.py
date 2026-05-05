@@ -37,6 +37,14 @@ def _volume_on_breakout(df, vol_ma_len=21):
     return float(df["Volume"].iloc[-1] / vol_ma) > 1.5
 
 
+def _volume_confirmation(df, vol_ma_len=21):
+    """Volume confirmation as directional string for scoring compatibility."""
+    if not _volume_on_breakout(df, vol_ma_len):
+        return "neutral"
+    structure = _market_structure(df)
+    return structure if structure != "neutral" else "neutral"
+
+
 def _vwap_bias(df, lookback=20):
     """Price vs VWAP. Returns: 'bullish', 'bearish', or 'neutral'."""
     vwap = calc_vwap(df, lookback)
@@ -109,6 +117,7 @@ def calc_institutional_trend(df):
     """
     components = {
         "market_structure": _market_structure(df),
+        "volume_confirm": _volume_confirmation(df),
         "volume_breakout": _volume_on_breakout(df),
         "vwap_bias": _vwap_bias(df),
         "pullback_holds": _pullback_holds(df),
