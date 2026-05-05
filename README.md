@@ -16,11 +16,26 @@
 ## 檔案結構
 
 ```
-vp_scanner.py                        # 自動掃描 + 信心評分 + Telegram 通知
+scanner.py                           # 主程式入口
+config.py                            # 全域設定、symbol 清單、板塊映射
+core/
+├── data.py                          # 數據下載 + cache
+├── indicators.py                    # 共用指標（VP、ATR、VWAP、Delta、Swing）
+└── market_context.py                # 市場環境（VIX、SPY、板塊動能）
+strategies/
+├── __init__.py                      # BaseStrategy + Signal dataclass
+├── vp_signals.py                    # VP 三大信號
+└── inst_trend.py                    # 機構趨勢指標（4 維度）
+scoring/
+└── confidence.py                    # 信心評分引擎
+notifications/
+├── telegram.py                      # Telegram 通知
+└── webhook.py                       # Webhook（未來 API 擴展）
+tests/                               # 測試
+.github/workflows/
+├── vp_scanner.yml                   # 每日排程
+└── tests.yml                        # CI 測試
 volume_profile_strategy.pine         # TradingView Pine Script 指標
-test_vp_scanner.py                   # 測試（26 個 test cases）
-.github/workflows/vp_scanner.yml    # GitHub Actions 每日排程
-.github/workflows/tests.yml         # CI 測試（push/PR 自動執行）
 ```
 
 ## 掃描標的
@@ -55,7 +70,7 @@ test_vp_scanner.py                   # 測試（26 個 test cases）
 | 大盤配合 | SPY VA 狀態支持信號方向 | +1 |
 | VIX 環境 | 均值回歸信號 VIX≥20 / 突破信號 VIX<20 | +1 |
 | 量能強度 | Volume > 1.5x 均量 | +1 |
-| POC/趨勢對齊 | POC 20日斜率方向配合 | +1 |
+| POC/趨勢對齊 | 機構趨勢指標方向配合（Market Structure + Liquidity Sweep + Volume + VWAP） | +1 |
 | 板塊動能 | 所屬板塊 ETF 10日動能配合 | +1 |
 | 60D/120D 同方向 | 兩個 lookback 出現同方向信號 | +1 |
 | Delta 方向 | 近10日買賣壓方向配合 | +1 |
@@ -84,13 +99,13 @@ test_vp_scanner.py                   # 測試（26 個 test cases）
 pip install yfinance requests pandas numpy
 export TELEGRAM_BOT_TOKEN="your_token"
 export TELEGRAM_CHAT_ID="your_chat_id"
-python vp_scanner.py
+python scanner.py
 ```
 
 **Dry Run（不發送 Telegram）**：
 
 ```bash
-python vp_scanner.py --dry-run
+python scanner.py --dry-run
 ```
 
 ## 通知範例
