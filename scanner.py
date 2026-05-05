@@ -75,7 +75,7 @@ def scan_symbol(symbol, df, cfg, lookbacks, state, today, market_ctx):
 
         # Calculate factors once per symbol
         if factors_cache is None:
-            factors_cache = calc_stock_factors(df, symbol, cfg_copy)
+            factors_cache = calc_stock_factors(df, symbol, cfg_copy, market_ctx)
 
         for sig in signals:
             results[lb].append((sig, factors_cache))
@@ -128,8 +128,13 @@ def format_signals(signals, lookback):
             stars = "⭐" * score
             lines.append(f"{emoji} <b>{sig.symbol}</b> {sig.direction} ({sig_label}) {stars} ({score}/5)")
             lines.append(f"   Entry: {sig.entry:.2f} | TP: {sig.tp:.2f} | SL: {sig.sl:.2f}")
-            parts = [f"{k}{v}" for k, v in details.items()]
-            lines.append(f"   📊 {' '.join(parts)}\n")
+            must = " ".join(f"{k}{v}" for k, v in details.items() if k in ("量能", "趨勢", "Regime"))
+            bonus = " ".join(f"{k}{v}" for k, v in details.items() if k not in ("量能", "趨勢", "Regime"))
+            lines.append(f"   🔑 {must}")
+            if bonus:
+                lines.append(f"   📊 {bonus}\n")
+            else:
+                lines.append("")
 
     return "\n".join(lines)
 

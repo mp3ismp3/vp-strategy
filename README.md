@@ -13,6 +13,54 @@
 
 每個交易信號附帶 Entry、TP、SL，並分 **60D**（波段）和 **120D**（中長線）兩組 lookback 顯示。
 
+### 動態 TP（根據 VIX 調整）
+
+TP 距離根據波動率環境動態調整：
+
+| VIX 水位 | TP 倍數 | 邏輯 |
+|---|---|---|
+| VIX ≥ 25 | 0.8x | 高波動，提早獲利 |
+| 15 < VIX < 25 | 1.0x | 正常 |
+| VIX ≤ 15 | 1.3x | 低波動趨勢明確，讓利潤跑 |
+
+## 機構趨勢指標 (Institutional Trend)
+
+判斷整體方向性偏差，用於信心評分。採用**階層式邏輯**（模擬機構決策流程）：
+
+### 決策流程
+
+```
+1. 結構突破了嗎？（close > swing high / < swing low）
+   └─ 沒有 → NEUTRAL，不論其他條件
+   
+2. 突破有量嗎？（volume > 1.5x 均量）
+   └─ 沒有 → NEUTRAL（結構突破但無量 = 弱信號）
+   └─ 有 → 確認方向，進入加分階段
+
+3. 加分條件：
+   ├─ VWAP 配合？（收盤在 VWAP 正確側）→ +1
+   ├─ 回踩守住？（pullback 不破突破點）→ +1
+   └─ 流動性掃描？（掃完 swing point 反轉）→ +1
+```
+
+### 判定標準
+
+| 條件 | 結果 |
+|---|---|
+| 結構突破 + 放量（score ≥ 2） | **BULLISH / BEARISH** |
+| 結構突破但無量（score = 1） | NEUTRAL |
+| 無結構突破 | NEUTRAL |
+
+### 各維度說明
+
+| 維度 | Bullish 條件 | Bearish 條件 |
+|---|---|---|
+| **Market Structure** | close > swing high | close < swing low |
+| **Volume** | 當天量 > 1.5x 均量 | 同 |
+| **VWAP Bias** | close > 20日 VWAP | close < 20日 VWAP |
+| **Pullback Holds** | 回踩低點守住 swing high（±0.5%） | 反彈高點壓在 swing low 下 |
+| **Liquidity Sweep** | 掃過 swing low 後收回上方 | 掃過 swing high 後收回下方 |
+
 ## 檔案結構
 
 ```
@@ -65,19 +113,32 @@ volume_profile_strategy.pine         # TradingView Pine Script 指標
 
 ### 評分因子
 
+**🔑 Must-have（Gate，未通過會限制最高分）：**
+
+| 信號類型 | Gate 條件 | 未通過結果 |
+|---|---|---|
+| VA Rejection / Failed Auction | 量能 >1.5x + Regime=Range | 0 過→cap 2, 1 過→cap 3 |
+| Breakout Retest | 量能 >1.5x + 趨勢 BULLISH/BEARISH | 0 過→cap 2, 1 過→cap 3 |
+| 任何信號 + Expansion | — | 強制 cap 2 |
+
+**📊 Nice-to-have（加分項）：**
+
 | 因子 | 條件 | 分數 |
 |---|---|---|
+| VIX | VIX < 20（低波動穩定環境） | +1 |
 | 大盤配合 | SPY VA 狀態支持信號方向 | +1 |
-| VIX 環境 | 均值回歸信號 VIX≥20 / 突破信號 VIX<20 | +1 |
-| 量能強度 | Volume > 1.5x 均量 | +1 |
-| POC/趨勢對齊 | 機構趨勢指標方向配合（Market Structure + Liquidity Sweep + Volume + VWAP） | +1 |
 | 板塊動能 | 所屬板塊 ETF 10日動能配合 | +1 |
 | 60D/120D 同方向 | 兩個 lookback 出現同方向信號 | +1 |
 | Delta 方向 | 近10日買賣壓方向配合 | +1 |
+
+**⚠️ Penalty：**
+
+| 因子 | 條件 | 分數 |
+|---|---|---|
 | 財報前 3 天 | 接近財報日，VP 結構可能失效 | -1 |
 | VA 過窄 | (VAH-VAL)/ATR < 1.5，方向不明 | -1 |
 
-總分 clamp 至 1-5 分（最高 7 分加分 - 最多 2 分扣分，限制在 1~5 範圍）。
+總分 clamp 至 1-5 分。
 
 ### 使用建議
 
