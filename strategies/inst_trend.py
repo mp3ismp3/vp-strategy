@@ -161,11 +161,9 @@ def calc_institutional_trend(df):
 
 
 class InstitutionalTrend(BaseStrategy):
-    """Institutional trend is not a trade signal generator —
-    it provides directional bias used by the scoring engine."""
+    """Institutional trend provides directional bias for scoring.
+    BOS detection is used as a scoring bonus, not a standalone signal."""
     name = "InstitutionalTrend"
 
     def detect(self, df, cfg, market_ctx) -> list:
-        # This strategy doesn't emit trade signals directly.
-        # It's consumed by the scoring engine via calc_institutional_trend().
         return []

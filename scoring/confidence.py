@@ -20,7 +20,7 @@ def calc_stock_factors(df, symbol, cfg):
     if vp and atr and atr > 0:
         factors["va_narrow"] = (vp["vah"] - vp["val"]) / atr < 1.5
 
-    # Institutional trend (replaces simple POC slope)
+    # Institutional trend (includes BOS via market_structure)
     trend = calc_institutional_trend(df)
     factors["inst_trend"] = trend["direction"]
     factors["inst_trend_score"] = trend["score"]
