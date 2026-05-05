@@ -152,18 +152,24 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
             gate_count += 1
         elif regime == "trend":
             pass  # Not ideal but not blocked (VA as pullback)
-        # expansion: no gate credit (VP unreliable)
+        # Trend alignment bonus for mean-reversion signals
+        if (is_long and trend == "BULLISH") or (not is_long and trend == "BEARISH"):
+            details["趨勢"] = f"{trend}✅"
+        else:
+            details["趨勢"] = f"{trend}❌"
 
     # ═══ NICE-TO-HAVE (Bonus conditions) ═══
 
-    # 3. VIX environment (low VIX = stable environment)
+    # 3. VIX environment (signal-type aware)
     vix = market_ctx.get("vix")
     if vix is not None:
-        if vix < 20:
+        is_mean_reversion = sig_name in ("VP: VA Rejection", "VP: Failed Auction")
+        vix_good = (is_mean_reversion and vix >= 20) or (not is_mean_reversion and vix < 20)
+        if vix_good:
             score += 1
-            details["VIX"] = f"{vix:.0f}✅"
+            details["VIX"] = "✅"
         else:
-            details["VIX"] = f"{vix:.0f}❌"
+            details["VIX"] = "❌"
     else:
         details["VIX"] = "—"
 
@@ -201,7 +207,15 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
     else:
         details["Delta"] = f"{'偏多' if delta > 0 else '偏空'}❌"
 
-    # ═══ PENALTY ═══
+    # ═══ GATE: cap score (before penalties) ═══
+    if regime == "expansion":
+        score = min(score, 2)
+    elif gate_count == 0:
+        score = min(score, 2)
+    elif gate_count == 1:
+        score = min(score, 3)
+
+    # ═══ PENALTY (applied after cap so they always bite) ═══
 
     # -1: Earnings within 3 days
     ed = factors["earnings_days"]
@@ -215,15 +229,6 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
     if factors["va_narrow"]:
         score -= 1
         details["VA窄"] = "⚠️"
-
-    # ═══ GATE: cap score ═══
-    if regime == "expansion":
-        # Expansion: VP signals unreliable, hard cap
-        score = min(score, 2)
-    elif gate_count == 0:
-        score = min(score, 2)
-    elif gate_count == 1:
-        score = min(score, 3)
 
     score = max(1, min(5, score))
     return score, details
