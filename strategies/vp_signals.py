@@ -7,6 +7,17 @@ from core.indicators import calc_vp, calc_atr
 class VPSignals(BaseStrategy):
     name = "VP"
 
+    def _vix_tp_multiplier(self, market_ctx):
+        """Adjust TP distance based on VIX environment."""
+        vix = market_ctx.get("vix") if market_ctx else None
+        if vix is None:
+            return 1.0
+        if vix >= 25:
+            return 0.8  # High vol: tighter TP (take profit sooner)
+        elif vix <= 15:
+            return 1.3  # Low vol: wider TP (let it run)
+        return 1.0
+
     def detect(self, df, cfg, market_ctx) -> list:
         if len(df) < cfg["vp_lookback"] + 5:
             return []
@@ -43,24 +54,29 @@ class VPSignals(BaseStrategy):
 
         signals = []
         symbol = df.attrs.get("symbol", "")
+        m = self._vix_tp_multiplier(market_ctx)
 
         # Signal 1: VA Rejection
         if c > val and c < poc and bull_rejection and high_vol and l <= val + atr * 0.3 and not poc_falling:
             sl = max(val - atr * 0.5, c - atr * cfg["max_sl_atr"])
-            signals.append(Signal(symbol, "LONG", "VP: VA Rejection", c, vah, sl))
+            tp = c + (vah - c) * m
+            signals.append(Signal(symbol, "LONG", "VP: VA Rejection", c, tp, sl))
         if not cfg["long_only"]:
             if c < vah and c > poc and bear_rejection and high_vol and h >= vah - atr * 0.3 and not poc_rising:
                 sl = min(vah + atr * 0.5, c + atr * cfg["max_sl_atr"])
-                signals.append(Signal(symbol, "SHORT", "VP: VA Rejection", c, val, sl))
+                tp = c - (c - val) * m
+                signals.append(Signal(symbol, "SHORT", "VP: VA Rejection", c, tp, sl))
 
         # Signal 2: Failed Auction
         if pl < val and pc < val and c > val and bull_close and high_vol:
             sl = max(pl - atr * 0.3, c - atr * cfg["max_sl_atr"])
-            signals.append(Signal(symbol, "LONG", "VP: Failed Auction", c, vah, sl))
+            tp = c + (vah - c) * m
+            signals.append(Signal(symbol, "LONG", "VP: Failed Auction", c, tp, sl))
         if not cfg["long_only"]:
             if ph > vah and pc > vah and c < vah and bear_close and high_vol:
                 sl = min(ph + atr * 0.3, c + atr * cfg["max_sl_atr"])
-                signals.append(Signal(symbol, "SHORT", "VP: Failed Auction", c, val, sl))
+                tp = c - (c - val) * m
+                signals.append(Signal(symbol, "SHORT", "VP: Failed Auction", c, tp, sl))
 
         # Signal 3: Breakout Retest
         confirmed_above, confirmed_below = False, False
@@ -76,11 +92,13 @@ class VPSignals(BaseStrategy):
                 confirmed_above = confirmed_below = False
 
         if confirmed_above and l <= vah + atr * 0.3 and c > vah and bull_close and not low_vol:
-            tp = poc + 2 * (vah - poc)
+            base_tp = poc + 2 * (vah - poc)
+            tp = c + (base_tp - c) * m
             sl = max(vah - atr * 0.5, c - atr * cfg["max_sl_atr"])
             signals.append(Signal(symbol, "LONG", "VP: Breakout Retest", c, tp, sl))
         if not cfg["long_only"] and confirmed_below and h >= val - atr * 0.3 and c < val and bear_close and not low_vol:
-            tp = poc - 2 * (poc - val)
+            base_tp = poc - 2 * (poc - val)
+            tp = c - (c - base_tp) * m
             sl = min(val + atr * 0.5, c + atr * cfg["max_sl_atr"])
             signals.append(Signal(symbol, "SHORT", "VP: Breakout Retest", c, tp, sl))
 

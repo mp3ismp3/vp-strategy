@@ -14,40 +14,68 @@ import numpy as np
 
 def _market_structure(df, lookback=20, swing_len=5):
     """Determine market structure from swing points.
+    Includes Break of Structure (BOS) detection for early trend shifts.
     Returns: 'bullish', 'bearish', or 'neutral'."""
     swing_highs, swing_lows = find_swing_points(df.tail(lookback + swing_len * 2), swing_len)
     if len(swing_highs) < 2 or len(swing_lows) < 2:
+        # BOS detection: even with insufficient swings, check if price broke prior structure
+        if len(swing_highs) >= 1 and len(swing_lows) >= 1:
+            last_close = float(df["Close"].iloc[-1])
+            # Broke above last swing high = partial bullish
+            if last_close > swing_highs[-1][1]:
+                return "bullish"
+            # Broke below last swing low = partial bearish
+            if last_close < swing_lows[-1][1]:
+                return "bearish"
         return "neutral"
-    # Check last two swing highs and lows
-    hh = swing_highs[-1][1] > swing_highs[-2][1]  # Higher High
-    hl = swing_lows[-1][1] > swing_lows[-2][1]    # Higher Low
-    lh = swing_highs[-1][1] < swing_highs[-2][1]  # Lower High
-    ll = swing_lows[-1][1] < swing_lows[-2][1]    # Lower Low
+
+    hh = swing_highs[-1][1] > swing_highs[-2][1]
+    hl = swing_lows[-1][1] > swing_lows[-2][1]
+    lh = swing_highs[-1][1] < swing_highs[-2][1]
+    ll = swing_lows[-1][1] < swing_lows[-2][1]
+
     if hh and hl:
         return "bullish"
     if lh and ll:
         return "bearish"
+
+    # BOS: price broke the last Lower High (bullish shift) or Higher Low (bearish shift)
+    last_close = float(df["Close"].iloc[-1])
+    if lh and last_close > swing_highs[-1][1]:
+        return "bullish"
+    if hl and last_close < swing_lows[-1][1]:
+        return "bearish"
+
     return "neutral"
 
 
 def _liquidity_sweep(df, lookback=20):
-    """Detect if recent price action swept prior liquidity.
+    """Detect if recent price action swept prior liquidity using swing points.
+    Uses swing highs/lows as key liquidity levels (not simple max/min).
     Returns: 'bull_sweep' (swept low then reversed up),
              'bear_sweep' (swept high then reversed down), or None."""
     if len(df) < lookback + 2:
         return None
-    recent = df.tail(lookback)
-    prior_high = recent["High"].iloc[:-2].max()
-    prior_low = recent["Low"].iloc[:-2].min()
+
+    # Use swing points as liquidity levels (more meaningful than raw max/min)
+    scan_df = df.tail(lookback)
+    swing_highs, swing_lows = find_swing_points(scan_df.iloc[:-2], lookback=3)
+
     last = df.iloc[-1]
     prev = df.iloc[-2]
 
-    # Bull sweep: price went below prior low then closed back above
-    if (prev["Low"] < prior_low or last["Low"] < prior_low) and last["Close"] > prior_low and last["Close"] > last["Open"]:
-        return "bull_sweep"
-    # Bear sweep: price went above prior high then closed back below
-    if (prev["High"] > prior_high or last["High"] > prior_high) and last["Close"] < prior_high and last["Close"] < last["Open"]:
-        return "bear_sweep"
+    # Bull sweep: price swept below a swing low then closed back above it
+    if swing_lows:
+        key_low = swing_lows[-1][1]  # Most recent swing low
+        if (prev["Low"] < key_low or last["Low"] < key_low) and last["Close"] > key_low and last["Close"] > last["Open"]:
+            return "bull_sweep"
+
+    # Bear sweep: price swept above a swing high then closed back below it
+    if swing_highs:
+        key_high = swing_highs[-1][1]  # Most recent swing high
+        if (prev["High"] > key_high or last["High"] > key_high) and last["Close"] < key_high and last["Close"] < last["Open"]:
+            return "bear_sweep"
+
     return None
 
 
