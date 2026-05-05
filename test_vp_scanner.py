@@ -111,10 +111,11 @@ class TestScoreSignal:
         assert details["VIX"] == "✅"
 
     def test_earnings_penalty(self):
-        factors = dict(self.good_factors, earnings_days=2)
-        score_with, details = vs.score_signal("LONG", "VA Rejection", factors, self.good_ctx, "SMH", True)
-        factors_no_earn = dict(self.good_factors, earnings_days=30)
-        score_without, _ = vs.score_signal("LONG", "VA Rejection", factors_no_earn, self.good_ctx, "SMH", True)
+        # Use factors that don't max out, so penalty is visible
+        mid_factors = dict(self.good_factors, earnings_days=2, vol_ratio=1.0, delta=-100)
+        score_with, details = vs.score_signal("LONG", "VA Rejection", mid_factors, self.good_ctx, "SMH", False)
+        mid_factors_no_earn = dict(mid_factors, earnings_days=30)
+        score_without, _ = vs.score_signal("LONG", "VA Rejection", mid_factors_no_earn, self.good_ctx, "SMH", False)
         assert score_with < score_without
         assert "⚠️" in details["財報"]
 
@@ -154,7 +155,7 @@ class TestDetectSignals:
         """If any signal is generated, it should be a 5-tuple."""
         df = make_df(200)
         # Force a climax volume on last bar
-        df.iloc[-1, df.columns.get_loc("Volume")] = df["Volume"].mean() * 3
+        df.iloc[-1, df.columns.get_loc("Volume")] = int(df["Volume"].mean() * 3)
         result = vs.detect_signals(df, {"vp_lookback": 60, "va_pct": 0.68, "atr_len": 14, "vol_ma_len": 21, "max_sl_atr": 3.0, "long_only": False})
         for sig in result:
             assert len(sig) == 5

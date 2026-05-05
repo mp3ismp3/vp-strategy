@@ -16,9 +16,11 @@
 ## 檔案結構
 
 ```
-vp_scanner.py                        # 自動掃描 + Telegram 通知
+vp_scanner.py                        # 自動掃描 + 信心評分 + Telegram 通知
 volume_profile_strategy.pine         # TradingView Pine Script 指標
+test_vp_scanner.py                   # 測試（26 個 test cases）
 .github/workflows/vp_scanner.yml    # GitHub Actions 每日排程
+.github/workflows/tests.yml         # CI 測試（push/PR 自動執行）
 ```
 
 ## 掃描標的
@@ -35,7 +37,18 @@ volume_profile_strategy.pine         # TradingView Pine Script 指標
 
 ## 信心評分系統 (Confidence Score)
 
-每個信號附帶 1-5 分的機構級信心評分：
+每個信號附帶 1-5 分的機構級信心評分，幫助判斷是否值得進場。
+
+### 設計理念
+
+機構交易者不會只看單一指標就進場，而是確認多個維度「對齊」後才行動。評分系統模擬這個決策流程：
+
+1. **大盤環境** — 順勢交易勝率更高，逆大盤方向的信號需要更多確認
+2. **波動率狀態** — 高 VIX 適合均值回歸（VA Rejection / Failed Auction），低 VIX 適合趨勢突破（Breakout Retest）
+3. **量價驗證** — 量能越大代表機構參與度越高，信號越可靠
+4. **多時間框架共識** — 60D 和 120D 同方向 = 短中期結構一致，信心更高
+
+### 評分因子
 
 | 因子 | 條件 | 分數 |
 |---|---|---|
@@ -49,7 +62,17 @@ volume_profile_strategy.pine         # TradingView Pine Script 指標
 | 財報前 3 天 | 接近財報日，VP 結構可能失效 | -1 |
 | VA 過窄 | (VAH-VAL)/ATR < 1.5，方向不明 | -1 |
 
-總分 clamp 至 1-5 分。
+總分 clamp 至 1-5 分（最高 7 分加分 - 最多 2 分扣分，限制在 1~5 範圍）。
+
+### 使用建議
+
+| 分數 | 建議操作 |
+|---|---|
+| ⭐⭐⭐⭐⭐ (5) | 高信心，正常倉位進場 |
+| ⭐⭐⭐⭐ (4) | 條件良好，可進場 |
+| ⭐⭐⭐ (3) | 及格，輕倉或等下一根 K 確認 |
+| ⭐⭐ (2) | 條件不足，建議觀望 |
+| ⭐ (1) | 多重矛盾，不進場 |
 
 ## 執行方式
 
