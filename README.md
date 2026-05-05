@@ -33,6 +33,24 @@ volume_profile_strategy.pine         # TradingView Pine Script 指標
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
 
+## 信心評分系統 (Confidence Score)
+
+每個信號附帶 1-5 分的機構級信心評分：
+
+| 因子 | 條件 | 分數 |
+|---|---|---|
+| 大盤配合 | SPY VA 狀態支持信號方向 | +1 |
+| VIX 環境 | 均值回歸信號 VIX≥20 / 突破信號 VIX<20 | +1 |
+| 量能強度 | Volume > 1.5x 均量 | +1 |
+| POC/趨勢對齊 | POC 20日斜率方向配合 | +1 |
+| 板塊動能 | 所屬板塊 ETF 10日動能配合 | +1 |
+| 60D/120D 同方向 | 兩個 lookback 出現同方向信號 | +1 |
+| Delta 方向 | 近10日買賣壓方向配合 | +1 |
+| 財報前 3 天 | 接近財報日，VP 結構可能失效 | -1 |
+| VA 過窄 | (VAH-VAL)/ATR < 1.5，方向不明 | -1 |
+
+總分 clamp 至 1-5 分。
+
 ## 執行方式
 
 **GitHub Actions（自動）**：每個交易日 UTC 21:05（美東收盤後）自動執行。
@@ -46,16 +64,23 @@ export TELEGRAM_CHAT_ID="your_chat_id"
 python vp_scanner.py
 ```
 
+**Dry Run（不發送 Telegram）**：
+
+```bash
+python vp_scanner.py --dry-run
+```
+
 ## 通知範例
 
 ```
 📊 VP Signals — 2026-05-04
-Scanned 52 symbols
+Scanned 52 symbols | VIX: 18.5 | SPY: in_va
 
 📏 60D Lookback
 
-🟢 NVDA LONG (VA Rejection)
+🟢 NVDA LONG (VA Rejection) ⭐⭐⭐⭐ (4/5)
    Entry: 125.30 | TP: 132.50 | SL: 121.80
+   📊 大盤✅ VIX❌ 量能1.8x✅ 趨勢✅ 板塊✅ 雙LB❌ Delta偏多✅
 
 📏 120D Lookback
 
