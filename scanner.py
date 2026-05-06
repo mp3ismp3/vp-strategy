@@ -113,28 +113,37 @@ def apply_scores(all_signals, market_ctx):
 
 def format_signals(signals, lookback):
     if not signals:
-        return f"\n<b>📏 {lookback}D Lookback</b>\n✅ No signals\n"
+        return f"\n{'─'*20}\n<b>📏 {lookback}D Lookback</b>\n✅ No signals\n"
 
-    lines = [f"\n<b>📏 {lookback}D Lookback</b>\n"]
+    lines = [f"\n{'─'*20}\n<b>📏 {lookback}D Lookback</b>\n"]
     for sig, score, details in signals:
         emoji = "🟢" if sig.direction == "LONG" else "🔴" if sig.direction == "SHORT" else "⚠️"
-        # Strip strategy prefix for display
         sig_label = sig.strategy.split(": ", 1)[-1] if ": " in sig.strategy else sig.strategy
 
         if sig.direction == "WARNING":
-            lines.append(f"{emoji} <b>{sig.symbol}</b> {sig.direction} ({sig_label})")
-            lines.append(f"   Price: {sig.entry:.2f} | Vol Ratio: {sig.sl:.1f}x\n")
+            lines.append(f"{emoji} <b>{sig.symbol}</b> — Climax Volume")
+            lines.append(f"   Price: {sig.entry:.2f} | Vol: {sig.sl:.1f}x avg\n")
         else:
             stars = "⭐" * score
-            lines.append(f"{emoji} <b>{sig.symbol}</b> {sig.direction} ({sig_label}) {stars} ({score}/5)")
-            lines.append(f"   Entry: {sig.entry:.2f} | TP: {sig.tp:.2f} | SL: {sig.sl:.2f}")
-            must = " ".join(f"{k}{v}" for k, v in details.items() if k in ("量能", "趨勢", "Regime"))
-            bonus = " ".join(f"{k}{v}" for k, v in details.items() if k not in ("量能", "趨勢", "Regime"))
-            lines.append(f"   🔑 {must}")
+            direction_zh = "做多" if sig.direction == "LONG" else "做空"
+            lines.append(f"{emoji} <b>{sig.symbol}</b> {direction_zh} ({sig_label}) {stars} ({score}/5)")
+            # R:R ratio
+            risk = abs(sig.entry - sig.sl)
+            reward = abs(sig.tp - sig.entry)
+            rr = f"{reward/risk:.1f}" if risk > 0 else "—"
+            lines.append(f"   ▸ Entry: <code>{sig.entry:.2f}</code>")
+            lines.append(f"   ▸ TP: <code>{sig.tp:.2f}</code> (+{reward:.2f})")
+            lines.append(f"   ▸ SL: <code>{sig.sl:.2f}</code> (-{risk:.2f})")
+            lines.append(f"   ▸ R:R = 1:{rr}")
+            # Gate + bonus on one line each
+            regime = details.get("Regime", "")
+            gate_keys = ("量能", "趨勢")
+            gate = " ".join(f"{k}{v}" for k, v in details.items() if k in gate_keys)
+            bonus = " ".join(f"{k}{v}" for k, v in details.items() if k not in gate_keys and k != "Regime")
+            lines.append(f"   🔑 {gate} | {regime}")
             if bonus:
-                lines.append(f"   📊 {bonus}\n")
-            else:
-                lines.append("")
+                lines.append(f"   📊 {bonus}")
+            lines.append("")
 
     return "\n".join(lines)
 
@@ -171,7 +180,10 @@ def main():
     msg = f"<b>📊 VP Signals — {today}</b>\n"
     msg += f"Scanned {len(SYMBOLS)} symbols"
     if market_ctx["vix"]:
-        msg += f" | VIX: {market_ctx['vix']:.1f} | SPY: {market_ctx['spy_state']}"
+        vix = market_ctx["vix"]
+        vix_emoji = "🟢" if vix < 15 else "🟡" if vix < 25 else "🔴"
+        spy_label = {"above_va": "Above VA ↑", "in_va": "In VA ↔", "below_va": "Below VA ↓"}.get(market_ctx["spy_state"], market_ctx["spy_state"])
+        msg += f"\n{vix_emoji} VIX: {vix:.1f} | SPY: {spy_label}"
     msg += "\n"
     for lb in lookbacks:
         msg += format_signals(scored[lb], lb)
