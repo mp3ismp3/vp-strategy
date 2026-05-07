@@ -207,6 +207,13 @@ def format_intraday(signals):
         lines.append(f"{emoji} <b>{symbol}</b> {dir_zh} ({sig_label}) [{lb}D] {stars} ({score}/5)")
         lines.append(f"   ▸ Entry: <code>{entry:.2f}</code> | TP: <code>{tp:.2f}</code> | SL: <code>{sl:.2f}</code>")
         lines.append(f"   ▸ R:R = 1:{rr}")
+        # Gate + bonus details
+        gate_keys = ("量能", "趨勢")
+        gate = " ".join(f"{k}{v}" for k, v in details.items() if k in gate_keys)
+        bonus = " ".join(f"{k}{v}" for k, v in details.items() if k not in gate_keys and k != "Regime")
+        lines.append(f"   🔑 {gate}")
+        if bonus:
+            lines.append(f"   📊 {bonus}")
         lines.append(f"   ⚠️ 盤中輕倉，收盤確認後加倉")
         lines.append("")
 
