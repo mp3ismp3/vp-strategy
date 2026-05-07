@@ -210,20 +210,35 @@ def main():
     import os
     if os.environ.get("GEMINI_API_KEY") and not DRY_RUN:
         print("\n  Running AI analysis...")
+        from core.indicators import calc_vp
+        from scoring.confidence import calc_stock_factors
+
         ai_inputs = []
         for lb in lookbacks:
             for sig, score, details in scored[lb]:
                 if sig.direction == "WARNING":
                     continue
-                # Find the df for this symbol
                 df = download_symbol(sig.symbol)
                 if df is None:
                     continue
+
+                vp = calc_vp(df, cfg["vp_lookback"], cfg["va_pct"])
+                factors = calc_stock_factors(df, sig.symbol, cfg, market_ctx)
+                factors["score_details"] = details
+
+                # Swing points
+                from core.indicators import find_swing_points
+                swings = find_swing_points(df)
+                factors["swing_points"] = {"high": f"{swings['high']:.2f}" if swings else "N/A",
+                                           "low": f"{swings['low']:.2f}" if swings else "N/A"} if swings else {}
+
                 ai_inputs.append({
                     "symbol": sig.symbol,
                     "df": df,
                     "signals": [{"direction": sig.direction, "type": sig.strategy,
-                                 "entry": sig.entry, "tp": sig.tp, "sl": sig.sl, "score": score}]
+                                 "entry": sig.entry, "tp": sig.tp, "sl": sig.sl, "score": score}],
+                    "vp_data": vp,
+                    "factors": factors,
                 })
 
         # Deduplicate by symbol (merge signals)

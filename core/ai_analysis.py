@@ -32,8 +32,8 @@ def calc_macd(df):
     return macd, signal
 
 
-def build_prompt(symbol, df, signals, market_ctx):
-    """Build analysis prompt with OHLCV + indicators."""
+def build_prompt(symbol, df, signals, market_ctx, vp_data=None, factors=None):
+    """Build analysis prompt with OHLCV + indicators + VP structure."""
     # Recent 20 days OHLCV
     recent = df.tail(20)
     ohlcv_str = "Date | Open | High | Low | Close | Volume\n"
@@ -57,6 +57,29 @@ EMA20: {ema20:.2f} | EMA50: {ema50:.2f} | 價格{'在EMA20上' if df['Close'].il
 ATR(14): {atr_val:.2f}
 成交量: {int(vol_today):,} ({'放量' if vol_today > vol_avg * 1.5 else '正常' if vol_today > vol_avg * 0.8 else '縮量'}, {vol_today/vol_avg:.1f}x 均量)"""
 
+    # VP structure
+    vp_str = "無資料"
+    if vp_data:
+        close = df["Close"].iloc[-1]
+        pos = "在VA內" if vp_data["val"] < close < vp_data["vah"] else "在VA上方" if close > vp_data["vah"] else "在VA下方"
+        vp_str = f"VAH: {vp_data['vah']:.2f} | POC: {vp_data['poc']:.2f} | VAL: {vp_data['val']:.2f} | 價格{pos}"
+
+    # Institutional trend + regime + score details
+    factors_str = "無資料"
+    if factors:
+        trend = factors.get("inst_trend", "NEUTRAL")
+        regime = factors.get("regime", "unknown")
+        score_details = factors.get("score_details", {})
+        swing = factors.get("swing_points", {})
+
+        factors_str = f"機構趨勢: {trend} | Regime: {regime}"
+        if score_details:
+            gate = " ".join(f"{k}{v}" for k, v in score_details.items() if k in ("量能", "趨勢"))
+            bonus = " ".join(f"{k}{v}" for k, v in score_details.items() if k not in ("量能", "趨勢", "Regime"))
+            factors_str += f"\n評分細節: 🔑 {gate} | 📊 {bonus}"
+        if swing:
+            factors_str += f"\nSwing High: {swing.get('high', 'N/A')} | Swing Low: {swing.get('low', 'N/A')}"
+
     # Signals
     signal_str = ""
     if signals:
@@ -77,7 +100,13 @@ ATR(14): {atr_val:.2f}
 ## 技術指標
 {indicators}
 
-## Volume Profile 信號
+## Volume Profile 結構
+{vp_str}
+
+## 機構分析
+{factors_str}
+
+## VP 信號
 {signal_str}
 
 ## 市場環境
@@ -123,7 +152,7 @@ def call_gemini(prompt):
 def analyze_signals(symbols_data, market_ctx):
     """Analyze signals for symbols that have VP signals.
     
-    symbols_data: list of {"symbol", "df", "signals": [{"direction", "type", "entry", "tp", "sl", "score"}]}
+    symbols_data: list of {"symbol", "df", "signals", "vp_data", "factors"}
     Returns: dict of {symbol: ai_analysis_text}
     """
     results = {}
@@ -132,8 +161,10 @@ def analyze_signals(symbols_data, market_ctx):
         symbol = item["symbol"]
         df = item["df"]
         signals = item["signals"]
+        vp_data = item.get("vp_data")
+        factors = item.get("factors")
 
-        prompt = build_prompt(symbol, df, signals, market_ctx)
+        prompt = build_prompt(symbol, df, signals, market_ctx, vp_data, factors)
         analysis = call_gemini(prompt)
         results[symbol] = analysis
 
