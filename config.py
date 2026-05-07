@@ -41,6 +41,6 @@ DEFAULT_CFG = {
     "vol_ma_len": 21,
     "max_sl_atr": 3.0,
     "cooldown_bars": 3,
-    "long_only": True,
+    "long_only": False,
     "primary_signal": "Breakout Retest",  # Best signal from backtest
 }
