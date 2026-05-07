@@ -190,10 +190,11 @@ def main():
     market_ctx = fetch_market_context(DEFAULT_CFG)
     signals = scan_intraday(SYMBOLS, DEFAULT_CFG, market_ctx)
 
-    # Deduplicate: don't send same signal twice in one day
+    # Deduplicate: same signal same hour won't repeat
+    now_hour = datetime.now().strftime("%H")
     new_signals = []
     for sig in signals:
-        key = f"{sig[0]}_{sig[1]}_{sig[2]}_{today}"
+        key = f"{sig[0]}_{sig[1]}_{sig[2]}_{today}_{now_hour}"
         if key not in state:
             state[key] = today
             new_signals.append(sig)

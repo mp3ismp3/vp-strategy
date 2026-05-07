@@ -14,7 +14,7 @@ SYMBOLS = [
     # ETFs
     "SPY", "QQQ",
     # Misc Tech / AI Adjacent
-    "UBER", "SQ", "SHOP", "COIN",
+    "UBER", "XYZ", "SHOP", "COIN",
 ]
 
 SECTOR_ETFS = ["SMH", "XLK", "IGV", "SKYY", "BOTZ"]
@@ -31,7 +31,7 @@ SECTOR_MAP = {
     "WDAY": "IGV", "TEAM": "IGV", "HUBS": "IGV",
     "DELL": "XLK", "HPE": "XLK", "SMCI": "SMH", "VRT": "XLK", "ANET": "XLK",
     "SPY": "SPY", "QQQ": "QQQ",
-    "UBER": "XLK", "SQ": "XLK", "SHOP": "IGV", "COIN": "XLK", "AMZN": "XLK",
+    "UBER": "XLK", "XYZ": "XLK", "SHOP": "IGV", "COIN": "XLK", "AMZN": "XLK",
 }
 
 DEFAULT_CFG = {
