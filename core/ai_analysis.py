@@ -123,13 +123,15 @@ VIX: {vix} | SPY: {spy}
 
 
 def call_gemini(prompt):
-    """Call Gemini API using official SDK."""
+    """Call Gemini API using official SDK with thinking enabled."""
     import time
     if not GEMINI_API_KEY:
         return "⚠️ GEMINI_API_KEY 未設定"
 
     try:
         from google import genai
+        from google.genai import types
+
         client = genai.Client(api_key=GEMINI_API_KEY)
 
         for attempt in range(3):
@@ -137,6 +139,9 @@ def call_gemini(prompt):
                 response = client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=prompt,
+                    config=types.GenerateContentConfig(
+                        thinking_config=types.ThinkingConfig(thinking_budget=2048)
+                    ),
                 )
                 return response.text
             except Exception as e:
