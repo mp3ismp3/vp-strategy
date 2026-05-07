@@ -135,12 +135,12 @@ def call_gemini(prompt):
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.0-flash",
+                    model="gemini-2.5-flash",
                     contents=prompt,
                 )
                 return response.text
             except Exception as e:
-                if "429" in str(e):
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                     time.sleep(10 * (attempt + 1))
                     continue
                 return f"⚠️ API error: {e}"
