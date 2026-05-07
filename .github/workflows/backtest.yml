@@ -3,11 +3,18 @@ name: Backtest
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Mode: backtest or optimize'
+        default: 'backtest'
+        type: choice
+        options:
+          - backtest
+          - optimize
       days:
         description: 'Days to backtest'
         default: '120'
       symbols:
-        description: 'Symbols (comma-separated, empty=all)'
+        description: 'Symbols (comma-separated, empty=all/top10)'
         default: ''
       max_hold:
         description: 'Max holding days'
@@ -30,8 +37,15 @@ jobs:
         run: pip install yfinance pandas numpy requests
 
       - name: Run backtest
+        if: ${{ github.event.inputs.mode == 'backtest' }}
         run: |
           python backtest.py \
             --days ${{ github.event.inputs.days }} \
             --max-hold ${{ github.event.inputs.max_hold }} \
+            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
+
+      - name: Run optimization
+        if: ${{ github.event.inputs.mode == 'optimize' }}
+        run: |
+          python optimize.py \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
