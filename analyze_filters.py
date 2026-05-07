@@ -163,9 +163,9 @@ def main():
     results.append(evaluate([t for t in trades if t["trend"] == "NEUTRAL"], "C4: NEUTRAL only"))
 
     # Regime
-    results.append(evaluate([t for t in trades if t["regime"] == "Range"], "D1: Regime=Range"))
-    results.append(evaluate([t for t in trades if t["regime"] == "Trend"], "D2: Regime=Trend"))
-    results.append(evaluate([t for t in trades if t["regime"] == "Expansion"], "D3: Regime=Expansion"))
+    results.append(evaluate([t for t in trades if t["regime"] == "range"], "D1: Regime=Range"))
+    results.append(evaluate([t for t in trades if t["regime"] == "trend"], "D2: Regime=Trend"))
+    results.append(evaluate([t for t in trades if t["regime"] == "expansion"], "D3: Regime=Expansion"))
 
     # Volume ratio tiers
     results.append(evaluate([t for t in trades if t["vol_ratio"] > 1.2], "E1: 量能 > 1.2x"))
@@ -202,14 +202,19 @@ def main():
     results.append(evaluate([t for t in trend_ok if t["score"] >= 4 and t["vol_ratio"] > 1.5], "H7: Score≥4 + 順趨勢 + 量能>1.5x"))
 
     # Score + Regime
-    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["regime"] == "Range"], "H8: Score≥3 + Range"))
-    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["regime"] == "Trend"], "H9: Score≥3 + Trend"))
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["regime"] == "range"], "H8: Score≥3 + Range"))
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["regime"] == "trend"], "H9: Score≥3 + Trend"))
 
     # Triple: Score + Trend + Range
-    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["regime"] == "Range"], "H10: Score≥3 + 順趨勢 + Range"))
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["regime"] == "range"], "H10: Score≥3 + 順趨勢 + Range"))
 
     # Score + Trend + Volume + Range (max filter)
-    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["vol_ratio"] > 1.5 and t["regime"] == "Range"], "H11: 全篩選(S3+趨勢+量1.5+Range)"))
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["vol_ratio"] > 1.5 and t["regime"] == "range"], "H11: 全篩選(S3+趨勢+量1.5+Range)"))
+
+    # === Additional: Score + LONG only ===
+    results.append(evaluate([t for t in trades if t["score"] >= 4 and t["direction"] == "LONG"], "H12: Score≥4 + 只做多"))
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["direction"] == "LONG"], "H13: Score≥3 + 只做多"))
+    results.append(evaluate([t for t in trades if t["direction"] == "LONG" and "Breakout" in t["signal"]], "H14: Breakout + 只做多"))
 
     # Print report
     print(f"{'='*70}")
