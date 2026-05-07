@@ -235,91 +235,113 @@ def main():
         print("❌ No trades.")
         return
 
-    results = []
+    # Filter: LONG only subsets by signal type
+    long_trades = [t for t in trades if t["direction"] == "LONG"]
+    breakout_long = [t for t in long_trades if "Breakout" in t.get("signal", "")]
+    failed_long = [t for t in long_trades if "Failed" in t.get("signal", "")]
+    rejection_long = [t for t in long_trades if "Rejection" in t.get("signal", "")]
 
-    # === Fixed R:R ratios ===
-    print("Testing fixed ATR-based TP/SL...")
-    for tp_atr in [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]:
-        for sl_atr in [0.5, 1.0, 1.5, 2.0]:
-            rr = tp_atr / sl_atr
-            pnls = simulate_exit(trades, tp_atr, sl_atr, max_hold=10)
-            results.append(evaluate(pnls, f"Fixed TP={tp_atr} SL={sl_atr} (R:R=1:{rr:.1f})"))
+    print(f"  All signals: {len(trades)}")
+    print(f"  LONG only: {len(long_trades)}")
+    print(f"  Breakout LONG: {len(breakout_long)}")
+    print(f"  Failed Auction LONG: {len(failed_long)}")
+    print(f"  VA Rejection LONG: {len(rejection_long)}\n")
 
-    # === Trailing stop ===
-    print("Testing trailing stop...")
-    for tp_atr in [2.0, 3.0, 4.0]:
-        for sl_atr in [1.0, 1.5]:
-            for trail in [1.0, 1.5]:
-                pnls = simulate_trailing(trades, tp_atr, sl_atr, trail, max_hold=10)
-                results.append(evaluate(pnls, f"Trail TP={tp_atr} SL={sl_atr} trail@{trail}ATR"))
+    # Run analysis on each LONG signal type
+    groups = [
+        ("ALL LONG", long_trades),
+        ("BREAKOUT RETEST LONG", breakout_long),
+        ("FAILED AUCTION LONG", failed_long),
+        ("VA REJECTION LONG", rejection_long),
+    ]
 
-    # === Partial exit ===
-    print("Testing partial exit...")
-    for tp1 in [1.0, 1.5]:
-        for tp2 in [2.5, 3.0, 4.0]:
-            for sl_atr in [1.0, 1.5]:
-                pnls = simulate_partial(trades, tp1, tp2, sl_atr, max_hold=10)
-                results.append(evaluate(pnls, f"Partial 50%@{tp1}+50%@{tp2} SL={sl_atr}"))
-
-    # === Original strategy TP/SL ===
-    orig_pnls = []
-    for t in trades:
-        entry = t["entry"]
-        tp, sl = t["orig_tp"], t["orig_sl"]
-        # Adjust for next-day open
-        if t["direction"] == "LONG":
-            tp = entry + (t["orig_tp"] - entry)
-            sl = entry - abs(entry - t["orig_sl"])
-        else:
-            tp = entry - abs(entry - t["orig_tp"])
-            sl = entry + abs(t["orig_sl"] - entry)
-        risk = abs(entry - sl)
-        if risk == 0:
+    for label, subset in groups:
+        if not subset or len(subset) < 5:
+            print(f"\n  {label}: too few trades ({len(subset)}), skip\n")
             continue
-        for bar in t["forward"][:10]:
+
+        print(f"\n{'='*75}")
+        print(f"  {label} ({len(subset)} trades)")
+        print(f"{'='*75}")
+
+        results = []
+
+        # Fixed R:R ratios
+        for tp_atr in [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]:
+            for sl_atr in [0.5, 1.0, 1.5, 2.0]:
+                rr = tp_atr / sl_atr
+                pnls = simulate_exit(subset, tp_atr, sl_atr, max_hold=10)
+                results.append(evaluate(pnls, f"Fixed TP={tp_atr} SL={sl_atr} (1:{rr:.1f})"))
+
+        # Trailing stop
+        for tp_atr in [2.0, 3.0, 4.0]:
+            for sl_atr in [1.0, 1.5]:
+                for trail in [1.0, 1.5]:
+                    pnls = simulate_trailing(subset, tp_atr, sl_atr, trail, max_hold=10)
+                    results.append(evaluate(pnls, f"Trail TP={tp_atr} SL={sl_atr} trail@{trail}"))
+
+        # Partial exit
+        for tp1 in [1.0, 1.5]:
+            for tp2 in [2.5, 3.0, 4.0]:
+                for sl_atr in [1.0, 1.5]:
+                    pnls = simulate_partial(subset, tp1, tp2, sl_atr, max_hold=10)
+                    results.append(evaluate(pnls, f"Partial 50%@{tp1}+50%@{tp2} SL={sl_atr}"))
+
+        # Original TP/SL
+        orig_pnls = []
+        for t in subset:
+            entry = t["entry"]
+            tp, sl = t["orig_tp"], t["orig_sl"]
             if t["direction"] == "LONG":
-                if bar["l"] <= sl:
-                    orig_pnls.append(-1.0)
-                    break
-                if bar["h"] >= tp:
-                    orig_pnls.append((tp - entry) / risk)
-                    break
+                tp = entry + (t["orig_tp"] - entry)
+                sl = entry - abs(entry - t["orig_sl"])
             else:
-                if bar["h"] >= sl:
-                    orig_pnls.append(-1.0)
-                    break
-                if bar["l"] <= tp:
-                    orig_pnls.append((entry - tp) / risk)
-                    break
-        else:
-            last_c = t["forward"][min(9, len(t["forward"]) - 1)]["c"]
-            r = (last_c - entry) / risk if t["direction"] == "LONG" else (entry - last_c) / risk
-            orig_pnls.append(r)
-    results.insert(0, evaluate(orig_pnls, "★ CURRENT (original TP/SL)"))
+                tp = entry - abs(entry - t["orig_tp"])
+                sl = entry + abs(t["orig_sl"] - entry)
+            risk = abs(entry - sl)
+            if risk == 0:
+                continue
+            for bar in t["forward"][:10]:
+                if t["direction"] == "LONG":
+                    if bar["l"] <= sl:
+                        orig_pnls.append(-1.0); break
+                    if bar["h"] >= tp:
+                        orig_pnls.append((tp - entry) / risk); break
+                else:
+                    if bar["h"] >= sl:
+                        orig_pnls.append(-1.0); break
+                    if bar["l"] <= tp:
+                        orig_pnls.append((entry - tp) / risk); break
+            else:
+                last_c = t["forward"][min(9, len(t["forward"]) - 1)]["c"]
+                r = (last_c - entry) / risk if t["direction"] == "LONG" else (entry - last_c) / risk
+                orig_pnls.append(r)
+        results.insert(0, evaluate(orig_pnls, "★ CURRENT (original TP/SL)"))
 
-    # Sort by expectancy
-    results.sort(key=lambda x: x["exp"], reverse=True)
+        results.sort(key=lambda x: x["exp"], reverse=True)
 
-    # Print
+        print(f"  {'Strategy':<42} | {'N':>5} {'WR':>6} {'Exp':>7} {'PF':>6}")
+        print(f"  {'─'*42} | {'─'*5} {'─'*6} {'─'*7} {'─'*6}")
+        for r in results[:15]:
+            marker = "→" if "CURRENT" in r["label"] else " "
+            print(f" {marker}{r['label']:<42} | {r['n']:>5} {r['wr']:>5.1f}% {r['exp']:>+6.2f}R {r['pf']:>5.2f}")
+
+        best = results[0]
+        current = next((r for r in results if "CURRENT" in r["label"]), results[-1])
+        print(f"\n  ★ CURRENT: Exp {current['exp']:+.2f}R | ✅ BEST: {best['label']} Exp {best['exp']:+.2f}R")
+
+    # Hold days analysis per signal type
     print(f"\n{'='*75}")
-    print(f"  EXIT STRATEGY ANALYSIS (sorted by expectancy)")
+    print(f"  MAX HOLD DAYS ANALYSIS (TP=2.0 SL=1.0)")
     print(f"{'='*75}")
-    print(f"  {'Strategy':<42} | {'N':>5} {'WR':>6} {'Exp':>7} {'PF':>6}")
-    print(f"  {'─'*42} | {'─'*5} {'─'*6} {'─'*7} {'─'*6}")
-
-    for r in results[:25]:
-        marker = "→" if "CURRENT" in r["label"] else " "
-        print(f" {marker}{r['label']:<42} | {r['n']:>5} {r['wr']:>5.1f}% {r['exp']:>+6.2f}R {r['pf']:>5.2f}")
-
-    # Best
-    best = results[0]
-    current = next(r for r in results if "CURRENT" in r["label"])
-    print(f"\n{'─'*75}")
-    print(f"  ★ CURRENT:  {current['n']} trades | WR {current['wr']:.1f}% | Exp {current['exp']:+.2f}R | PF {current['pf']:.2f}")
-    print(f"  ✅ BEST:     {best['label']}")
-    print(f"              {best['n']} trades | WR {best['wr']:.1f}% | Exp {best['exp']:+.2f}R | PF {best['pf']:.2f}")
-    improvement = best["exp"] - current["exp"]
-    print(f"  📈 Improvement: {improvement:+.2f}R per trade")
+    for label, subset in groups:
+        if not subset or len(subset) < 5:
+            continue
+        print(f"\n  {label}:")
+        for hold in [3, 5, 7, 10, 15, 20]:
+            pnls = simulate_exit(subset, 2.0, 1.0, max_hold=hold)
+            r = evaluate(pnls, f"Hold={hold}d")
+            print(f"    {r['label']:<10} | {r['n']:>5} {r['wr']:>5.1f}% {r['exp']:>+6.2f}R {r['pf']:>5.2f}")
     print(f"{'='*75}")
 
 
