@@ -3,6 +3,12 @@ name: Tests
 on:
   push:
     branches: [main]
+    paths:
+      - 'core/**'
+      - 'strategies/**'
+      - 'scoring/**'
+      - 'tests/**'
+      - 'scanner.py'
   pull_request:
     branches: [main]
 
