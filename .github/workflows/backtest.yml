@@ -15,6 +15,7 @@ on:
           - analyze_filters
           - analyze_exits
           - analyze_exits_1h
+          - analyze_filters_1h
       days:
         description: 'Days to backtest'
         default: '365'
@@ -85,4 +86,10 @@ jobs:
         if: ${{ github.event.inputs.mode == 'analyze_exits_1h' }}
         run: |
           python analyze_exits_1h.py \
+            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
+
+      - name: Run 1H filter analysis
+        if: ${{ github.event.inputs.mode == 'analyze_filters_1h' }}
+        run: |
+          python analyze_filters_1h.py \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
