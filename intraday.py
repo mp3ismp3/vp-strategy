@@ -5,9 +5,7 @@ Only sends signals with confidence >= 3 and volume >= 1.5x avg.
 """
 
 import sys
-import json
 from datetime import datetime
-from pathlib import Path
 
 from config import SYMBOLS, DEFAULT_CFG, SECTOR_MAP
 from core.data import download_symbol
@@ -17,20 +15,9 @@ from scoring.confidence import score_signal, calc_stock_factors
 from notifications.telegram import send_telegram
 
 DRY_RUN = "--dry-run" in sys.argv
-STATE_FILE = Path(__file__).parent / "intraday_state.json"
-MIN_VOL_RATIO = 1.2  # 1H volume must be > 1.2x avg (institutional: 1.5x on daily, scaled down for 1H)
+MIN_VOL_RATIO = 1.2  # 1H volume must be > 1.2x 20-period avg
 MIN_SCORE = 3        # Only send signals with score >= 3
-VOL_AVG_PERIOD = 20  # Use 20-period avg like institutions, not 5
-
-
-def load_state():
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {}
-
-
-def save_state(state):
-    STATE_FILE.write_text(json.dumps(state, indent=2))
+VOL_AVG_PERIOD = 20  # Institutional standard
 
 
 def download_1h(symbol):
@@ -147,10 +134,11 @@ def scan_intraday(symbols, cfg, market_ctx):
                 continue
 
             vah, val = vp["vah"], vp["val"]
-            last = df_1h.iloc[-1]
-            prev = df_1h.iloc[-2] if len(df_1h) >= 2 else None
+            # Use last COMPLETED candle (iloc[-2]), not the forming one
+            last = df_1h.iloc[-2] if len(df_1h) >= 3 else df_1h.iloc[-1]
+            prev = df_1h.iloc[-3] if len(df_1h) >= 3 else None
             # Use 20-period volume average (institutional standard)
-            vol_avg = df_1h["Volume"].iloc[-21:-1].mean() if len(df_1h) >= 21 else df_1h["Volume"].iloc[:-1].mean()
+            vol_avg = df_1h["Volume"].iloc[-(VOL_AVG_PERIOD+2):-2].mean() if len(df_1h) >= VOL_AVG_PERIOD + 2 else df_1h["Volume"].iloc[:-2].mean()
 
             sig = None
             if check_va_rejection_long(last, val, vol_avg):
@@ -227,29 +215,17 @@ def format_intraday(signals):
 
 def main():
     print("Scanning intraday confirmations (1H)...")
-    state = load_state()
     today = datetime.now().strftime("%Y-%m-%d")
 
     market_ctx = fetch_market_context(DEFAULT_CFG)
     signals = scan_intraday(SYMBOLS, DEFAULT_CFG, market_ctx)
 
-    # Deduplicate: same signal same hour won't repeat
-    now_hour = datetime.now().strftime("%H")
-    new_signals = []
-    for sig in signals:
-        key = f"{sig[0]}_{sig[1]}_{sig[2]}_{today}_{now_hour}"
-        if key not in state:
-            state[key] = today
-            new_signals.append(sig)
-
-    if new_signals:
-        msg = format_intraday(new_signals)
+    if signals:
+        msg = format_intraday(signals)
         send_telegram(msg, dry_run=DRY_RUN)
         print(msg)
     else:
         print("No new intraday signals.")
-
-    save_state(state)
 
 
 if __name__ == "__main__":
