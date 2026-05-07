@@ -141,50 +141,75 @@ def main():
     # Define filter groups
     results = []
 
+    # === INDIVIDUAL FILTERS ===
+
     # A: Baseline (no filter)
     results.append(evaluate(trades, "A: 無篩選（全部信號）"))
 
-    # B: Score >= 3
-    results.append(evaluate([t for t in trades if t["score"] >= 3], "B: Score ≥ 3"))
+    # Score tiers
+    results.append(evaluate([t for t in trades if t["score"] >= 2], "B1: Score ≥ 2"))
+    results.append(evaluate([t for t in trades if t["score"] >= 3], "B2: Score ≥ 3"))
+    results.append(evaluate([t for t in trades if t["score"] >= 4], "B3: Score ≥ 4"))
+    results.append(evaluate([t for t in trades if t["score"] == 5], "B4: Score = 5"))
 
-    # C: Score >= 4
-    results.append(evaluate([t for t in trades if t["score"] >= 4], "C: Score ≥ 4"))
-
-    # D: Trend filter (no counter-trend)
+    # Trend filter
     trend_ok = [t for t in trades if not (
         (t["direction"] == "LONG" and t["trend"] == "BEARISH") or
         (t["direction"] == "SHORT" and t["trend"] == "BULLISH")
     )]
-    results.append(evaluate(trend_ok, "D: 順趨勢（過濾逆勢）"))
+    results.append(evaluate(trend_ok, "C: 順趨勢（過濾逆勢）"))
+    results.append(evaluate([t for t in trades if t["trend"] == "BULLISH" and t["direction"] == "LONG"], "C2: BULLISH+LONG"))
+    results.append(evaluate([t for t in trades if t["trend"] == "BEARISH" and t["direction"] == "SHORT"], "C3: BEARISH+SHORT"))
+    results.append(evaluate([t for t in trades if t["trend"] == "NEUTRAL"], "C4: NEUTRAL only"))
 
-    # E: Only Range regime
-    results.append(evaluate([t for t in trades if t["regime"] == "Range"], "E: 只做 Range"))
+    # Regime
+    results.append(evaluate([t for t in trades if t["regime"] == "Range"], "D1: Regime=Range"))
+    results.append(evaluate([t for t in trades if t["regime"] == "Trend"], "D2: Regime=Trend"))
+    results.append(evaluate([t for t in trades if t["regime"] == "Expansion"], "D3: Regime=Expansion"))
 
-    # F: Volume > 1.5x
-    results.append(evaluate([t for t in trades if t["vol_ratio"] > 1.5], "F: 量能 > 1.5x"))
+    # Volume ratio tiers
+    results.append(evaluate([t for t in trades if t["vol_ratio"] > 1.2], "E1: 量能 > 1.2x"))
+    results.append(evaluate([t for t in trades if t["vol_ratio"] > 1.5], "E2: 量能 > 1.5x"))
+    results.append(evaluate([t for t in trades if t["vol_ratio"] > 2.0], "E3: 量能 > 2.0x"))
+    results.append(evaluate([t for t in trades if t["vol_ratio"] > 2.5], "E4: 量能 > 2.5x"))
+    results.append(evaluate([t for t in trades if 1.2 <= t["vol_ratio"] <= 1.5], "E5: 量能 1.2-1.5x"))
+    results.append(evaluate([t for t in trades if 1.5 < t["vol_ratio"] <= 2.0], "E6: 量能 1.5-2.0x"))
+    results.append(evaluate([t for t in trades if 2.0 < t["vol_ratio"] <= 3.0], "E7: 量能 2.0-3.0x"))
+    results.append(evaluate([t for t in trades if t["vol_ratio"] > 3.0], "E8: 量能 > 3.0x"))
 
-    # G: Volume > 2.0x
-    results.append(evaluate([t for t in trades if t["vol_ratio"] > 2.0], "G: 量能 > 2.0x"))
+    # Direction
+    results.append(evaluate([t for t in trades if t["direction"] == "LONG"], "F1: 只做多"))
+    results.append(evaluate([t for t in trades if t["direction"] == "SHORT"], "F2: 只做空"))
 
-    # H: Score >= 3 + Trend filter (combined)
-    combined = [t for t in trades if t["score"] >= 3 and not (
-        (t["direction"] == "LONG" and t["trend"] == "BEARISH") or
-        (t["direction"] == "SHORT" and t["trend"] == "BULLISH")
-    )]
-    results.append(evaluate(combined, "H: Score≥3 + 順趨勢"))
+    # Signal type
+    results.append(evaluate([t for t in trades if "Rejection" in t["signal"]], "G1: VA Rejection"))
+    results.append(evaluate([t for t in trades if "Failed" in t["signal"]], "G2: Failed Auction"))
+    results.append(evaluate([t for t in trades if "Breakout" in t["signal"]], "G3: Breakout Retest"))
 
-    # I: Score >= 4 + Trend filter
-    combined4 = [t for t in trades if t["score"] >= 4 and not (
-        (t["direction"] == "LONG" and t["trend"] == "BEARISH") or
-        (t["direction"] == "SHORT" and t["trend"] == "BULLISH")
-    )]
-    results.append(evaluate(combined4, "I: Score≥4 + 順趨勢"))
+    # === COMBINATIONS ===
 
-    # J: Only LONG
-    results.append(evaluate([t for t in trades if t["direction"] == "LONG"], "J: 只做多"))
+    # Score + Trend
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 3], "H1: Score≥3 + 順趨勢"))
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 4], "H2: Score≥4 + 順趨勢"))
 
-    # K: Only SHORT
-    results.append(evaluate([t for t in trades if t["direction"] == "SHORT"], "K: 只做空"))
+    # Score + Volume
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["vol_ratio"] > 1.5], "H3: Score≥3 + 量能>1.5x"))
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["vol_ratio"] > 2.0], "H4: Score≥3 + 量能>2.0x"))
+    results.append(evaluate([t for t in trades if t["score"] >= 4 and t["vol_ratio"] > 1.5], "H5: Score≥4 + 量能>1.5x"))
+
+    # Score + Trend + Volume
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["vol_ratio"] > 1.5], "H6: Score≥3 + 順趨勢 + 量能>1.5x"))
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 4 and t["vol_ratio"] > 1.5], "H7: Score≥4 + 順趨勢 + 量能>1.5x"))
+
+    # Score + Regime
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["regime"] == "Range"], "H8: Score≥3 + Range"))
+    results.append(evaluate([t for t in trades if t["score"] >= 3 and t["regime"] == "Trend"], "H9: Score≥3 + Trend"))
+
+    # Triple: Score + Trend + Range
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["regime"] == "Range"], "H10: Score≥3 + 順趨勢 + Range"))
+
+    # Score + Trend + Volume + Range (max filter)
+    results.append(evaluate([t for t in trend_ok if t["score"] >= 3 and t["vol_ratio"] > 1.5 and t["regime"] == "Range"], "H11: 全篩選(S3+趨勢+量1.5+Range)"))
 
     # Print report
     print(f"{'='*70}")
