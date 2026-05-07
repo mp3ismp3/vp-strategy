@@ -4,12 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Mode: backtest or optimize'
+        description: 'Mode: backtest or optimize or backtest_1h'
         default: 'backtest'
         type: choice
         options:
           - backtest
           - optimize
+          - backtest_1h
       days:
         description: 'Days to backtest'
         default: '120'
@@ -48,4 +49,10 @@ jobs:
         if: ${{ github.event.inputs.mode == 'optimize' }}
         run: |
           python optimize.py \
+            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
+
+      - name: Run 1H backtest
+        if: ${{ github.event.inputs.mode == 'backtest_1h' }}
+        run: |
+          python backtest_1h.py \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
