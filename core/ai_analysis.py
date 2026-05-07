@@ -1,0 +1,140 @@
+"""
+AI analysis module — uses Gemini to analyze signals with full OHLCV context.
+"""
+
+import os
+import json
+import requests
+import pandas as pd
+import numpy as np
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+
+def calc_rsi(df, period=14):
+    delta = df["Close"].diff()
+    gain = delta.where(delta > 0, 0).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
+
+
+def calc_ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
+
+
+def calc_macd(df):
+    ema12 = calc_ema(df["Close"], 12)
+    ema26 = calc_ema(df["Close"], 26)
+    macd = ema12 - ema26
+    signal = calc_ema(macd, 9)
+    return macd, signal
+
+
+def build_prompt(symbol, df, signals, market_ctx):
+    """Build analysis prompt with OHLCV + indicators."""
+    # Recent 20 days OHLCV
+    recent = df.tail(20)
+    ohlcv_str = "Date | Open | High | Low | Close | Volume\n"
+    for idx, row in recent.iterrows():
+        date = idx.strftime("%m/%d") if hasattr(idx, "strftime") else str(idx)[:10]
+        ohlcv_str += f"{date} | {row['Open']:.2f} | {row['High']:.2f} | {row['Low']:.2f} | {row['Close']:.2f} | {int(row['Volume']):,}\n"
+
+    # Indicators
+    rsi = calc_rsi(df).iloc[-1]
+    macd, macd_signal = calc_macd(df)
+    ema20 = calc_ema(df["Close"], 20).iloc[-1]
+    ema50 = calc_ema(df["Close"], 50).iloc[-1]
+    atr = df["High"].tail(14).values - df["Low"].tail(14).values
+    atr_val = np.mean(atr)
+    vol_avg = df["Volume"].tail(21).mean()
+    vol_today = df["Volume"].iloc[-1]
+
+    indicators = f"""RSI(14): {rsi:.1f}
+MACD: {macd.iloc[-1]:.2f} | Signal: {macd_signal.iloc[-1]:.2f} | {'多頭' if macd.iloc[-1] > macd_signal.iloc[-1] else '空頭'}
+EMA20: {ema20:.2f} | EMA50: {ema50:.2f} | 價格{'在EMA20上' if df['Close'].iloc[-1] > ema20 else '在EMA20下'}
+ATR(14): {atr_val:.2f}
+成交量: {int(vol_today):,} ({'放量' if vol_today > vol_avg * 1.5 else '正常' if vol_today > vol_avg * 0.8 else '縮量'}, {vol_today/vol_avg:.1f}x 均量)"""
+
+    # Signals
+    signal_str = ""
+    if signals:
+        for sig in signals:
+            signal_str += f"- {sig['direction']} {sig['type']} | Entry: {sig['entry']:.2f} | TP: {sig['tp']:.2f} | SL: {sig['sl']:.2f} | Score: {sig['score']}/5\n"
+    else:
+        signal_str = "- 無信號觸發\n"
+
+    # Market context
+    vix = market_ctx.get("vix", "N/A")
+    spy = market_ctx.get("spy_va_pos", "N/A")
+
+    prompt = f"""你是專業的量化交易分析師。請分析以下股票的技術面，給出交易建議。
+
+## {symbol} 近20日 OHLCV
+{ohlcv_str}
+
+## 技術指標
+{indicators}
+
+## Volume Profile 信號
+{signal_str}
+
+## 市場環境
+VIX: {vix} | SPY: {spy}
+
+## 請分析：
+1. 趨勢判斷（多頭/空頭/盤整）+ 理由
+2. 關鍵支撐壓力位（2-3個）
+3. 對 VP 信號的看法（是否值得進場）
+4. 風險提醒
+5. 最終建議：進場 / 觀望 / 跳過
+
+請用繁體中文回答，簡潔扼要（200字以內）。"""
+
+    return prompt
+
+
+def call_gemini(prompt):
+    """Call Gemini API."""
+    if not GEMINI_API_KEY:
+        return "⚠️ GEMINI_API_KEY 未設定"
+
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 500, "temperature": 0.3}
+    }
+
+    try:
+        resp = requests.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            headers=headers, json=data, timeout=30
+        )
+        if resp.status_code == 200:
+            result = resp.json()
+            return result["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return f"⚠️ API error: {resp.status_code}"
+    except Exception as e:
+        return f"⚠️ API error: {e}"
+
+
+def analyze_signals(symbols_data, market_ctx):
+    """Analyze signals for symbols that have VP signals.
+    
+    symbols_data: list of {"symbol", "df", "signals": [{"direction", "type", "entry", "tp", "sl", "score"}]}
+    Returns: dict of {symbol: ai_analysis_text}
+    """
+    results = {}
+
+    for item in symbols_data:
+        symbol = item["symbol"]
+        df = item["df"]
+        signals = item["signals"]
+
+        prompt = build_prompt(symbol, df, signals, market_ctx)
+        analysis = call_gemini(prompt)
+        results[symbol] = analysis
+
+    return results

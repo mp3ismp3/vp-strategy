@@ -18,6 +18,7 @@ from strategies.vp_signals import VPSignals
 from strategies.inst_trend import calc_institutional_trend
 from scoring.confidence import score_signal, calc_stock_factors
 from notifications.telegram import send_telegram
+from core.ai_analysis import analyze_signals
 
 STATE_FILE = Path(__file__).parent / "vp_state.json"
 DRY_RUN = "--dry-run" in sys.argv
@@ -204,6 +205,44 @@ def main():
 
     send_telegram(msg, dry_run=DRY_RUN)
     print(msg)
+
+    # AI analysis for symbols with signals
+    import os
+    if os.environ.get("GEMINI_API_KEY") and not DRY_RUN:
+        print("\n  Running AI analysis...")
+        ai_inputs = []
+        for lb in lookbacks:
+            for sig, score, details in scored[lb]:
+                if sig.direction == "WARNING":
+                    continue
+                # Find the df for this symbol
+                df = download_symbol(sig.symbol)
+                if df is None:
+                    continue
+                ai_inputs.append({
+                    "symbol": sig.symbol,
+                    "df": df,
+                    "signals": [{"direction": sig.direction, "type": sig.strategy,
+                                 "entry": sig.entry, "tp": sig.tp, "sl": sig.sl, "score": score}]
+                })
+
+        # Deduplicate by symbol (merge signals)
+        merged = {}
+        for item in ai_inputs:
+            s = item["symbol"]
+            if s not in merged:
+                merged[s] = item
+            else:
+                merged[s]["signals"].extend(item["signals"])
+
+        if merged:
+            ai_results = analyze_signals(list(merged.values()), market_ctx)
+            ai_msg = "<b>🤖 AI 分析</b>\n\n"
+            for symbol, analysis in ai_results.items():
+                ai_msg += f"<b>{symbol}</b>\n{analysis}\n\n"
+            send_telegram(ai_msg, dry_run=DRY_RUN)
+            print(ai_msg)
+
     save_state(state)
 
 
