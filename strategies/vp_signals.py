@@ -92,13 +92,13 @@ class VPSignals(BaseStrategy):
                 confirmed_above = confirmed_below = False
 
         if confirmed_above and l <= vah + atr * 0.3 and c > vah and bull_close and not low_vol:
-            base_tp = poc + 2 * (vah - poc)
-            tp = c + (base_tp - c) * m
+            base_tp = vah + (vah - val)  # Measured move: VA width projection
+            tp = c + (base_tp - c) * m if base_tp > c else c + atr * 1.5 * m
             sl = max(vah - atr * 0.5, c - atr * cfg["max_sl_atr"])
             signals.append(Signal(symbol, "LONG", "VP: Breakout Retest", c, tp, sl))
         if not cfg["long_only"] and confirmed_below and h >= val - atr * 0.3 and c < val and bear_close and not low_vol:
-            base_tp = poc - 2 * (poc - val)
-            tp = c - (c - base_tp) * m
+            base_tp = val - (vah - val)  # Measured move down
+            tp = c - (c - base_tp) * m if base_tp < c else c - atr * 1.5 * m
             sl = min(val + atr * 0.5, c + atr * cfg["max_sl_atr"])
             signals.append(Signal(symbol, "SHORT", "VP: Breakout Retest", c, tp, sl))
 
