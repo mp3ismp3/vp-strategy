@@ -145,8 +145,8 @@ def call_gemini(prompt):
                 )
                 return response.text
             except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    time.sleep(10 * (attempt + 1))
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "503" in str(e) or "UNAVAILABLE" in str(e):
+                    time.sleep(15 * (attempt + 1))
                     continue
                 return f"⚠️ API error: {e}"
 
