@@ -3,7 +3,8 @@ Backtest module — simulates VP strategy signals over historical data.
 Walks through each trading day, generates signals, and tracks outcomes.
 
 Usage:
-    python backtest.py [--days 120] [--symbols NVDA,AAPL] [--dry-run]
+    python backtest.py [--days 120] [--symbols NVDA,AAPL] [--min-score 3]
+                       [--vp-lookback 60] [--va-pct 0.68] [--max-sl-atr 3.0]
 """
 
 import sys
@@ -15,8 +16,10 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
-from config import SYMBOLS, DEFAULT_CFG
+from config import SYMBOLS, DEFAULT_CFG, SECTOR_MAP
 from core.indicators import calc_vp, calc_atr
+from core.market_context import fetch_market_context
+from scoring.confidence import score_signal, calc_stock_factors
 from strategies.vp_signals import VPSignals
 
 
@@ -33,12 +36,14 @@ class Trade:
     exit_price: float = 0.0
     result: str = ""  # "WIN" / "LOSS" / "OPEN"
     pnl_r: float = 0.0  # P&L in R multiples
+    score: int = 0
 
 
-def run_backtest(symbols, cfg, days=120, max_hold=10):
+def run_backtest(symbols, cfg, days=120, max_hold=10, min_score=0):
     """Walk-forward backtest: for each day, generate signals and track outcomes."""
     strategy = VPSignals()
     trades = []
+    market_ctx = fetch_market_context(cfg)
 
     for symbol in symbols:
         # Download enough history: days + lookback + buffer
@@ -68,6 +73,22 @@ def run_backtest(symbols, cfg, days=120, max_hold=10):
                 if sig.direction == "WARNING":
                     continue
 
+                # Score the signal and filter
+                if min_score > 0:
+                    factors = calc_stock_factors(window, symbol, cfg, market_ctx)
+                    sector_etf = SECTOR_MAP.get(symbol, "QQQ")
+                    score, _ = score_signal(sig.direction, sig.strategy, factors, market_ctx, sector_etf, False)
+                    # Trend filter
+                    trend = factors.get("inst_trend", "NEUTRAL")
+                    if sig.direction == "LONG" and trend == "BEARISH":
+                        continue
+                    if sig.direction == "SHORT" and trend == "BULLISH":
+                        continue
+                    if score < min_score:
+                        continue
+                else:
+                    score = 0
+
                 # Use next day's open as actual entry (realistic execution)
                 if i + 1 >= end_idx:
                     continue
@@ -84,7 +105,7 @@ def run_backtest(symbols, cfg, days=120, max_hold=10):
                 trade = Trade(
                     symbol=symbol, direction=sig.direction,
                     signal_type=sig.strategy, entry=entry,
-                    tp=tp, sl=sl, entry_date=entry_date
+                    tp=tp, sl=sl, entry_date=entry_date, score=score
                 )
 
                 for j in range(i + 2, min(i + 2 + max_hold, end_idx)):
@@ -223,17 +244,30 @@ def main():
     parser.add_argument("--days", type=int, default=120, help="Days to backtest (default: 120)")
     parser.add_argument("--symbols", type=str, default="", help="Comma-separated symbols (default: all)")
     parser.add_argument("--max-hold", type=int, default=10, help="Max holding days (default: 10)")
+    parser.add_argument("--min-score", type=int, default=0, help="Min confidence score filter (0=off, 3=recommended)")
+    parser.add_argument("--vp-lookback", type=int, default=None, help="Override vp_lookback")
+    parser.add_argument("--va-pct", type=float, default=None, help="Override va_pct")
+    parser.add_argument("--max-sl-atr", type=float, default=None, help="Override max_sl_atr")
     args = parser.parse_args()
 
     symbols = args.symbols.split(",") if args.symbols else SYMBOLS
     symbols = [s.strip() for s in symbols if s.strip()]
 
+    cfg = dict(DEFAULT_CFG)
+    if args.vp_lookback:
+        cfg["vp_lookback"] = args.vp_lookback
+    if args.va_pct:
+        cfg["va_pct"] = args.va_pct
+    if args.max_sl_atr:
+        cfg["max_sl_atr"] = args.max_sl_atr
+
     print(f"VP Strategy Backtest")
     print(f"  Symbols: {len(symbols)} | Days: {args.days} | Max Hold: {args.max_hold}")
-    print(f"  Config: lookback={DEFAULT_CFG['vp_lookback']}, va_pct={DEFAULT_CFG['va_pct']}")
+    print(f"  Config: lookback={cfg['vp_lookback']}, va_pct={cfg['va_pct']}, max_sl_atr={cfg['max_sl_atr']}")
+    print(f"  Min Score: {args.min_score} {'(filtering enabled)' if args.min_score > 0 else '(no filter)'}")
     print(f"{'─'*60}")
 
-    trades = run_backtest(symbols, DEFAULT_CFG, days=args.days, max_hold=args.max_hold)
+    trades = run_backtest(symbols, cfg, days=args.days, max_hold=args.max_hold, min_score=args.min_score)
     print_report(trades)
 
 

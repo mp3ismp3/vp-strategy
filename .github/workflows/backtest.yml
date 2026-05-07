@@ -43,6 +43,7 @@ jobs:
           python backtest.py \
             --days ${{ github.event.inputs.days }} \
             --max-hold ${{ github.event.inputs.max_hold }} \
+            --min-score 3 \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
 
       - name: Run optimization
