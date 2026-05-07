@@ -156,8 +156,11 @@ def analyze_signals(symbols_data, market_ctx):
     Returns: dict of {symbol: ai_analysis_text}
     """
     results = {}
+    import time
 
-    for item in symbols_data:
+    for i, item in enumerate(symbols_data):
+        if i > 0:
+            time.sleep(4)  # Gemini free: max 15 req/min
         symbol = item["symbol"]
         df = item["df"]
         signals = item["signals"]
