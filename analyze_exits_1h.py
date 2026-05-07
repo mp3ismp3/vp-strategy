@@ -62,21 +62,28 @@ def collect_1h_trades(symbols, cfg):
                     continue
 
                 sig = None
+                signal_name = ""
                 wick_dn = min(c, o) - l
                 wick_up = h - max(c, o)
 
                 if l <= val * 1.005 and c > o and c > val and wick_dn >= body * 0.8 and v > vol_avg * MIN_VOL_RATIO:
                     sig = "LONG"
+                    signal_name = "VA Rejection"
                 elif h >= vah * 0.995 and c < o and c < vah and wick_up >= body * 0.8 and v > vol_avg * MIN_VOL_RATIO:
                     sig = "SHORT"
+                    signal_name = "VA Rejection"
                 elif prev["Close"] < val and c > val and c > o and v > vol_avg * MIN_VOL_RATIO:
                     sig = "LONG"
+                    signal_name = "Failed Auction"
                 elif prev["Close"] > vah and c < vah and c < o and v > vol_avg * MIN_VOL_RATIO:
                     sig = "SHORT"
+                    signal_name = "Failed Auction"
                 elif abs(l - vah) < atr * 0.5 and c > vah and c > o and v > vol_avg * MIN_VOL_RATIO:
                     sig = "LONG"
+                    signal_name = "Breakout Retest"
                 elif abs(h - val) < atr * 0.5 and c < val and c < o and v > vol_avg * MIN_VOL_RATIO:
                     sig = "SHORT"
+                    signal_name = "Breakout Retest"
 
                 if sig is None:
                     continue
@@ -96,6 +103,7 @@ def collect_1h_trades(symbols, cfg):
                 trades.append({
                     "symbol": symbol,
                     "direction": sig,
+                    "signal": signal_name,
                     "entry": float(c),
                     "atr": atr,
                     "vah": vah,
@@ -197,65 +205,87 @@ def main():
         print("❌ No trades.")
         return
 
-    results = []
+    # Group by signal type (LONG only)
+    long_trades = [t for t in trades if t["direction"] == "LONG"]
+    breakout_long = [t for t in long_trades if t["signal"] == "Breakout Retest"]
+    failed_long = [t for t in long_trades if t["signal"] == "Failed Auction"]
+    rejection_long = [t for t in long_trades if t["signal"] == "VA Rejection"]
 
-    # Current: TP=VAH/VAL, SL=0.5 ATR
-    orig_pnls = []
-    for t in trades:
-        entry, atr, d = t["entry"], t["atr"], t["direction"]
-        tp = t["vah"] if d == "LONG" else t["val"]
-        sl = entry - atr * 0.5 if d == "LONG" else entry + atr * 0.5
-        risk = atr * 0.5
-        if risk == 0:
+    print(f"  LONG: {len(long_trades)} | Breakout: {len(breakout_long)} | Failed: {len(failed_long)} | Rejection: {len(rejection_long)}\n")
+
+    groups = [
+        ("ALL LONG", long_trades),
+        ("BREAKOUT RETEST LONG", breakout_long),
+        ("FAILED AUCTION LONG", failed_long),
+        ("VA REJECTION LONG", rejection_long),
+    ]
+
+    for label, subset in groups:
+        if not subset or len(subset) < 5:
+            print(f"\n  {label}: too few trades ({len(subset)}), skip\n")
             continue
-        for bar in t["forward"][:MAX_HOLD]:
-            if d == "LONG":
+
+        print(f"\n{'='*75}")
+        print(f"  {label} ({len(subset)} trades)")
+        print(f"{'='*75}")
+
+        results = []
+
+        # Fixed R:R
+        for tp_atr in [0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0]:
+            for sl_atr in [0.3, 0.5, 0.8, 1.0]:
+                pnls = simulate(subset, tp_atr, sl_atr, MAX_HOLD)
+                rr = tp_atr / sl_atr
+                results.append(evaluate(pnls, f"Fixed TP={tp_atr} SL={sl_atr} (1:{rr:.1f})"))
+
+        # TP = POC
+        for sl in [0.3, 0.5, 0.8, 1.0]:
+            pnls = simulate_to_poc(subset, sl, MAX_HOLD)
+            results.append(evaluate(pnls, f"TP=POC, SL={sl}ATR"))
+
+        # Original TP/SL
+        orig_pnls = []
+        for t in subset:
+            entry, atr, d = t["entry"], t["atr"], t["direction"]
+            tp = t["vah"]
+            sl = entry - atr * 0.5
+            risk = atr * 0.5
+            if risk == 0:
+                continue
+            for bar in t["forward"][:MAX_HOLD]:
                 if bar["l"] <= sl:
                     orig_pnls.append(-1.0); break
                 if bar["h"] >= tp:
                     orig_pnls.append((tp - entry) / risk); break
             else:
-                if bar["h"] >= sl:
-                    orig_pnls.append(-1.0); break
-                if bar["l"] <= tp:
-                    orig_pnls.append((entry - tp) / risk); break
-        else:
-            last_c = t["forward"][min(MAX_HOLD - 1, len(t["forward"]) - 1)]["c"]
-            r = (last_c - entry) / risk if d == "LONG" else (entry - last_c) / risk
-            orig_pnls.append(r)
-    results.append(evaluate(orig_pnls, "★ CURRENT (TP=VAH/VAL, SL=0.5ATR)"))
+                last_c = t["forward"][min(MAX_HOLD - 1, len(t["forward"]) - 1)]["c"]
+                orig_pnls.append((last_c - entry) / risk)
+        results.insert(0, evaluate(orig_pnls, "★ CURRENT (TP=VAH, SL=0.5ATR)"))
 
-    # TP = POC
-    for sl in [0.3, 0.5, 0.8, 1.0]:
-        pnls = simulate_to_poc(trades, sl, MAX_HOLD)
-        results.append(evaluate(pnls, f"TP=POC, SL={sl}ATR"))
+        results.sort(key=lambda x: x["exp"], reverse=True)
 
-    # Fixed R:R
-    for tp_atr in [0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0]:
-        for sl_atr in [0.3, 0.5, 0.8, 1.0]:
-            pnls = simulate(trades, tp_atr, sl_atr, MAX_HOLD)
-            rr = tp_atr / sl_atr
-            results.append(evaluate(pnls, f"Fixed TP={tp_atr} SL={sl_atr} (1:{rr:.1f})"))
+        print(f"  {'Strategy':<42} | {'N':>5} {'WR':>6} {'Exp':>7} {'PF':>6}")
+        print(f"  {'─'*42} | {'─'*5} {'─'*6} {'─'*7} {'─'*6}")
+        for r in results[:15]:
+            marker = "→" if "CURRENT" in r["label"] else " "
+            print(f" {marker}{r['label']:<42} | {r['n']:>5} {r['wr']:>5.1f}% {r['exp']:>+6.2f}R {r['pf']:>5.2f}")
 
-    # Sort
-    results.sort(key=lambda x: x["exp"], reverse=True)
+        best = results[0]
+        current = next((r for r in results if "CURRENT" in r["label"]), results[-1])
+        print(f"\n  ★ CURRENT: Exp {current['exp']:+.2f}R | ✅ BEST: {best['label']} Exp {best['exp']:+.2f}R")
 
+    # Hold bars analysis
+    print(f"\n{'='*75}")
+    print(f"  MAX HOLD BARS (TP=1.5 SL=0.5)")
     print(f"{'='*75}")
-    print(f"  1H EXIT STRATEGY ANALYSIS (sorted by expectancy)")
-    print(f"{'='*75}")
-    print(f"  {'Strategy':<42} | {'N':>5} {'WR':>6} {'Exp':>7} {'PF':>6}")
-    print(f"  {'─'*42} | {'─'*5} {'─'*6} {'─'*7} {'─'*6}")
-
-    for r in results[:20]:
-        marker = "→" if "CURRENT" in r["label"] else " "
-        print(f" {marker}{r['label']:<42} | {r['n']:>5} {r['wr']:>5.1f}% {r['exp']:>+6.2f}R {r['pf']:>5.2f}")
-
-    best = results[0]
-    current = next(r for r in results if "CURRENT" in r["label"])
-    print(f"\n{'─'*75}")
-    print(f"  ★ CURRENT:  Exp {current['exp']:+.2f}R | WR {current['wr']:.1f}%")
-    print(f"  ✅ BEST:     {best['label']}")
-    print(f"              Exp {best['exp']:+.2f}R | WR {best['wr']:.1f}% | PF {best['pf']:.2f}")
+    for label, subset in groups:
+        if not subset or len(subset) < 5:
+            continue
+        print(f"\n  {label}:")
+        for hold in [3, 4, 5, 6, 8, 10]:
+            pnls = simulate(subset, 1.5, 0.5, max_hold=hold)
+            r = evaluate(pnls, f"Hold={hold}h")
+            print(f"    {r['label']:<10} | {r['n']:>5} {r['wr']:>5.1f}% {r['exp']:>+6.2f}R {r['pf']:>5.2f}")
     print(f"{'='*75}")
 
 
