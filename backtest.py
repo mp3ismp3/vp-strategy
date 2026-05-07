@@ -68,14 +68,17 @@ def run_backtest(symbols, cfg, days=120, max_hold=10):
                 if sig.direction == "WARNING":
                     continue
 
-                entry = sig.entry
-                tp = sig.tp
-                sl = sig.sl
+                # Use next day's open as actual entry (realistic execution)
+                if i + 1 >= end_idx:
+                    continue
+                entry = float(df.iloc[i + 1]["Open"])
+                tp = entry + (sig.tp - sig.entry) if sig.direction == "LONG" else entry - (sig.entry - sig.tp)
+                sl = entry - (sig.entry - sig.sl) if sig.direction == "LONG" else entry + (sig.sl - sig.entry)
                 risk = abs(entry - sl)
                 if risk == 0:
                     continue
 
-                entry_date = str(df.index[i].date())
+                entry_date = str(df.index[i + 1].date())
 
                 # Simulate forward: check next max_hold days
                 trade = Trade(
@@ -84,7 +87,7 @@ def run_backtest(symbols, cfg, days=120, max_hold=10):
                     tp=tp, sl=sl, entry_date=entry_date
                 )
 
-                for j in range(i + 1, min(i + 1 + max_hold, end_idx)):
+                for j in range(i + 2, min(i + 2 + max_hold, end_idx)):
                     day = df.iloc[j]
                     h, l, c = day["High"], day["Low"], day["Close"]
 
@@ -116,9 +119,9 @@ def run_backtest(symbols, cfg, days=120, max_hold=10):
                             break
                 else:
                     # Max hold reached, exit at close
-                    last_close = float(df.iloc[min(i + max_hold, end_idx - 1)]["Close"])
+                    last_close = float(df.iloc[min(i + 1 + max_hold, end_idx - 1)]["Close"])
                     trade.exit_price = last_close
-                    trade.exit_date = str(df.index[min(i + max_hold, end_idx - 1)].date())
+                    trade.exit_date = str(df.index[min(i + 1 + max_hold, end_idx - 1)].date())
                     if sig.direction == "LONG":
                         trade.pnl_r = (last_close - entry) / risk
                     else:
