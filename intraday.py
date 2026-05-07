@@ -95,12 +95,6 @@ def scan_intraday(symbols, cfg, market_ctx):
     """Scan for intraday confirmations, return scored signals."""
     signals = []
 
-    # Skip if too close to market close (last 30 min not useful)
-    now_hour = datetime.now().hour  # UTC
-    if now_hour >= 19:  # UTC 19:30 = ET 15:30
-        print("Too close to market close, skipping.")
-        return signals
-
     for symbol in symbols:
         df_daily = download_symbol(symbol)
         if df_daily is None or len(df_daily) < cfg["vp_lookback"] + 5:

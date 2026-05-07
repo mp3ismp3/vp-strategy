@@ -2,8 +2,8 @@ name: Intraday Signal Confirmation
 
 on:
   schedule:
-    # Every hour during US market hours (ET 10:30-14:30 = UTC 14:30-18:30)
-    - cron: '30 14-18 * * 1-5'
+    # Every hour during US market hours (ET 10:30-15:30 = UTC 14:30-19:30)
+    - cron: '30 14-19 * * 1-5'
   workflow_dispatch:
 
 env:
