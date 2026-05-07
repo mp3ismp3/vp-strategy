@@ -126,7 +126,21 @@ def format_signals(signals, lookback):
         else:
             stars = "⭐" * score
             direction_zh = "做多" if sig.direction == "LONG" else "做空"
-            lines.append(f"{emoji} <b>{sig.symbol}</b> {direction_zh} ({sig_label}) {stars} ({score}/5)")
+
+            # Priority tag based on backtest results
+            priority = ""
+            is_breakout = "Breakout" in sig.strategy
+            is_long = sig.direction == "LONG"
+            if is_breakout and is_long:
+                priority = " 🏆"  # Best: Breakout + LONG
+            elif is_long and score >= 4:
+                priority = " ⭐⭐"  # Strong: LONG + high score
+            elif is_long:
+                priority = " ✅"  # Good: LONG
+            elif sig.direction == "SHORT":
+                priority = " ⚠️低勝率"  # Weak: SHORT
+
+            lines.append(f"{emoji} <b>{sig.symbol}</b> {direction_zh} ({sig_label}) {stars} ({score}/5){priority}")
             # R:R ratio
             risk = abs(sig.entry - sig.sl)
             reward = abs(sig.tp - sig.entry)
