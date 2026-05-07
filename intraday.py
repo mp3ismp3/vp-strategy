@@ -165,13 +165,14 @@ def scan_intraday(symbols, cfg, market_ctx):
             sector_etf = SECTOR_MAP.get(symbol, "QQQ")
             score, details = score_signal(direction, name, factors, market_ctx, sector_etf, False)
 
-            # Hard filter: don't send counter-trend signals
+            # Hard filter: long only (based on backtest results)
+            if direction == "SHORT":
+                continue
+
+            # Don't send counter-trend signals
             trend = factors.get("inst_trend", "NEUTRAL")
             if direction == "LONG" and trend == "BEARISH":
                 print(f"  [SKIP] {symbol} [{lb}D] LONG — trend BEARISH")
-                continue
-            if direction == "SHORT" and trend == "BULLISH":
-                print(f"  [SKIP] {symbol} [{lb}D] SHORT — trend BULLISH")
                 continue
 
             stats["trend_ok"] += 1
@@ -204,7 +205,11 @@ def format_intraday(signals):
         reward = abs(tp - entry)
         rr = f"{reward/risk:.1f}" if risk > 0 else "—"
 
-        lines.append(f"{emoji} <b>{symbol}</b> {dir_zh} ({sig_label}) [{lb}D] {stars} ({score}/5)")
+        # Priority tag
+        is_breakout = "Breakout" in name
+        priority = " 🏆" if is_breakout else ""
+
+        lines.append(f"{emoji} <b>{symbol}</b> {dir_zh} ({sig_label}) [{lb}D] {stars} ({score}/5){priority}")
         lines.append(f"   ▸ Entry: <code>{entry:.2f}</code> | TP: <code>{tp:.2f}</code> | SL: <code>{sl:.2f}</code>")
         lines.append(f"   ▸ R:R = 1:{rr}")
         # Gate + bonus details
