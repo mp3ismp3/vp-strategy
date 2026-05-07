@@ -117,9 +117,8 @@ def main():
     parser.add_argument("--symbols", type=str, default="", help="Comma-separated (default: top 10 liquid)")
     args = parser.parse_args()
 
-    # Use top 10 most liquid for speed
-    default_symbols = ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AMD", "SPY", "QQQ"]
-    symbols = args.symbols.split(",") if args.symbols else default_symbols
+    # Use all symbols for better sample size
+    symbols = args.symbols.split(",") if args.symbols else SYMBOLS
     symbols = [s.strip() for s in symbols if s.strip()]
 
     print(f"Parameter Optimization")
@@ -135,7 +134,7 @@ def main():
     print("Downloading data...")
     all_data = {}
     for symbol in symbols:
-        df = yf.download(symbol, period="1y", progress=False)
+        df = yf.download(symbol, period="2y", progress=False)
         if df.empty:
             continue
         if isinstance(df.columns, pd.MultiIndex):

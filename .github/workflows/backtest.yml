@@ -14,7 +14,7 @@ on:
           - optimize_1h
       days:
         description: 'Days to backtest'
-        default: '120'
+        default: '365'
       symbols:
         description: 'Symbols (comma-separated, empty=all/top10)'
         default: ''
