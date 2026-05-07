@@ -228,9 +228,11 @@ def main():
 
                 # Swing points
                 from core.indicators import find_swing_points
-                swings = find_swing_points(df)
-                factors["swing_points"] = {"high": f"{swings['high']:.2f}" if swings else "N/A",
-                                           "low": f"{swings['low']:.2f}" if swings else "N/A"} if swings else {}
+                sh, sl_pts = find_swing_points(df)
+                factors["swing_points"] = {
+                    "high": f"{sh[-1][1]:.2f}" if sh else "N/A",
+                    "low": f"{sl_pts[-1][1]:.2f}" if sl_pts else "N/A",
+                } if (sh or sl_pts) else {}
 
                 ai_inputs.append({
                     "symbol": sig.symbol,
