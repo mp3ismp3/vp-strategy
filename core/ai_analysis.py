@@ -4,12 +4,10 @@ AI analysis module — uses Gemini to analyze signals with full OHLCV context.
 
 import os
 import json
-import requests
 import pandas as pd
 import numpy as np
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 
 def calc_rsi(df, period=14):
@@ -125,26 +123,31 @@ VIX: {vix} | SPY: {spy}
 
 
 def call_gemini(prompt):
-    """Call Gemini API."""
+    """Call Gemini API using official SDK."""
+    import time
     if not GEMINI_API_KEY:
         return "⚠️ GEMINI_API_KEY 未設定"
 
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 500, "temperature": 0.3}
-    }
-
     try:
-        resp = requests.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
-            headers=headers, json=data, timeout=30
-        )
-        if resp.status_code == 200:
-            result = resp.json()
-            return result["candidates"][0]["content"]["parts"][0]["text"]
-        else:
-            return f"⚠️ API error: {resp.status_code}"
+        from google import genai
+        client = genai.Client(api_key=GEMINI_API_KEY)
+
+        for attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt,
+                )
+                return response.text
+            except Exception as e:
+                if "429" in str(e):
+                    time.sleep(10 * (attempt + 1))
+                    continue
+                return f"⚠️ API error: {e}"
+
+        return "⚠️ API rate limited, retry later"
+    except ImportError:
+        return "⚠️ google-genai not installed"
     except Exception as e:
         return f"⚠️ API error: {e}"
 
