@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Mode: backtest or optimize or backtest_1h or optimize_1h'
+        description: 'Mode'
         default: 'backtest'
         type: choice
         options:
@@ -12,6 +12,7 @@ on:
           - optimize
           - backtest_1h
           - optimize_1h
+          - analyze_filters
       days:
         description: 'Days to backtest'
         default: '365'
@@ -44,7 +45,6 @@ jobs:
           python backtest.py \
             --days ${{ github.event.inputs.days }} \
             --max-hold ${{ github.event.inputs.max_hold }} \
-            --min-score 3 \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
 
       - name: Run optimization
@@ -63,4 +63,11 @@ jobs:
         if: ${{ github.event.inputs.mode == 'optimize_1h' }}
         run: |
           python optimize_1h.py \
+            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
+
+      - name: Run filter analysis
+        if: ${{ github.event.inputs.mode == 'analyze_filters' }}
+        run: |
+          python analyze_filters.py \
+            --days ${{ github.event.inputs.days }} \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
