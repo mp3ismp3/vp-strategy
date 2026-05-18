@@ -140,15 +140,16 @@ def calc_ema(series, period):
 
 
 def is_atr_compressed(df, atr_len=14, lookback=20, threshold=0.7):
-    """Check if current ATR is compressed (< threshold * avg ATR over lookback)."""
-    if len(df) < lookback + atr_len:
+    """Check if current ATR is compressed (< threshold * historical avg ATR)."""
+    if len(df) < lookback + atr_len + 5:
         return False
     h, l, c = df["High"].values, df["Low"].values, df["Close"].values
     tr = np.maximum(h[1:] - l[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])))
-    if len(tr) < atr_len:
+    if len(tr) < lookback + atr_len:
         return False
     current_atr = float(np.mean(tr[-atr_len:]))
-    avg_atr = float(np.mean(tr[-lookback:]))
-    if avg_atr == 0:
+    # Use historical ATR (before current period) as baseline
+    hist_atr = float(np.mean(tr[-(lookback + atr_len):-atr_len]))
+    if hist_atr == 0:
         return False
-    return current_atr < threshold * avg_atr
+    return current_atr < threshold * hist_atr

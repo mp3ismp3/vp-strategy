@@ -32,7 +32,7 @@ def _poc_shift(df, cfg):
 
 
 def _atr_compression_days(df, atr_len=14, lookback=20, threshold=0.7):
-    """Count consecutive recent days where ATR < threshold * avg ATR."""
+    """Count consecutive recent days where ATR < threshold * historical avg ATR."""
     if len(df) < lookback + atr_len + 5:
         return 0
     h, l, c = df["High"].values, df["Low"].values, df["Close"].values
@@ -43,15 +43,16 @@ def _atr_compression_days(df, atr_len=14, lookback=20, threshold=0.7):
     atrs = []
     for i in range(atr_len, len(tr) + 1):
         atrs.append(np.mean(tr[i - atr_len:i]))
-    if len(atrs) < lookback:
+    if len(atrs) < lookback + atr_len:
         return 0
-    avg_atr = np.mean(atrs[-lookback:])
-    if avg_atr == 0:
+    # Use first half as historical baseline (not contaminated by compression)
+    hist_avg = np.mean(atrs[:len(atrs) // 2])
+    if hist_avg == 0:
         return 0
     # Count consecutive compressed days from most recent
     count = 0
     for a in reversed(atrs):
-        if a < threshold * avg_atr:
+        if a < threshold * hist_avg:
             count += 1
         else:
             break
