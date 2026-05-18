@@ -1,0 +1,134 @@
+"""Trend Following Strategy — Breakout Acceptance, EMA Cross, Compression Breakout."""
+
+from core.base_strategy import BaseStrategy
+from core.signal import StrategySignal
+from core.indicators import calc_donchian, calc_ema, calc_atr, calc_vol_ratio, is_atr_compressed
+
+
+class TrendSignals(BaseStrategy):
+    name = "TrendFollowing"
+
+    def detect(self, df, cfg, market_ctx) -> list:
+        if len(df) < 60:
+            return []
+
+        atr = calc_atr(df, cfg["atr_len"])
+        if not atr or atr == 0:
+            return []
+
+        donchian = calc_donchian(df.iloc[:-1], 20)  # exclude today for breakout ref
+        vol_ratio = calc_vol_ratio(df, cfg["vol_ma_len"])
+        ema20 = calc_ema(df["Close"], 20)
+        ema50 = calc_ema(df["Close"], 50)
+
+        cur = df.iloc[-1]
+        ticker = df.attrs.get("symbol", "")
+        ts = df.index[-1]
+        c = cur["Close"]
+        o = cur["Open"]
+        bull = c > o
+        bear = c < o
+
+        signals = []
+
+        # --- Breakout Acceptance LONG ---
+        if donchian and c > donchian["upper"]:
+            # Check 2 consecutive days above
+            prev1 = df.iloc[-2]["Close"]
+            prev2 = df.iloc[-3]["Close"] if len(df) > 2 else 0
+            if prev1 > donchian["upper"] and vol_ratio > 1.5:
+                sl = max(donchian["upper"] - atr * 0.5, c - atr * cfg["max_sl_atr"])
+                tp = c + (donchian["upper"] - donchian["lower"])  # measured move
+                signals.append(StrategySignal(
+                    ticker=ticker, timestamp=ts, strategy="TrendFollowing",
+                    signal_type="Breakout Acceptance", direction="LONG",
+                    confidence=min(vol_ratio / 2.5, 1.0),
+                    entry=c, stop=sl, target=tp, holding_type="long",
+                    reasons=[
+                        f"Broke Donchian high {donchian['upper']:.2f}",
+                        f"2 days above breakout",
+                        f"Volume {vol_ratio:.1f}x avg",
+                    ],
+                    warnings=[], triggered=True,
+                ))
+
+        # --- Breakout Acceptance SHORT ---
+        if not cfg["long_only"] and donchian and c < donchian["lower"]:
+            prev1 = df.iloc[-2]["Close"]
+            if prev1 < donchian["lower"] and vol_ratio > 1.5:
+                sl = min(donchian["lower"] + atr * 0.5, c + atr * cfg["max_sl_atr"])
+                tp = c - (donchian["upper"] - donchian["lower"])
+                signals.append(StrategySignal(
+                    ticker=ticker, timestamp=ts, strategy="TrendFollowing",
+                    signal_type="Breakout Acceptance", direction="SHORT",
+                    confidence=min(vol_ratio / 2.5, 1.0),
+                    entry=c, stop=sl, target=tp, holding_type="long",
+                    reasons=[
+                        f"Broke Donchian low {donchian['lower']:.2f}",
+                        f"2 days below breakdown",
+                        f"Volume {vol_ratio:.1f}x avg",
+                    ],
+                    warnings=[], triggered=True,
+                ))
+
+        # --- EMA Cross LONG ---
+        if ema20 and ema50 and ema20 > ema50 and c > ema20 and bull and vol_ratio >= 1.2:
+            # Check EMA20 just crossed above EMA50 (within last 3 bars)
+            prev_ema20 = calc_ema(df["Close"].iloc[:-3], 20)
+            prev_ema50 = calc_ema(df["Close"].iloc[:-3], 50)
+            if prev_ema20 and prev_ema50 and prev_ema20 <= prev_ema50:
+                sl = max(ema20 - atr * 0.3, c - atr * cfg["max_sl_atr"])
+                tp = c + atr * 3.0
+                signals.append(StrategySignal(
+                    ticker=ticker, timestamp=ts, strategy="TrendFollowing",
+                    signal_type="EMA Cross", direction="LONG",
+                    confidence=0.6,
+                    entry=c, stop=sl, target=tp, holding_type="long",
+                    reasons=[f"EMA20 ({ema20:.2f}) crossed above EMA50 ({ema50:.2f})", f"Price above EMA20"],
+                    warnings=["Lagging signal — confirm with price action"],
+                    triggered=True,
+                ))
+
+        # --- EMA Cross SHORT ---
+        if not cfg["long_only"] and ema20 and ema50 and ema20 < ema50 and c < ema20 and bear and vol_ratio >= 1.2:
+            prev_ema20 = calc_ema(df["Close"].iloc[:-3], 20)
+            prev_ema50 = calc_ema(df["Close"].iloc[:-3], 50)
+            if prev_ema20 and prev_ema50 and prev_ema20 >= prev_ema50:
+                sl = min(ema20 + atr * 0.3, c + atr * cfg["max_sl_atr"])
+                tp = c - atr * 3.0
+                signals.append(StrategySignal(
+                    ticker=ticker, timestamp=ts, strategy="TrendFollowing",
+                    signal_type="EMA Cross", direction="SHORT",
+                    confidence=0.6,
+                    entry=c, stop=sl, target=tp, holding_type="long",
+                    reasons=[f"EMA20 ({ema20:.2f}) crossed below EMA50 ({ema50:.2f})", f"Price below EMA20"],
+                    warnings=["Lagging signal — confirm with price action"],
+                    triggered=True,
+                ))
+
+        # --- Compression Breakout ---
+        if is_atr_compressed(df.iloc[:-1], cfg["atr_len"], 20, 0.7):
+            # ATR was compressed, check if today expanded
+            current_range = cur["High"] - cur["Low"]
+            if current_range > atr * 1.5:
+                direction = "LONG" if bull else "SHORT"
+                if cfg["long_only"] and direction == "SHORT":
+                    pass
+                else:
+                    if direction == "LONG":
+                        sl = max(cur["Low"] - atr * 0.3, c - atr * cfg["max_sl_atr"])
+                        tp = c + atr * 2.5
+                    else:
+                        sl = min(cur["High"] + atr * 0.3, c + atr * cfg["max_sl_atr"])
+                        tp = c - atr * 2.5
+                    signals.append(StrategySignal(
+                        ticker=ticker, timestamp=ts, strategy="TrendFollowing",
+                        signal_type="Compression Breakout", direction=direction,
+                        confidence=0.7,
+                        entry=c, stop=sl, target=tp, holding_type="mid",
+                        reasons=["ATR was compressed 5+ days", f"Today range {current_range:.2f} > 1.5x ATR"],
+                        warnings=["First expansion bar — wait for follow-through"],
+                        triggered=True,
+                    ))
+
+        return signals

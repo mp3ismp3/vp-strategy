@@ -45,7 +45,9 @@ class TestVPSignals:
         df.iloc[-1, df.columns.get_loc("Volume")] = int(df["Volume"].mean() * 3)
         result = s.detect(df, {"vp_lookback": 60, "va_pct": 0.68, "atr_len": 14, "vol_ma_len": 21, "max_sl_atr": 3.0, "long_only": False}, {})
         assert len(result) > 0
-        assert result[0].symbol == "TEST"
+        assert result[0].ticker == "TEST"
+        assert result[0].strategy.startswith("VP:")
+        assert result[0].signal_type in ("VA Rejection", "Failed Auction", "Breakout Retest", "Climax Volume")
 
 
 class TestInstitutionalTrend:

@@ -9,7 +9,8 @@ Bearish: close < swing low + volume > 1.5x avg + (VWAP/pullback/sweep)
 Neutral: no confirmed breakout
 """
 
-from strategies import BaseStrategy, Signal
+from core.base_strategy import BaseStrategy
+from core.signal import StrategySignal
 from core.indicators import calc_vwap, find_swing_points
 
 

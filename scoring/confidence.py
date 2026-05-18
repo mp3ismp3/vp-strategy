@@ -113,12 +113,22 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
       EXPANSION: all VP signals capped (VP unreliable)
 
     Returns (score, details_dict).
+
+    sig_name can be either "VP: VA Rejection" (legacy) or just "VA Rejection" (new).
     """
     score = 0
     details = {}
     is_long = direction == "LONG"
     gate_count = 0
     regime = factors.get("regime", "range")
+
+    # Normalize sig_name: handle "VP: Breakout Retest" (legacy), "VP" (base only), or "Breakout Retest"
+    if ": " in sig_name:
+        full_name = sig_name  # Already in "VP: X" format
+    elif sig_name in ("VP", "VWAP", "TrendFollowing"):
+        full_name = sig_name  # Base strategy name only — skip specific checks
+    else:
+        full_name = f"VP: {sig_name}"  # Signal type only → prepend VP
 
     # ═══ REGIME DISPLAY ═══
     regime_label = {"range": "📦Range", "trend": "📈Trend", "expansion": "🔥Expansion"}
@@ -137,7 +147,7 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
 
     # 2. Regime-specific gate
     trend = factors["inst_trend"]
-    if sig_name == "VP: Breakout Retest":
+    if full_name == "VP: Breakout Retest":
         # Breakout needs trend confirmation
         if (is_long and trend == "BULLISH") or (not is_long and trend == "BEARISH"):
             score += 1
@@ -145,7 +155,7 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
             details["趨勢"] = f"{trend}✅"
         else:
             details["趨勢"] = f"{trend}❌"
-    elif sig_name in ("VP: VA Rejection", "VP: Failed Auction"):
+    elif full_name in ("VP: VA Rejection", "VP: Failed Auction"):
         # Mean-reversion needs range regime
         if regime == "range":
             score += 1
@@ -163,7 +173,7 @@ def score_signal(direction, sig_name, factors, market_ctx, sector_etf, has_same_
     # 3. VIX environment (signal-type aware)
     vix = market_ctx.get("vix")
     if vix is not None:
-        is_mean_reversion = sig_name in ("VP: VA Rejection", "VP: Failed Auction")
+        is_mean_reversion = full_name in ("VP: VA Rejection", "VP: Failed Auction")
         vix_good = (is_mean_reversion and vix >= 20) or (not is_mean_reversion and vix < 20)
         if vix_good:
             score += 1
