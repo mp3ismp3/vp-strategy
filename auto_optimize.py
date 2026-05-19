@@ -198,7 +198,7 @@ def main():
     # Download all data once (2 years)
     print("Downloading 2 years of data...")
     all_data = {}
-    for symbol in symbols:
+    for i, symbol in enumerate(symbols):
         df = yf.download(symbol, period="2y", progress=False)
         if df.empty:
             continue
@@ -206,7 +206,8 @@ def main():
             df.columns = df.columns.get_level_values(0)
         if len(df) >= 200:
             all_data[symbol] = df
-    print(f"  ✓ {len(all_data)} symbols loaded\n")
+            print(f"    {symbol}: {len(df)} days", flush=True)
+    print(f"  ✓ {len(all_data)} symbols loaded\n", flush=True)
 
     # Split 70/30
     split_data = {}
@@ -228,7 +229,7 @@ def main():
         all_combos = list(itertools.product(param_combos, max_holds))
         sig_filter = grid["signal_filter"]
 
-        print(f"  {len(all_combos)} combinations to test...")
+        print(f"  {len(all_combos)} combinations to test...", flush=True)
 
         results_table = []
         for idx, (params, max_hold) in enumerate(all_combos):
@@ -256,8 +257,8 @@ def main():
                 "test_results": test_results,
             })
 
-            if (idx + 1) % 20 == 0:
-                print(f"    {idx+1}/{len(all_combos)} done...")
+            if (idx + 1) % 5 == 0 or idx == 0:
+                print(f"    [{tf_name}] {idx+1}/{len(all_combos)} combos done...", flush=True)
 
         # Sort by test expectancy
         results_table.sort(key=lambda x: x["test"]["expectancy"], reverse=True)
