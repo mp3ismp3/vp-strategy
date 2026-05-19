@@ -23,10 +23,11 @@ jobs:
 
       - name: Run auto optimization
         run: |
-          if [ -n "${{ github.event.inputs.symbols }}" ]; then
-            python auto_optimize.py --symbols "${{ github.event.inputs.symbols }}"
-          else
+          SYMBOLS="${{ github.event.inputs.symbols }}"
+          if [ -z "$SYMBOLS" ]; then
             python auto_optimize.py
+          else
+            python auto_optimize.py --symbols "$SYMBOLS"
           fi
 
       - name: Upload results
