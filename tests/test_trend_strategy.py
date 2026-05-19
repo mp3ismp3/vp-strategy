@@ -26,15 +26,20 @@ def _cfg():
 def test_breakout_acceptance():
     """Force a Donchian breakout scenario with strict acceptance."""
     df = _make_df(80, trend=0.3)
-    from core.indicators import calc_donchian, calc_atr
-    don = calc_donchian(df.iloc[:-3], 20)
+    from core.indicators import calc_donchian
+    # Strategy uses df.iloc[:-1] as Donchian reference (excludes last bar)
+    don = calc_donchian(df.iloc[:-1], 20)
     if don:
-        # Force last 3 bars clearly above Donchian upper (close AND low)
-        for i in [-3, -2, -1]:
-            df.iloc[i, df.columns.get_loc("Close")] = don["upper"] + 3
-            df.iloc[i, df.columns.get_loc("Open")] = don["upper"] + 1
-            df.iloc[i, df.columns.get_loc("High")] = don["upper"] + 5
-            df.iloc[i, df.columns.get_loc("Low")] = don["upper"] + 0.5  # Low holds above level
+        upper = don["upper"]
+        # prev1 (iloc[-2]): close above + low holds above level
+        df.iloc[-2, df.columns.get_loc("Close")] = upper + 2
+        df.iloc[-2, df.columns.get_loc("Low")] = upper + 0.1
+        df.iloc[-2, df.columns.get_loc("High")] = upper + 3
+        # today (iloc[-1]): close above + bullish + high volume
+        df.iloc[-1, df.columns.get_loc("Close")] = upper + 3
+        df.iloc[-1, df.columns.get_loc("Open")] = upper + 1
+        df.iloc[-1, df.columns.get_loc("High")] = upper + 4
+        df.iloc[-1, df.columns.get_loc("Low")] = upper + 0.5
         df.iloc[-1, df.columns.get_loc("Volume")] = 20_000_000
 
     strategy = TrendSignals()
