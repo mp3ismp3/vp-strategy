@@ -72,7 +72,7 @@ class Trade:
 
 # ─── Backtest Engine ─────────────────────────────────────────────────────────
 
-def run_backtest(symbols, cfg, timeframe="long", days=250):
+def run_backtest(symbols, cfg, timeframe="long", days=750, entry_delay=0):
     """Walk-forward backtest for a specific timeframe."""
     tf = TIMEFRAMES[timeframe]
     strategies = tf["strategies"]
@@ -110,10 +110,28 @@ def run_backtest(symbols, cfg, timeframe="long", days=250):
             filtered = [s for s in all_signals if s.direction in ("LONG", "SHORT") and sig_filter(s)]
 
             for sig in filtered:
-                if i + 1 >= end_idx:
+                entry_bar = i + 1 + entry_delay
+                if entry_bar >= end_idx:
                     continue
 
-                entry = float(df.iloc[i + 1]["Open"])
+                # During delay, check price still holds (not invalidated)
+                if entry_delay > 0:
+                    invalidated = False
+                    for d in range(entry_delay):
+                        check_idx = i + 1 + d
+                        if check_idx >= end_idx:
+                            invalidated = True
+                            break
+                        if sig.direction == "LONG" and float(df.iloc[check_idx]["Low"]) <= sig.stop:
+                            invalidated = True
+                            break
+                        if sig.direction == "SHORT" and float(df.iloc[check_idx]["High"]) >= sig.stop:
+                            invalidated = True
+                            break
+                    if invalidated:
+                        continue
+
+                entry = float(df.iloc[entry_bar]["Open"])
                 risk = abs(sig.entry - sig.stop)
                 if risk == 0:
                     continue
@@ -141,7 +159,7 @@ def run_backtest(symbols, cfg, timeframe="long", days=250):
                 )
 
                 # Simulate forward
-                for j in range(i + 2, min(i + 2 + max_hold, end_idx)):
+                for j in range(entry_bar + 1, min(entry_bar + 1 + max_hold, end_idx)):
                     h, l = float(df.iloc[j]["High"]), float(df.iloc[j]["Low"])
 
                     if sig.direction == "LONG":
@@ -167,7 +185,7 @@ def run_backtest(symbols, cfg, timeframe="long", days=250):
                             trade.pnl_r = abs(entry - tp) / actual_risk
                             break
                 else:
-                    last_idx = min(i + 1 + max_hold, end_idx - 1)
+                    last_idx = min(entry_bar + max_hold, end_idx - 1)
                     last_c = float(df.iloc[last_idx]["Close"])
                     trade.exit_price = last_c
                     if sig.direction == "LONG":
@@ -251,8 +269,9 @@ def print_report(trades, timeframe):
 def main():
     parser = argparse.ArgumentParser(description="Multi-Strategy Backtest by Timeframe")
     parser.add_argument("--timeframe", type=str, default="long", choices=["short", "mid", "long", "all"])
-    parser.add_argument("--days", type=int, default=250, help="Backtest period in days")
+    parser.add_argument("--days", type=int, default=750, help="Backtest period in days (default: 750 for long)")
     parser.add_argument("--symbols", type=str, default="", help="Comma-separated symbols")
+    parser.add_argument("--entry-delay", type=int, default=0, help="Wait N bars after signal before entry")
     args = parser.parse_args()
 
     symbols = args.symbols.split(",") if args.symbols else SYMBOLS
@@ -263,9 +282,9 @@ def main():
     for tf in timeframes:
         print(f"\n{'━'*65}")
         print(f"  Running {TIMEFRAMES[tf]['label']} backtest | {len(symbols)} symbols | {args.days} days")
-        print(f"  Max hold: {TIMEFRAMES[tf]['max_hold']} days")
+        print(f"  Max hold: {TIMEFRAMES[tf]['max_hold']} days | Entry delay: {args.entry_delay}")
         print(f"{'━'*65}")
-        trades = run_backtest(symbols, DEFAULT_CFG, timeframe=tf, days=args.days)
+        trades = run_backtest(symbols, DEFAULT_CFG, timeframe=tf, days=args.days, entry_delay=args.entry_delay)
         print_report(trades, tf)
 
 

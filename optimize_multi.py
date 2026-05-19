@@ -56,6 +56,7 @@ PARAM_GRIDS = {
             "vp_lookback": [60, 90, 120, 180],
             "va_pct": [0.68, 0.75, 0.80],
             "max_sl_atr": [3.0, 4.0, 5.0],
+            "entry_delay": [0, 1, 2],  # 突破後等幾根再進場
         },
         "strategies": lambda: [TrendSignals(), VWAPSignals()],
         "signal_filter": lambda sig: sig.holding_type == "long",
@@ -73,6 +74,7 @@ def simulate(df, cfg, strategies, max_hold, sig_filter):
     if len(df) < cfg["vp_lookback"] + 40:
         return results
 
+    entry_delay = cfg.get("entry_delay", 0)
     df.attrs["symbol"] = "OPT"
     start_idx = cfg["vp_lookback"] + 30
 
@@ -91,10 +93,22 @@ def simulate(df, cfg, strategies, max_hold, sig_filter):
         filtered = [s for s in all_signals if s.direction in ("LONG", "SHORT") and sig_filter(s)]
 
         for sig in filtered:
-            if i + 1 >= len(df):
+            # entry_delay: wait N bars after signal before entering
+            entry_bar = i + 1 + entry_delay
+            if entry_bar >= len(df):
                 continue
 
-            entry = float(df.iloc[i + 1]["Open"])
+            # Check price still holds during delay (no invalidation)
+            if entry_delay > 0 and sig.direction == "LONG":
+                held = all(float(df.iloc[i + 1 + d]["Low"]) > sig.stop for d in range(entry_delay) if i + 1 + d < len(df))
+                if not held:
+                    continue
+            elif entry_delay > 0 and sig.direction == "SHORT":
+                held = all(float(df.iloc[i + 1 + d]["High"]) < sig.stop for d in range(entry_delay) if i + 1 + d < len(df))
+                if not held:
+                    continue
+
+            entry = float(df.iloc[entry_bar]["Open"])
             risk = abs(sig.entry - sig.stop)
             if risk == 0:
                 continue
@@ -113,7 +127,7 @@ def simulate(df, cfg, strategies, max_hold, sig_filter):
             if actual_risk == 0:
                 continue
 
-            for j in range(i + 2, min(i + 2 + max_hold, len(df))):
+            for j in range(entry_bar + 1, min(entry_bar + 1 + max_hold, len(df))):
                 h, l = float(df.iloc[j]["High"]), float(df.iloc[j]["Low"])
                 if sig.direction == "LONG":
                     if l <= sl:
@@ -130,7 +144,7 @@ def simulate(df, cfg, strategies, max_hold, sig_filter):
                         results.append((abs(entry - tp) / actual_risk, sig.signal_type))
                         break
             else:
-                last_c = float(df.iloc[min(i + 1 + max_hold, len(df) - 1)]["Close"])
+                last_c = float(df.iloc[min(entry_bar + max_hold, len(df) - 1)]["Close"])
                 if sig.direction == "LONG":
                     r = (last_c - entry) / actual_risk
                 else:
@@ -260,7 +274,12 @@ def main():
         if best["test"]["expectancy"] <= 0 and best["train"]["expectancy"] > 0:
             print(f"     ⚠️ Overfitting detected — train positive but test negative")
         elif best["test"]["expectancy"] > 0:
-            print(f"     ✅ Out-of-sample positive — robust")
+            # Robustness check: top 3 should all be positive
+            top3_positive = all(r["test"]["expectancy"] > 0 for r in results_table[:3])
+            if top3_positive:
+                print(f"     ✅ Robust — top 3 parameter sets all positive OOS")
+            else:
+                print(f"     ⚠️ Fragile — only best params positive, neighbors negative")
 
         # Signal type breakdown for best params
         cfg = deepcopy(DEFAULT_CFG)

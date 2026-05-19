@@ -33,10 +33,15 @@ class TrendSignals(BaseStrategy):
 
         # --- Breakout Acceptance LONG ---
         if donchian and c > donchian["upper"]:
-            # Check 2 consecutive days above
+            # Strict confirmation: 2 consecutive closes above + no pullback below level
             prev1 = df.iloc[-2]["Close"]
-            prev2 = df.iloc[-3]["Close"] if len(df) > 2 else 0
-            if prev1 > donchian["upper"] and vol_ratio > 1.5:
+            prev1_low = df.iloc[-2]["Low"]
+            prev2_close = df.iloc[-3]["Close"] if len(df) > 3 else 0
+            # All 3 conditions: close above, prev close above, prev low didn't breach level
+            acceptance = (prev1 > donchian["upper"] and
+                         prev1_low > donchian["upper"] - atr * 0.1 and
+                         vol_ratio > 1.3)
+            if acceptance:
                 sl = max(donchian["upper"] - atr * 0.5, c - atr * cfg["max_sl_atr"])
                 tp = c + (donchian["upper"] - donchian["lower"])  # measured move
                 signals.append(StrategySignal(
@@ -46,7 +51,7 @@ class TrendSignals(BaseStrategy):
                     entry=c, stop=sl, target=tp, holding_type="long",
                     reasons=[
                         f"Broke Donchian high {donchian['upper']:.2f}",
-                        f"2 days above breakout",
+                        f"2 days accepted (low held above level)",
                         f"Volume {vol_ratio:.1f}x avg",
                     ],
                     warnings=[], triggered=True,
@@ -55,7 +60,11 @@ class TrendSignals(BaseStrategy):
         # --- Breakout Acceptance SHORT ---
         if not cfg["long_only"] and donchian and c < donchian["lower"]:
             prev1 = df.iloc[-2]["Close"]
-            if prev1 < donchian["lower"] and vol_ratio > 1.5:
+            prev1_high = df.iloc[-2]["High"]
+            acceptance = (prev1 < donchian["lower"] and
+                         prev1_high < donchian["lower"] + atr * 0.1 and
+                         vol_ratio > 1.3)
+            if acceptance:
                 sl = min(donchian["lower"] + atr * 0.5, c + atr * cfg["max_sl_atr"])
                 tp = c - (donchian["upper"] - donchian["lower"])
                 signals.append(StrategySignal(
@@ -65,7 +74,7 @@ class TrendSignals(BaseStrategy):
                     entry=c, stop=sl, target=tp, holding_type="long",
                     reasons=[
                         f"Broke Donchian low {donchian['lower']:.2f}",
-                        f"2 days below breakdown",
+                        f"2 days accepted (high held below level)",
                         f"Volume {vol_ratio:.1f}x avg",
                     ],
                     warnings=[], triggered=True,
