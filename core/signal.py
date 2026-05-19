@@ -5,6 +5,21 @@ from datetime import datetime
 from typing import List
 
 
+# Fixed track assignment — signal_type → timeframe track
+TRACK_MAP = {
+    "VA Rejection": "short",
+    "Failed Auction": "short",
+    "VWAP Deviation": "short",
+    "Breakout Retest": "mid",
+    "VWAP Reclaim": "mid",
+    "AVWAP Pullback": "mid",
+    "Compression Breakout": "mid",
+    "Breakout Acceptance": "long",
+    "EMA Cross": "long",
+    "Climax Volume": "short",  # warning, won't score
+}
+
+
 @dataclass
 class StrategySignal:
     ticker: str

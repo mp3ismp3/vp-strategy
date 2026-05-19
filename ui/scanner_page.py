@@ -69,13 +69,13 @@ def render_scanner():
             "Ticker": r["ticker"],
             "Score": r["score"],
             "Direction": r["direction"],
-            "Setup": r["setup"],
+            "Setup": r.get("setup", r.get("best_setup", "—")),
             "Regime": r["regime"],
             "R:R": r["rr"],
             "Holding": r["holding"],
-            "Short": tracks.get("short", {}).get("score", "—"),
-            "Mid": tracks.get("mid", {}).get("score", "—"),
-            "Long": tracks.get("long", {}).get("score", "—"),
+            "Short": tracks.get("short", {}).get("score", "—") if tracks.get("short") else "—",
+            "Mid": tracks.get("mid", {}).get("score", "—") if tracks.get("mid") else "—",
+            "Long": tracks.get("long", {}).get("score", "—") if tracks.get("long") else "—",
         })
 
     df = pd.DataFrame(rows)

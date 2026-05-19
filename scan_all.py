@@ -55,45 +55,46 @@ def scan_symbol(symbol, df, cfg, market_ctx):
 
     # Holding estimate
     atr = calc_atr(df, cfg["atr_len"]) or 0
-    atr_avg = atr  # simplified: use current as avg baseline
+    atr_avg = atr
     if len(df) > 40:
         h, l, c = df["High"].values, df["Low"].values, df["Close"].values
         tr = max(h[-1] - l[-1], abs(h[-1] - c[-2]), abs(l[-1] - c[-2]))
-        # 20-day avg ATR
         trs = []
         for i in range(-20, 0):
             if abs(i) < len(df):
                 trs.append(max(h[i] - l[i], abs(h[i] - c[i-1]), abs(l[i] - c[i-1])))
         atr_avg = sum(trs) / len(trs) if trs else atr
 
-    holding = estimate_holding(
-        fusion.dominant_signal, atr, atr_avg, market_ctx.get("vix")
-    )
+    # Find the actual dominant StrategySignal for holding/rr
+    dominant_sig = None
+    if fusion.best_track != "—":
+        best_track_result = fusion.tracks.get(fusion.best_track)
+        if best_track_result:
+            # Find matching signal
+            for s in all_signals:
+                if s.signal_type == best_track_result.main_signal and s.triggered:
+                    dominant_sig = s
+                    break
 
-    # Build result
-    rr = 0.0
-    setup = "—"
-    if fusion.dominant_signal:
-        rr = fusion.dominant_signal.rr_ratio
-        setup = fusion.dominant_signal.signal_type
+    holding = estimate_holding(dominant_sig, atr, atr_avg, market_ctx.get("vix"))
+    rr = dominant_sig.rr_ratio if dominant_sig else 0.0
 
     return {
         "ticker": symbol,
-        "score": fusion.score,
+        "score": fusion.best_score,
         "direction": fusion.direction,
         "label": fusion.label,
-        "setup": setup,
+        "setup": fusion.best_setup,
         "regime": regime_state.regime,
         "rr": rr,
         "holding": holding.range_str,
         "holding_days": holding.days,
         "holding_timeframe": holding.timeframe,
         "holding_reasoning": holding.reasoning,
-        "per_strategy": fusion.per_strategy,
-        "conflicts": fusion.conflicts,
-        "tracks": {k: {"score": v.score, "direction": v.direction, "label": v.label,
-                       "setup": v.primary_signal.signal_type if v.primary_signal else "—"}
-                   for k, v in fusion.tracks.items()},
+        "best_track": fusion.best_track,
+        "cross_track_conflict": fusion.cross_track_conflict,
+        "conflict_note": fusion.conflict_note,
+        "tracks": {k: v.to_dict() for k, v in fusion.tracks.items()},
         "signals": [s.to_dict() for s in all_signals],
         "regime_trust": regime_state.normalized_trust,
     }

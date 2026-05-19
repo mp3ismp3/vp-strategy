@@ -17,6 +17,8 @@ class RegimeState:
     confidence: float                    # 0.0 - 1.0
     raw_trust: dict = field(default_factory=dict)
     normalized_trust: dict = field(default_factory=dict)
+    atr_ratio: float = 1.0              # current ATR / historical ATR
+    vix: float = 18.0                   # current VIX value
 
 
 def _poc_shift(df, cfg):
@@ -120,11 +122,24 @@ def detect_regime(df, cfg: dict, market_ctx: dict) -> RegimeState:
     raw_trust = REGIME_STRATEGY_TRUST.get(regime, REGIME_STRATEGY_TRUST["range"]).copy()
     normalized_trust = _normalize_trust(raw_trust)
 
+    # Compute atr_ratio for holding adjustment
+    atr_ratio = 1.0
+    if len(df) > cfg["atr_len"] + 20:
+        h, l, c = df["High"].values, df["Low"].values, df["Close"].values
+        tr = np.maximum(h[1:] - l[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])))
+        if len(tr) >= cfg["atr_len"] + 20:
+            current_atr = float(np.mean(tr[-cfg["atr_len"]:]))
+            hist_atr = float(np.mean(tr[-(cfg["atr_len"] + 20):-cfg["atr_len"]]))
+            if hist_atr > 0:
+                atr_ratio = current_atr / hist_atr
+
     return RegimeState(
         regime=regime,
         confidence=confidence,
         raw_trust=raw_trust,
         normalized_trust=normalized_trust,
+        atr_ratio=atr_ratio,
+        vix=vix if vix is not None else 18.0,
     )
 
 
