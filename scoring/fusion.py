@@ -35,12 +35,13 @@ class TrackResult:
 class FusionResult:
     tracks: dict = field(default_factory=dict)   # {"short": TrackResult, "mid": ..., "long": ...}
     best_track: object = None                     # TrackResult with highest score
-    # Backward compat
-    score: int = 0
-    direction: str = "NEUTRAL"
-    label: str = "Neutral"
+    # Scanner display fields (derived from best_track)
+    score: int = 0              # max(triggered tracks) — for sorting
+    direction: str = "NEUTRAL"  # best_track's direction
+    label: str = "Neutral"      # best_track's label
     per_strategy: dict = field(default_factory=dict)
-    conflicts: list = field(default_factory=list)
+    conflicts: list = field(default_factory=list)  # vetoes within best track
+    cross_track_warning: str = ""  # e.g. "Short=LONG vs Long=SHORT"
     dominant_signal: object = None
 
 
@@ -204,6 +205,14 @@ def fuse_signals(signals: list, regime_state: RegimeState) -> FusionResult:
     # Conflicts = vetoes from best track
     conflicts = [f"{_base_strategy(v)} says {v.direction}" for v in best.vetoes]
 
+    # Cross-track direction warning (informational, no penalty)
+    directions = {k: v.direction for k, v in tracks.items()}
+    dirs_set = set(directions.values())
+    cross_warning = ""
+    if "LONG" in dirs_set and "SHORT" in dirs_set:
+        parts = [f"{k}={v}" for k, v in directions.items()]
+        cross_warning = " vs ".join(parts)
+
     return FusionResult(
         tracks=tracks,
         best_track=best,
@@ -212,5 +221,6 @@ def fuse_signals(signals: list, regime_state: RegimeState) -> FusionResult:
         label=best.label,
         per_strategy=per_strategy,
         conflicts=conflicts,
+        cross_track_warning=cross_warning,
         dominant_signal=best.primary_signal,
     )
