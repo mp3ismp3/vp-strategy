@@ -25,35 +25,39 @@ def _cfg():
 
 def test_breakout_acceptance():
     """Force a Donchian breakout scenario with strict acceptance."""
-    df = _make_df(80, trend=0.3)
-    from core.indicators import calc_donchian
+    # Use flat data so we fully control the Donchian level
+    np.random.seed(99)
+    n = 80
+    dates = pd.date_range("2026-01-01", periods=n, freq="B")
+    # All bars at price ~100, range ~2
+    close = np.full(n, 100.0)
+    high = np.full(n, 101.0)
+    low = np.full(n, 99.0)
+    open_ = np.full(n, 100.0)
+    volume = np.full(n, 1_000_000)
 
-    # Set all volume low so last bar's high volume gives vol_ratio > 1.3
-    df["Volume"] = 1_000_000
-    
-    # Set iloc[-2] high to establish Donchian upper
-    df.iloc[-2, df.columns.get_loc("Close")] = 200
-    df.iloc[-2, df.columns.get_loc("High")] = 205
-    df.iloc[-2, df.columns.get_loc("Low")] = 204
-    df.iloc[-2, df.columns.get_loc("Open")] = 199
+    df = pd.DataFrame({"Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume}, index=dates)
+    df.attrs["symbol"] = "TEST"
 
-    # Compute what strategy sees as Donchian upper
-    don = calc_donchian(df.iloc[:-1], 20)
-    assert don is not None
-    upper = don["upper"]  # 205
+    # iloc[-2]: breakout bar — High sets new Donchian upper, Close above it
+    df.iloc[-2, df.columns.get_loc("High")] = 105
+    df.iloc[-2, df.columns.get_loc("Close")] = 106
+    df.iloc[-2, df.columns.get_loc("Low")] = 105      # Low holds above Donchian upper
+    df.iloc[-2, df.columns.get_loc("Open")] = 105
 
-    # Today: close above, bullish, high volume
-    df.iloc[-1, df.columns.get_loc("Close")] = upper + 3
-    df.iloc[-1, df.columns.get_loc("Open")] = upper + 1
-    df.iloc[-1, df.columns.get_loc("High")] = upper + 5
-    df.iloc[-1, df.columns.get_loc("Low")] = upper + 0.5
-    df.iloc[-1, df.columns.get_loc("Volume")] = 5_000_000  # 5x avg → vol_ratio > 1.3
+    # iloc[-1]: today — continues above, high volume
+    df.iloc[-1, df.columns.get_loc("High")] = 108
+    df.iloc[-1, df.columns.get_loc("Close")] = 107
+    df.iloc[-1, df.columns.get_loc("Open")] = 105
+    df.iloc[-1, df.columns.get_loc("Low")] = 105
+    df.iloc[-1, df.columns.get_loc("Volume")] = 5_000_000
 
     strategy = TrendSignals()
     signals = strategy.detect(df, _cfg(), {"vix": 18})
     breakouts = [s for s in signals if s.signal_type == "Breakout Acceptance"]
     assert len(breakouts) >= 1
     assert breakouts[0].holding_type == "long"
+    assert breakouts[0].direction == "LONG"
 
 
 def test_compression_breakout():
