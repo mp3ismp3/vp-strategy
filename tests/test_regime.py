@@ -48,8 +48,8 @@ def test_expansion_regime():
     """High VIX + outside VA → expansion."""
     df = _make_df(100, trend=1.0)
     # Force price well above VA
-    df["Close"].iloc[-5:] = df["Close"].iloc[-5:] + 50
-    df["High"].iloc[-5:] = df["High"].iloc[-5:] + 55
+    df.loc[df.index[-5:], "Close"] = df.loc[df.index[-5:], "Close"] + 50
+    df.loc[df.index[-5:], "High"] = df.loc[df.index[-5:], "High"] + 55
     ctx = {"vix": 30}
     state = detect_regime(df, _cfg(), ctx)
     assert state.regime == "expansion"
