@@ -91,6 +91,9 @@ def scan_symbol(symbol, df, cfg, market_ctx):
         "holding_reasoning": holding.reasoning,
         "per_strategy": fusion.per_strategy,
         "conflicts": fusion.conflicts,
+        "tracks": {k: {"score": v.score, "direction": v.direction, "label": v.label,
+                       "setup": v.primary_signal.signal_type if v.primary_signal else "—"}
+                   for k, v in fusion.tracks.items()},
         "signals": [s.to_dict() for s in all_signals],
         "regime_trust": regime_state.normalized_trust,
     }

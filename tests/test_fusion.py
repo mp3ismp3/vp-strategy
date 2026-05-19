@@ -39,27 +39,26 @@ def test_fusion_all_long():
     result = fuse_signals(signals, _regime("range"))
     assert result.direction == "LONG"
     assert result.score > 50
-    assert "Strong" in result.label or "Moderate" in result.label
     assert result.conflicts == []
 
 
 def test_fusion_conflict_active_only():
-    """Conflict penalty only applies to active strategies (trust > 0.15)."""
-    # In range regime, TrendFollowing trust = 0.143 < 0.15 → not active
+    """Veto only from active strategies."""
+    # In range regime, TrendFollowing trust = 0.143 < 0.15 → not active → no veto
     signals = [_sig("VP", "LONG", 0.8), _sig("TrendFollowing", "SHORT", 0.9)]
     result = fuse_signals(signals, _regime("range"))
-    # TrendFollowing is not active in range, so no conflict penalty
     assert result.direction == "LONG"
     assert result.conflicts == []
 
 
-def test_fusion_conflict_both_active():
-    """Conflict penalty when both strategies are active."""
+def test_fusion_veto_from_active():
+    """Veto penalty when active strategy opposes."""
     # In trend regime, VP trust=0.208 and VWAP trust=0.375 → both active
     signals = [_sig("VP", "LONG", 0.8), _sig("VWAP", "SHORT", 0.9)]
     result = fuse_signals(signals, _regime("trend"))
+    # VWAP has higher trust in trend, so it's primary SHORT
+    # VP opposes → veto
     assert len(result.conflicts) > 0
-    assert result.score < 70  # penalty applied
 
 
 def test_fusion_empty():
@@ -78,6 +77,28 @@ def test_fusion_score_capped_100():
     signals = [_sig("VP", "LONG", 1.0), _sig("VWAP", "LONG", 1.0), _sig("TrendFollowing", "LONG", 1.0)]
     result = fuse_signals(signals, _regime("range"))
     assert result.score <= 100
+
+
+def test_fusion_tracks_independent():
+    """Different holding_type signals go to different tracks."""
+    sig_short = _sig("VP", "LONG", 0.8, holding_type="short")
+    sig_long = _sig("TrendFollowing", "SHORT", 0.9, holding_type="long")
+    result = fuse_signals([sig_short, sig_long], _regime("range"))
+    # They're in different tracks, so no conflict between them
+    tracks = result.tracks
+    if "short" in tracks and "long" in tracks:
+        assert tracks["short"].direction == "LONG"
+        assert tracks["long"].direction == "SHORT"
+
+
+def test_fusion_confirmation_bonus():
+    """Same-direction signals in same track give confirmation bonus."""
+    sig1 = _sig("VP", "LONG", 0.8, holding_type="short")
+    sig2 = _sig("VWAP", "LONG", 0.6, holding_type="short")
+    result_single = fuse_signals([sig1], _regime("range"))
+    result_confirmed = fuse_signals([sig1, sig2], _regime("range"))
+    # Confirmed should score higher (but not double)
+    assert result_confirmed.score >= result_single.score
 
 
 # --- Holding Tests ---

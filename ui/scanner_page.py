@@ -64,6 +64,7 @@ def render_scanner():
     # Build DataFrame
     rows = []
     for r in filtered:
+        tracks = r.get("tracks", {})
         rows.append({
             "Ticker": r["ticker"],
             "Score": r["score"],
@@ -72,7 +73,9 @@ def render_scanner():
             "Regime": r["regime"],
             "R:R": r["rr"],
             "Holding": r["holding"],
-            "Label": r["label"],
+            "Short": tracks.get("short", {}).get("score", "—"),
+            "Mid": tracks.get("mid", {}).get("score", "—"),
+            "Long": tracks.get("long", {}).get("score", "—"),
         })
 
     df = pd.DataFrame(rows)
