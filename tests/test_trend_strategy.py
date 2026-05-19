@@ -28,36 +28,26 @@ def test_breakout_acceptance():
     df = _make_df(80, trend=0.3)
     from core.indicators import calc_donchian
 
-    # First, get the Donchian upper from bars [:-1] BEFORE any modification
-    # The strategy will recalculate using df.iloc[:-1] which includes iloc[-2]
-    # So we need to set iloc[-2] high FIRST, then compute what the strategy sees
+    # Set all volume low so last bar's high volume gives vol_ratio > 1.3
+    df["Volume"] = 1_000_000
     
-    # Set iloc[-2] to a high value (this will be included in strategy's Donchian calc)
+    # Set iloc[-2] high to establish Donchian upper
     df.iloc[-2, df.columns.get_loc("Close")] = 200
     df.iloc[-2, df.columns.get_loc("High")] = 205
-    df.iloc[-2, df.columns.get_loc("Low")] = 198
+    df.iloc[-2, df.columns.get_loc("Low")] = 204
     df.iloc[-2, df.columns.get_loc("Open")] = 199
 
-    # Now calc what strategy will see as Donchian upper (includes our modified iloc[-2])
+    # Compute what strategy sees as Donchian upper
     don = calc_donchian(df.iloc[:-1], 20)
     assert don is not None
-    upper = don["upper"]  # This will be 205 (our modified High)
+    upper = don["upper"]  # 205
 
-    # Today (iloc[-1]): close above upper + bullish + high volume
+    # Today: close above, bullish, high volume
     df.iloc[-1, df.columns.get_loc("Close")] = upper + 3
     df.iloc[-1, df.columns.get_loc("Open")] = upper + 1
     df.iloc[-1, df.columns.get_loc("High")] = upper + 5
     df.iloc[-1, df.columns.get_loc("Low")] = upper + 0.5
-    df.iloc[-1, df.columns.get_loc("Volume")] = 20_000_000
-
-    # prev1_low (iloc[-2] Low=198) must be > upper - atr*0.1
-    # upper=205, so 198 > 205 - atr*0.1? No! That fails.
-    # Fix: set iloc[-2] Low above upper
-    df.iloc[-2, df.columns.get_loc("Low")] = upper + 0.1
-
-    # Recalc to verify (High didn't change so Donchian stays same)
-    don2 = calc_donchian(df.iloc[:-1], 20)
-    assert don2["upper"] == upper  # Confirm unchanged
+    df.iloc[-1, df.columns.get_loc("Volume")] = 5_000_000  # 5x avg → vol_ratio > 1.3
 
     strategy = TrendSignals()
     signals = strategy.detect(df, _cfg(), {"vix": 18})
