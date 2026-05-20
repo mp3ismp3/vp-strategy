@@ -347,7 +347,7 @@ def main():
         "symbols_count": len(all_data),
         "results": final_results,
     }
-    RESULTS_FILE.write_text(json.dumps(output, indent=2, ensure_ascii=False))
+    RESULTS_FILE.write_text(json.dumps(output, indent=2, ensure_ascii=False, default=str))
     print(f"\n  Results saved to {RESULTS_FILE}")
     print(f"{'═'*70}")
 
