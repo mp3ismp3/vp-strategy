@@ -7,10 +7,14 @@ SYMBOLS = [
     "AVGO", "AMD", "INTC", "QCOM", "MU", "MRVL", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON",
     # AI / Cloud / Software
     "NOW", "CRWV", "PLTR", "AI", "SNOW", "DDOG", "NET", "MDB", "PANW", "CRWD", "ZS", "FTNT",
+    # AI Agent 概念
+    "CRM", "PATH", "HUBS", "ADBE",
     # Cloud Infrastructure
-    "CRM", "ORCL", "IBM", "ADBE", "INTU", "WDAY", "TEAM", "HUBS",
+    "ORCL", "IBM", "INTU", "WDAY", "TEAM",
     # AI Hardware / Robotics
     "DELL", "HPE", "SMCI", "VRT", "ANET",
+    # AI Power / Energy
+    "VST", "CEG", "TLN", "NRG", "ETN", "PWR", "GEV", "FSLR",
     # ETFs
     "SPY", "QQQ",
     # Misc Tech / AI Adjacent
@@ -27,9 +31,12 @@ SECTOR_MAP = {
     "NOW": "IGV", "CRWV": "IGV", "PLTR": "IGV", "AI": "IGV", "SNOW": "IGV",
     "DDOG": "IGV", "NET": "IGV", "MDB": "IGV", "PANW": "IGV", "CRWD": "IGV",
     "ZS": "IGV", "FTNT": "IGV",
-    "CRM": "IGV", "ORCL": "XLK", "IBM": "XLK", "ADBE": "IGV", "INTU": "IGV",
-    "WDAY": "IGV", "TEAM": "IGV", "HUBS": "IGV",
+    "CRM": "IGV", "PATH": "IGV", "HUBS": "IGV", "ADBE": "IGV",
+    "ORCL": "XLK", "IBM": "XLK", "INTU": "IGV",
+    "WDAY": "IGV", "TEAM": "IGV",
     "DELL": "XLK", "HPE": "XLK", "SMCI": "SMH", "VRT": "XLK", "ANET": "XLK",
+    "VST": "XLK", "CEG": "XLK", "TLN": "XLK", "NRG": "XLK",
+    "ETN": "XLK", "PWR": "XLK", "GEV": "XLK", "FSLR": "XLK",
     "SPY": "SPY", "QQQ": "QQQ",
     "UBER": "XLK", "XYZ": "XLK", "SHOP": "IGV", "COIN": "XLK", "AMZN": "XLK",
 }
