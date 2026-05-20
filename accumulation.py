@@ -15,6 +15,7 @@ Usage:
 """
 
 import argparse
+import os
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -275,34 +276,36 @@ def detect_accumulation(df, spy_df=None, lookback=40):
 
 def main():
     parser = argparse.ArgumentParser(description="Accumulation Detection")
-    parser.add_argument("symbols", type=str, help="Comma-separated symbols")
+    parser.add_argument("symbols", type=str, nargs="?", default="", help="Comma-separated symbols")
     parser.add_argument("--days", type=int, default=40, help="Lookback days (default: 40)")
+    parser.add_argument("--notify", action="store_true", help="Send Telegram notification")
     args = parser.parse_args()
 
-    symbols = [s.strip() for s in args.symbols.split(",")]
+    from config import SYMBOLS as DEFAULT_SYMBOLS
+    symbols = [s.strip() for s in args.symbols.split(",") if s.strip()] if args.symbols else DEFAULT_SYMBOLS
 
     print(f"{'═'*60}")
     print(f"  ACCUMULATION ANALYSIS v3 (lookback: {args.days} days)")
     print(f"{'═'*60}\n")
 
-    # Download SPY once for relative strength
     spy_df = _download_spy()
+    results_all = []
 
     for symbol in symbols:
         df = yf.download(symbol, period="6mo", progress=False)
         if df.empty:
-            print(f"  {symbol}: no data\n")
             continue
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
         result = detect_accumulation(df, spy_df, args.days)
         if not result:
-            print(f"  {symbol}: insufficient data\n")
             continue
 
         comp = result["composite"]
         pos = result["price_position"]
+        results_all.append((symbol, result))
+
         print(f"  {comp['level']} {symbol} — Score: {comp['adjusted_score']}/{comp['max']} (raw: {comp['raw_score']})")
         print(f"  {comp['conclusion']}")
         print(f"  {'─'*50}")
@@ -314,6 +317,31 @@ def main():
         print(f"  Rel Strength:{result['relative_strength']['signal']} ({result['relative_strength']['score']}/3)")
         print(f"  Position:    {pos['signal']} (×{pos['discount']})")
         print()
+
+    # Telegram notification
+    if args.notify or os.environ.get("TELEGRAM_BOT_TOKEN"):
+        from notifications.telegram import send_telegram
+        strong = [(s, r) for s, r in results_all if r["composite"]["adjusted_score"] >= 11]
+        moderate = [(s, r) for s, r in results_all if 7 <= r["composite"]["adjusted_score"] < 11]
+
+        if strong or moderate:
+            msg = "<b>🔍 Accumulation Scan</b>\n"
+            msg += f"Scanned {len(symbols)} symbols | {len(strong)} strong | {len(moderate)} moderate\n\n"
+
+            for symbol, r in strong:
+                comp = r["composite"]
+                msg += f"🟢 <b>{symbol}</b> — {comp['adjusted_score']}/{comp['max']}\n"
+                msg += f"   {r['obv']['signal']}\n"
+                msg += f"   {r['buying_streak']['signal']}\n"
+                msg += f"   {r['relative_strength']['signal']}\n\n"
+
+            for symbol, r in moderate[:5]:
+                comp = r["composite"]
+                msg += f"🟡 <b>{symbol}</b> — {comp['adjusted_score']}/{comp['max']}\n"
+
+            send_telegram(msg, dry_run=not args.notify)
+        else:
+            print("  No accumulation signals to notify.")
 
 
 if __name__ == "__main__":
