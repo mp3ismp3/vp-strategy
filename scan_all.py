@@ -160,9 +160,11 @@ def main():
         emoji = "🟢" if r["direction"] == "LONG" else "🔴" if r["direction"] == "SHORT" else "⚪"
         msg += f"{emoji} <b>{r['ticker']}</b> — {r['label']} ({r['score']}/100)\n"
         msg += f"   Setup: {r['setup']} | R:R {r['rr']:.1f} | Hold: {r['holding']}\n"
-        msg += f"   Regime: {r['regime']} | {', '.join(f'{k}:{v:.0f}' for k,v in r['per_strategy'].items())}\n"
-        if r["conflicts"]:
-            msg += f"   ⚠️ Conflicts: {', '.join(r['conflicts'])}\n"
+        tracks = r.get("tracks", {})
+        track_str = " | ".join(f"{k}:{v.get('score','—')}" for k, v in tracks.items() if v)
+        msg += f"   Regime: {r['regime']} | {track_str}\n"
+        if r.get("conflict_note"):
+            msg += f"   ⚠️ {r['conflict_note']}\n"
         msg += "\n"
 
     if not triggered:
