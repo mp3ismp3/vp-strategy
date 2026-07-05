@@ -12,10 +12,17 @@ Also computes support/resistance levels for the tracker.
 """
 
 import numpy as np
-from scipy.stats import percentileofscore
 
 from core.indicators import find_swing_points
 from strategies.accumulation.config import DEFAULT_LOOKBACK, SWING_LOOKBACK
+
+
+def _percentileofscore(data, score):
+    """Calculate percentile rank of score within data (replaces scipy)."""
+    arr = np.asarray(data)
+    if len(arr) == 0:
+        return 50.0
+    return float(np.sum(arr <= score) / len(arr) * 100)
 
 
 def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
@@ -152,7 +159,7 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
 
     if len(atr_values) >= 5:
         recent_atr = atr_values[-1]
-        pctile = percentileofscore(atr_values, recent_atr)
+        pctile = _percentileofscore(atr_values, recent_atr)
 
         # Volume during compression
         recent_vol = float(np.mean(v_clean[-10:]))
