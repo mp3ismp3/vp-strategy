@@ -1,3 +1,4 @@
 __pycache__/
 vp_state.json
 data/scan_results.json
+data/accum_state.json

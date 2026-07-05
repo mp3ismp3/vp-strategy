@@ -6,7 +6,7 @@ SYMBOLS = [
     # Semiconductor / AI Chips
     "AVGO", "AMD", "INTC", "QCOM", "MU", "MRVL", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON",
     # AI / Cloud / Software
-    "NOW", "CRWV", "PLTR", "AI", "SNOW", "DDOG", "NET", "MDB", "PANW", "CRWD", "ZS", "FTNT",
+    "NOW", "CRWV", "PLTR", "AI", "SNOW", "DDOG", "NET", "MDB", "PANW", "CRWD", "ZS", "FTNT", "ESTC",
     # AI Agent 概念
     "CRM", "PATH", "HUBS", "ADBE",
     # Cloud Infrastructure
@@ -30,7 +30,7 @@ SECTOR_MAP = {
     "AAPL": "XLK", "MSFT": "XLK", "GOOGL": "XLK", "META": "XLK", "TSLA": "XLK",
     "NOW": "IGV", "CRWV": "IGV", "PLTR": "IGV", "AI": "IGV", "SNOW": "IGV",
     "DDOG": "IGV", "NET": "IGV", "MDB": "IGV", "PANW": "IGV", "CRWD": "IGV",
-    "ZS": "IGV", "FTNT": "IGV",
+    "ZS": "IGV", "FTNT": "IGV", "ESTC": "IGV",
     "CRM": "IGV", "PATH": "IGV", "HUBS": "IGV", "ADBE": "IGV",
     "ORCL": "XLK", "IBM": "XLK", "INTU": "IGV",
     "WDAY": "IGV", "TEAM": "IGV",

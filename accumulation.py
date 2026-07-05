@@ -1,24 +1,43 @@
-"""Accumulation Detection v3 — identifies steady institutional buying.
+"""Accumulation Detection v4 — Wyckoff-based institutional accumulation tracker.
 
-Indicators:
-1. OBV Trend: On-Balance Volume rising while price flat
-2. Close Position: Consistently closing in upper half of bar
-3. Volume Asymmetry: Rally volume > pullback volume
-4. Price Tightening: ATR compressing (rolling, not half-split)
-5. Buying Streak: Consecutive days closing in upper half (not just count)
-6. Relative Strength vs SPY: Holds up when market drops
-7. Price Position Guard: Discount near ATH without pullback
+Maintains a persistent watchlist of symbols showing accumulation patterns.
+Uses decay scoring, Wyckoff phase classification, and entry trigger detection.
 
 Usage:
-    python accumulation.py NVDA
-    python accumulation.py NVDA,AVGO,AMD --days 40
+    python accumulation.py                    # Scan all symbols, update state
+    python accumulation.py NVDA,AVGO,AMD      # Scan specific symbols
+    python accumulation.py --notify           # Scan + send Telegram notifications
+    python accumulation.py --dry-run          # Scan + print (no Telegram)
+    python accumulation.py --debug            # Show detailed component breakdown
+    python accumulation.py --phase            # Show phase classification only
+    python accumulation.py --triggers         # Show trigger status only
 """
 
 import argparse
 import os
-import yfinance as yf
-import pandas as pd
+import sys
 import numpy as np
+import pandas as pd
+import yfinance as yf
+
+from strategies.accumulation.config import (
+    CLOSE_POS_FAIL,
+    CLOSE_POS_HARD_FAIL,
+    DEFAULT_LOOKBACK,
+    SOFT_FAIL_DAYS,
+    VOLUME_HARD_MULT,
+    VOLUME_SURGE_MULT,
+    VOL_MEDIAN_WINDOW,
+)
+from strategies.accumulation.detector import compute_daily_score
+from strategies.accumulation.entry_triggers import check_triggers
+from strategies.accumulation.notifications import (
+    format_daily_report,
+    format_proximity_alert,
+    format_trigger_alert,
+)
+from strategies.accumulation.phase_classifier import classify_phase
+from strategies.accumulation.tracker import AccumulationTracker
 
 
 def _download_spy():
@@ -29,319 +48,351 @@ def _download_spy():
     return df if not df.empty else None
 
 
-def detect_accumulation(df, spy_df=None, lookback=40):
-    """Analyze volume behavior for signs of institutional accumulation."""
-    if len(df) < lookback + 10:
-        return None
+def _download_symbol(symbol):
+    """Download a single symbol."""
+    df = yf.download(symbol, period="6mo", progress=False)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    return df if not df.empty else None
 
-    d = df.tail(lookback).copy()
-    c = d["Close"].values
-    o = d["Open"].values
-    h = d["High"].values
-    l = d["Low"].values
-    v = d["Volume"].values.astype(float)
-    n = len(d)
 
-    # Spike filter: cap > 3x avg
-    vol_avg = np.mean(v)
-    v_clean = np.where(v > 3 * vol_avg, vol_avg, v)
+def _get_market_context():
+    """Get basic market context (VIX + SPY state)."""
+    ctx = {"vix": None, "spy_state": "unknown"}
+    try:
+        vix_df = yf.download("^VIX", period="5d", progress=False)
+        if isinstance(vix_df.columns, pd.MultiIndex):
+            vix_df.columns = vix_df.columns.get_level_values(0)
+        if not vix_df.empty:
+            ctx["vix"] = float(vix_df["Close"].iloc[-1])
+    except Exception:
+        pass
 
-    # Bar properties
-    bar_range = h - l
-    close_pos = np.where(bar_range > 0, (c - l) / bar_range, 0.5)
-
-    results = {}
-
-    # ─── 1. OBV Trend ───
-    obv = np.zeros(n)
-    for i in range(1, n):
-        if c[i] > c[i-1]:
-            obv[i] = obv[i-1] + v_clean[i]
-        elif c[i] < c[i-1]:
-            obv[i] = obv[i-1] - v_clean[i]
-        else:
-            obv[i] = obv[i-1]
-
-    x = np.arange(n)
-    obv_slope = np.polyfit(x, obv, 1)[0]
-    price_slope = np.polyfit(x, c, 1)[0]
-    price_flat = abs(price_slope / c[0]) < 0.001
-
-    obv_score = 0
-    if obv_slope > 0 and price_flat:
-        obv_score = 3
-    elif obv_slope > 0 and price_slope > 0:
-        obv_score = 2
-    elif obv_slope > 0:
-        obv_score = 1
-
-    results["obv"] = {
-        "score": obv_score,
-        "signal": "OBV rising + price flat → absorption" if obv_score == 3 else
-                  "OBV rising + price up → trend buying" if obv_score == 2 else "Weak/None",
-    }
-
-    # ─── 2. Close Position ───
-    avg_close_pos = np.mean(close_pos[-20:])
-    lower_wick = np.minimum(c, o) - l
-    body = np.abs(c - o)
-    wick_days = int(np.sum(lower_wick[-20:] > np.where(body[-20:] > 0, body[-20:] * 1.2, 0.01)))
-
-    close_score = 0
-    if avg_close_pos >= 0.65 and wick_days >= 8:
-        close_score = 3
-    elif avg_close_pos >= 0.6 or wick_days >= 6:
-        close_score = 2
-    elif avg_close_pos >= 0.55:
-        close_score = 1
-
-    results["close_position"] = {
-        "score": close_score,
-        "avg_close_pos": round(float(avg_close_pos), 2),
-        "wick_days": wick_days,
-        "signal": f"Avg close at {avg_close_pos:.0%} of bar | {wick_days} lower-wick days",
-    }
-
-    # ─── 3. Volume Asymmetry ───
-    rally_vol = [v_clean[i] for i in range(1, n) if c[i] > c[i-1]]
-    pullback_vol = [v_clean[i] for i in range(1, n) if c[i] < c[i-1]]
-    avg_rally = np.mean(rally_vol) if rally_vol else 0
-    avg_pullback = np.mean(pullback_vol) if pullback_vol else 1
-    vol_asymmetry = avg_rally / max(avg_pullback, 1)
-
-    vol_score = 0
-    if vol_asymmetry >= 1.4:
-        vol_score = 3
-    elif vol_asymmetry >= 1.2:
-        vol_score = 2
-    elif vol_asymmetry >= 1.1:
-        vol_score = 1
-
-    results["volume_asymmetry"] = {
-        "score": vol_score,
-        "ratio": round(float(vol_asymmetry), 2),
-        "signal": f"Rally volume {vol_asymmetry:.2f}x pullback volume",
-    }
-
-    # ─── 4. Price Tightening (ATR rolling) ───
-    tr = np.zeros(n)
-    tr[1:] = np.maximum(h[1:] - l[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])))
-    recent_atr = np.mean(tr[-10:]) if n >= 10 else np.mean(tr)
-    hist_atr = np.mean(tr[-30:-10]) if n >= 30 else np.mean(tr[:n//2])
-    atr_ratio = recent_atr / max(hist_atr, 0.01)
-
-    # Volume during compression
-    recent_vol = np.mean(v_clean[-10:])
-    hist_vol = np.mean(v_clean[-30:-10]) if n >= 30 else np.mean(v_clean[:n//2])
-    vol_during_compression = recent_vol / max(hist_vol, 1)
-
-    tight_score = 0
-    if atr_ratio < 0.6 and vol_during_compression >= 0.85:
-        tight_score = 3
-    elif atr_ratio < 0.7 and vol_during_compression >= 0.8:
-        tight_score = 2
-    elif atr_ratio < 0.8:
-        tight_score = 1
-
-    results["tightening"] = {
-        "score": tight_score,
-        "atr_ratio": round(float(atr_ratio), 2),
-        "vol_maintained": round(float(vol_during_compression), 2),
-        "signal": f"ATR ratio {atr_ratio:.2f} | Vol maintained {vol_during_compression:.0%}" +
-                  (" → coiling" if tight_score >= 2 else ""),
-    }
-
-    # ─── 5. Buying Streak (consecutive days close > 55%) ───
-    max_streak = 0
-    current_streak = 0
-    for i in range(n):
-        if close_pos[i] > 0.55:
-            current_streak += 1
-            max_streak = max(max_streak, current_streak)
-        else:
-            current_streak = 0
-
-    # Also count recent streak (from end)
-    recent_streak = 0
-    for i in range(n-1, -1, -1):
-        if close_pos[i] > 0.55:
-            recent_streak += 1
-        else:
-            break
-
-    streak_score = 0
-    if max_streak >= 7 or recent_streak >= 5:
-        streak_score = 3
-    elif max_streak >= 5 or recent_streak >= 3:
-        streak_score = 2
-    elif max_streak >= 3:
-        streak_score = 1
-
-    results["buying_streak"] = {
-        "score": streak_score,
-        "max_streak": max_streak,
-        "recent_streak": recent_streak,
-        "signal": f"Max streak: {max_streak} days | Current: {recent_streak} days closing in upper half",
-    }
-
-    # ─── 6. Relative Strength vs SPY ───
-    rs_score = 0
-    rs_signal = "SPY data not available"
-
-    if spy_df is not None and len(spy_df) >= lookback:
-        spy_tail = spy_df.tail(lookback)
-        if len(spy_tail) == n:
-            spy_c = spy_tail["Close"].values
-            # Days where SPY dropped but stock held/rose
-            stock_returns = np.diff(c) / c[:-1]
-            spy_returns = np.diff(spy_c) / spy_c[:-1]
-
-            spy_down_days = spy_returns < -0.003  # SPY down > 0.3%
-            if np.sum(spy_down_days) > 0:
-                stock_on_spy_down = stock_returns[spy_down_days]
-                # How many of those days did stock hold up (not drop as much)?
-                held_up = np.sum(stock_on_spy_down > spy_returns[spy_down_days] + 0.005)
-                total_spy_down = np.sum(spy_down_days)
-                hold_ratio = held_up / total_spy_down
-
-                # Overall relative performance
-                stock_total = (c[-1] / c[0] - 1) * 100
-                spy_total = (spy_c[-1] / spy_c[0] - 1) * 100
-                relative_perf = stock_total - spy_total
-
-                if hold_ratio >= 0.6 and relative_perf > 0:
-                    rs_score = 3
-                elif hold_ratio >= 0.5 or relative_perf > 3:
-                    rs_score = 2
-                elif hold_ratio >= 0.4:
-                    rs_score = 1
-
-                rs_signal = f"Held up {hold_ratio:.0%} of SPY-down days | Relative: {relative_perf:+.1f}%"
+    try:
+        spy_df = yf.download("SPY", period="1mo", progress=False)
+        if isinstance(spy_df.columns, pd.MultiIndex):
+            spy_df.columns = spy_df.columns.get_level_values(0)
+        if not spy_df.empty and len(spy_df) >= 5:
+            spy_5d_return = (float(spy_df["Close"].iloc[-1]) / float(spy_df["Close"].iloc[-5]) - 1) * 100
+            if spy_5d_return > 1:
+                ctx["spy_state"] = "上漲趨勢"
+            elif spy_5d_return < -1:
+                ctx["spy_state"] = "下跌趨勢"
             else:
-                rs_signal = "No SPY down days in period"
+                ctx["spy_state"] = "盤整"
+    except Exception:
+        pass
 
-    results["relative_strength"] = {
-        "score": rs_score,
-        "signal": rs_signal,
-    }
+    return ctx
 
-    # ─── 7. Price Position Guard ───
-    full_high = df["High"].max()
-    full_low = df["Low"].min()
-    full_range = full_high - full_low
-    current_pos = (c[-1] - full_low) / max(full_range, 0.01)
 
-    # Check if there was a pullback from high (> 15% from ATH = OK)
-    ath = df["High"].max()
-    pullback_from_ath = (ath - c[-1]) / ath
+def check_failure(df, support_primary, support_dynamic, lookback=DEFAULT_LOOKBACK):
+    """Check if accumulation has failed (breakdown).
+    
+    Returns:
+        dict with 'failed', 'severity' ('hard'/'soft'/None), 'reason', 'is_spring'
+    """
+    result = {"failed": False, "severity": None, "reason": "", "is_spring": False}
 
-    position_discount = 1.0
-    if current_pos > 0.85 and pullback_from_ath < 0.05:
-        position_discount = 0.4  # Near ATH, no pullback → likely distribution
-    elif current_pos > 0.75 and pullback_from_ath < 0.08:
-        position_discount = 0.6
-    elif pullback_from_ath > 0.15:
-        position_discount = 1.2  # Pulled back 15%+ and consolidating → accumulation zone
+    if len(df) < 10:
+        return result
 
-    results["price_position"] = {
-        "position_pct": round(float(current_pos * 100), 1),
-        "pullback_from_ath": round(float(pullback_from_ath * 100), 1),
-        "discount": position_discount,
-        "signal": (f"Price at {current_pos:.0%} of range | {pullback_from_ath:.0%} from ATH" +
-                  (" ⚠️ near ATH no pullback" if position_discount < 1.0 else
-                   " ✅ pullback zone" if position_discount > 1.0 else "")),
-    }
+    c = df["Close"].values.astype(float)
+    h = df["High"].values.astype(float)
+    l = df["Low"].values.astype(float)
+    v = df["Volume"].values.astype(float)
 
-    # ─── Composite Score ───
-    raw_total = obv_score + close_score + vol_score + tight_score + streak_score + rs_score  # max 18
-    adjusted_total = round(raw_total * position_discount)
-    adjusted_total = max(0, min(18, adjusted_total))
+    last_close = float(c[-1])
+    last_low = float(l[-1])
+    last_bar_range = h[-1] - l[-1]
+    close_pos = (c[-1] - l[-1]) / last_bar_range if last_bar_range > 0 else 0.5
 
-    level = "🟢 STRONG" if adjusted_total >= 11 else "🟡 MODERATE" if adjusted_total >= 7 else "⚪ WEAK"
+    vol_median = float(np.median(v[-VOL_MEDIAN_WINDOW:])) if len(v) >= VOL_MEDIAN_WINDOW else float(np.median(v))
+    vol_ratio = v[-1] / max(vol_median, 1)
 
-    results["composite"] = {
-        "raw_score": raw_total,
-        "adjusted_score": adjusted_total,
-        "max": 18,
-        "level": level,
-        "conclusion": (
-            "Clear institutional accumulation — steady buying detected" if adjusted_total >= 11 else
-            "Some accumulation signs — monitor for breakout" if adjusted_total >= 7 else
-            "No clear accumulation pattern"
-        ),
-    }
+    # ─── Spring Detection (NOT a failure) ───
+    # Intraday pierce below support but close recovers above
+    if last_low < support_dynamic and last_close > support_dynamic:
+        result["is_spring"] = True
+        return result
 
-    return results
+    # ─── Hard Failure: below PRIMARY support ───
+    if last_close < support_primary:
+        if vol_ratio > VOLUME_HARD_MULT and close_pos < CLOSE_POS_HARD_FAIL:
+            result["failed"] = True
+            result["severity"] = "hard"
+            result["reason"] = f"收盤 ${last_close:.2f} < 主支撐 ${support_primary:.2f} + 量增 {vol_ratio:.1f}x + 收低 {close_pos:.0%}"
+            return result
+
+        # Check consecutive days below primary
+        days_below = 0
+        for i in range(len(c) - 1, max(0, len(c) - 5) - 1, -1):
+            if c[i] < support_primary:
+                days_below += 1
+            else:
+                break
+        if days_below >= 2:
+            result["failed"] = True
+            result["severity"] = "hard"
+            result["reason"] = f"連續 {days_below} 天收盤 < 主支撐 ${support_primary:.2f}"
+            return result
+
+    # ─── Soft Failure: below DYNAMIC support with selling pressure ───
+    if last_close < support_dynamic:
+        if vol_ratio > VOLUME_SURGE_MULT and close_pos < CLOSE_POS_FAIL:
+            result["failed"] = True
+            result["severity"] = "soft"
+            result["reason"] = f"收盤 ${last_close:.2f} < 動態支撐 ${support_dynamic:.2f} + 量增 {vol_ratio:.1f}x + 收低 {close_pos:.0%}"
+            return result
+
+    return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Accumulation Detection")
-    parser.add_argument("symbols", type=str, nargs="?", default="", help="Comma-separated symbols")
-    parser.add_argument("--days", type=int, default=40, help="Lookback days (default: 40)")
-    parser.add_argument("--notify", action="store_true", help="Send Telegram notification")
+    parser = argparse.ArgumentParser(description="Accumulation Tracker v4")
+    parser.add_argument("symbols", type=str, nargs="?", default="",
+                        help="Comma-separated symbols (default: all)")
+    parser.add_argument("--days", type=int, default=DEFAULT_LOOKBACK,
+                        help=f"Lookback days (default: {DEFAULT_LOOKBACK})")
+    parser.add_argument("--notify", action="store_true",
+                        help="Send Telegram notifications")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print only, no Telegram")
+    parser.add_argument("--debug", action="store_true",
+                        help="Show detailed component breakdown")
+    parser.add_argument("--phase", action="store_true",
+                        help="Show phase classification only")
+    parser.add_argument("--triggers", action="store_true",
+                        help="Show trigger status only")
     args = parser.parse_args()
 
     from config import SYMBOLS as DEFAULT_SYMBOLS
     symbols = [s.strip() for s in args.symbols.split(",") if s.strip()] if args.symbols else DEFAULT_SYMBOLS
 
-    print(f"{'═'*60}")
-    print(f"  ACCUMULATION ANALYSIS v3 (lookback: {args.days} days)")
-    print(f"{'═'*60}\n")
+    print(f"{'═' * 60}")
+    print(f"  ACCUMULATION TRACKER v4 (lookback: {args.days} days)")
+    print(f"{'═' * 60}\n")
 
+    # ─── 1. Market Context ───
+    market_ctx = _get_market_context()
+    vix_str = f"{market_ctx['vix']:.1f}" if market_ctx["vix"] else "N/A"
+    print(f"  📊 Market: VIX={vix_str} | SPY={market_ctx['spy_state']}")
+    print()
+
+    # ─── 2. Download SPY for relative strength ───
     spy_df = _download_spy()
-    results_all = []
+
+    # ─── 3. Load Tracker State ───
+    tracker = AccumulationTracker()
+    tracker.load_state()
+    print(f"  📋 Loaded state: {tracker.count} symbols tracked "
+          f"(✅{tracker.confirmed_count} + 👀{tracker.watch_count})")
+    print()
+
+    # ─── 4. Scan Each Symbol ───
+    trigger_results = {}
+    phase_results = {}
 
     for symbol in symbols:
-        df = yf.download(symbol, period="6mo", progress=False)
-        if df.empty:
-            continue
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-
-        result = detect_accumulation(df, spy_df, args.days)
-        if not result:
+        df = _download_symbol(symbol)
+        if df is None or len(df) < args.days + 10:
             continue
 
-        comp = result["composite"]
-        pos = result["price_position"]
-        results_all.append((symbol, result))
+        # 4a. Compute daily score
+        score_result = compute_daily_score(df, spy_df, args.days)
+        if score_result is None:
+            continue
 
-        print(f"  {comp['level']} {symbol} — Score: {comp['adjusted_score']}/{comp['max']} (raw: {comp['raw_score']})")
-        print(f"  {comp['conclusion']}")
-        print(f"  {'─'*50}")
-        print(f"  OBV:         {result['obv']['signal']} ({result['obv']['score']}/3)")
-        print(f"  Close Pos:   {result['close_position']['signal']} ({result['close_position']['score']}/3)")
-        print(f"  Vol Asym:    {result['volume_asymmetry']['signal']} ({result['volume_asymmetry']['score']}/3)")
-        print(f"  Tightening:  {result['tightening']['signal']} ({result['tightening']['score']}/3)")
-        print(f"  Streak:      {result['buying_streak']['signal']} ({result['buying_streak']['score']}/3)")
-        print(f"  Rel Strength:{result['relative_strength']['signal']} ({result['relative_strength']['score']}/3)")
-        print(f"  Position:    {pos['signal']} (×{pos['discount']})")
-        print()
+        raw_score = score_result["raw_score"]
+        sp = score_result["support_primary"]
+        sd = score_result["support_dynamic"]
+        res = score_result["resistance"]
 
-    # Telegram notification
-    if args.notify or os.environ.get("TELEGRAM_BOT_TOKEN"):
+        # 4b. Classify phase
+        phase_info = classify_phase(df, sp, sd, res, args.days)
+        phase = phase_info["phase"]
+        phase_results[symbol] = phase_info
+
+        # 4c. Check failure (before update, to avoid adding then immediately removing)
+        if tracker.is_tracked(symbol):
+            tracked = tracker.get_symbol(symbol)
+            failure = check_failure(df, tracked["support_primary"], tracked["support_dynamic"])
+
+            if failure["is_spring"]:
+                tracker.clear_failure(symbol)
+            elif failure["failed"]:
+                tracker.mark_failure(symbol, failure["reason"], failure["severity"])
+                if symbol not in tracker._state:
+                    # Was removed
+                    _print_failure(symbol, failure)
+                    continue
+
+        # 4d. Update tracker
+        tracker.update(symbol, raw_score, phase, sp, sd, res)
+
+        # 4e. Check triggers (only for tracked symbols)
+        if tracker.is_tracked(symbol):
+            triggers = check_triggers(df, phase, sp, sd, res, args.days)
+            trigger_results[symbol] = triggers
+
+            # Record fired triggers
+            for t in triggers.get("triggered", []):
+                tracker.record_trigger(symbol, t["type"])
+
+        # ─── Print Output ───
+        if args.debug:
+            _print_debug(symbol, score_result, phase_info, trigger_results.get(symbol))
+        elif args.phase:
+            _print_phase(symbol, phase_info, raw_score)
+        elif args.triggers and symbol in trigger_results:
+            _print_triggers(symbol, trigger_results[symbol], phase_info)
+        elif raw_score >= 5 or tracker.is_tracked(symbol):
+            _print_summary(symbol, raw_score, phase_info, tracker.get_symbol(symbol))
+
+    # ─── 5. Save State ───
+    tracker.save_state()
+    print(f"\n{'─' * 60}")
+    print(f"  💾 State saved: {tracker.count} symbols "
+          f"(✅{tracker.confirmed_count} + 👀{tracker.watch_count})")
+
+    # ─── 6. Print Changes ───
+    changes = tracker.get_changes()
+    if changes:
+        print(f"\n  📋 Changes this scan:")
+        for ch in changes:
+            ch_type = ch["type"]
+            sym = ch["symbol"]
+            if ch_type == "added":
+                print(f"    🆕 {sym} → 觀察 (Phase {ch['phase']}, {ch['score']}分)")
+            elif ch_type == "promoted":
+                print(f"    📈 {sym} → 確認 ({ch['score']:.1f}分)")
+            elif ch_type == "demoted":
+                print(f"    📉 {sym} → 觀察 ({ch['score']:.1f}分)")
+            elif ch_type == "removed":
+                print(f"    ❌ {sym} 移除 ({ch.get('reason', '')})")
+
+    # ─── 7. Notifications ───
+    should_notify = args.notify or (os.environ.get("TELEGRAM_BOT_TOKEN") and not args.dry_run)
+
+    if should_notify or args.dry_run:
         from notifications.telegram import send_telegram
-        strong = [(s, r) for s, r in results_all if r["composite"]["adjusted_score"] >= 11]
-        moderate = [(s, r) for s, r in results_all if 7 <= r["composite"]["adjusted_score"] < 11]
 
-        if strong or moderate:
-            msg = "<b>🔍 Accumulation Scan</b>\n"
-            msg += f"Scanned {len(symbols)} symbols | {len(strong)} strong | {len(moderate)} moderate\n\n"
+        # 7a. Trigger alerts (independent, sent first)
+        for symbol, tr in trigger_results.items():
+            for t in tr.get("triggered", []):
+                msg = format_trigger_alert(symbol, t, phase_results.get(symbol))
+                if args.dry_run:
+                    print(f"\n{'─' * 40}")
+                    print(f"  [TRIGGER ALERT]")
+                    print(msg)
+                else:
+                    send_telegram(msg, dry_run=not should_notify)
 
-            for symbol, r in strong:
-                comp = r["composite"]
-                msg += f"🟢 <b>{symbol}</b> — {comp['adjusted_score']}/{comp['max']}\n"
-                msg += f"   {r['obv']['signal']}\n"
-                msg += f"   {r['buying_streak']['signal']}\n"
-                msg += f"   {r['relative_strength']['signal']}\n\n"
+        # 7b. Proximity alerts
+        for symbol, tr in trigger_results.items():
+            for p in tr.get("proximity", []):
+                # Only send proximity if price is really close
+                if p.get("pct_away", 999) <= 2.0:
+                    msg = format_proximity_alert(symbol, p, phase_results.get(symbol))
+                    if args.dry_run:
+                        print(f"\n{'─' * 40}")
+                        print(f"  [PROXIMITY ALERT]")
+                        print(msg)
+                    else:
+                        send_telegram(msg, dry_run=not should_notify)
 
-            for symbol, r in moderate[:5]:
-                comp = r["composite"]
-                msg += f"🟡 <b>{symbol}</b> — {comp['adjusted_score']}/{comp['max']}\n"
-
-            send_telegram(msg, dry_run=not args.notify)
+        # 7c. Daily report (sent last)
+        report = format_daily_report(tracker, trigger_results, market_ctx)
+        if args.dry_run:
+            print(f"\n{'═' * 60}")
+            print("  [DAILY REPORT]")
+            print(report)
         else:
-            print("  No accumulation signals to notify.")
+            send_telegram(report, dry_run=not should_notify)
+
+
+# ─── Print Helpers ───
+
+def _print_summary(symbol, raw_score, phase_info, tracked_state):
+    """Print one-line summary for a symbol."""
+    phase = phase_info["phase"]
+    conf = phase_info["confidence"]
+    tier = tracked_state["tier"] if tracked_state else "—"
+    decay = tracked_state["decay_score"] if tracked_state else raw_score
+
+    tier_emoji = "✅" if tier == "confirmed" else "👀" if tier == "watch" else "  "
+    level = "🟢" if decay >= 11 else "🟡" if decay >= 7 else "⚪"
+
+    print(f"  {level} {tier_emoji} {symbol:6s} | Phase {phase} ({conf:.0%}) | "
+          f"Score {raw_score} (decay {decay:.1f}) | {phase_info['next_event']}")
+
+
+def _print_debug(symbol, score_result, phase_info, triggers):
+    """Print detailed breakdown."""
+    print(f"\n  {'─' * 50}")
+    print(f"  {symbol} — Raw Score: {score_result['raw_score']}/18")
+    print(f"  Phase: {phase_info['phase']} (confidence: {phase_info['confidence']:.0%})")
+    print(f"  {phase_info['description']}")
+    print(f"  Next: {phase_info['next_event']}")
+    print(f"  Support: P=${score_result['support_primary']:.2f} | "
+          f"D=${score_result['support_dynamic']:.2f} | R=${score_result['resistance']:.2f}")
+    print(f"  {'─' * 50}")
+
+    for name, comp in score_result["components"].items():
+        print(f"  {name:20s}: {comp['score']}/3 — {comp['signal']}")
+
+    if triggers:
+        if triggers["triggered"]:
+            print(f"\n  ⚡ TRIGGERED:")
+            for t in triggers["triggered"]:
+                print(f"    {t['type']}: Entry ${t['entry']} | SL ${t['stop']} | "
+                      f"TP ${t['target']} | R:R 1:{t['rr']}")
+                print(f"    {t['reason']}")
+        if triggers["proximity"]:
+            print(f"\n  ⚠️ PROXIMITY:")
+            for p in triggers["proximity"]:
+                print(f"    {p['type']}: ${p['trigger_price']} (差 {p['pct_away']:.1f}%)")
+                print(f"    {p['vol_status']}")
+        dist = triggers.get("distance", {})
+        if dist.get("nearest_trigger"):
+            print(f"\n  📏 Distance: {dist['nearest_trigger']} — {dist['price_away_pct']:.1f}% away")
+
+
+def _print_phase(symbol, phase_info, raw_score):
+    """Print phase-only output."""
+    phase = phase_info["phase"]
+    conf = phase_info["confidence"]
+    print(f"  {symbol:6s} | Phase {phase} ({conf:.0%}) | Score {raw_score}/18")
+    print(f"         {phase_info['description']}")
+    print(f"         → {phase_info['next_event']}")
+    print()
+
+
+def _print_triggers(symbol, triggers, phase_info):
+    """Print trigger-only output."""
+    print(f"\n  {symbol} (Phase {phase_info['phase']}):")
+    if triggers["triggered"]:
+        for t in triggers["triggered"]:
+            print(f"    ⚡ {t['type']}: Entry ${t['entry']} | SL ${t['stop']} | "
+                  f"TP ${t['target']} | R:R 1:{t['rr']}")
+            print(f"       {t['reason']}")
+            print(f"       行動: {t['action']}")
+    elif triggers["proximity"]:
+        for p in triggers["proximity"]:
+            print(f"    ⚠️ {p['type']}: 觸發價 ${p['trigger_price']} (差 {p['pct_away']:.1f}%)")
+            print(f"       {p['vol_status']}")
+    else:
+        dist = triggers.get("distance", {})
+        if dist.get("nearest_trigger"):
+            print(f"    📏 最近觸發: {dist['nearest_trigger']} — 差 {dist['price_away_pct']:.1f}%")
+        else:
+            print(f"    — 無接近觸發條件")
+
+
+def _print_failure(symbol, failure):
+    """Print failure notice."""
+    sev = "❌" if failure["severity"] == "hard" else "⚠️"
+    print(f"  {sev} {symbol}: {failure['reason']}")
 
 
 if __name__ == "__main__":
