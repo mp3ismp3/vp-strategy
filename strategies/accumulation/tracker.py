@@ -217,6 +217,9 @@ class AccumulationTracker:
             s["demote_streak"] = 0
 
         if s["demote_streak"] >= DEMOTION_STREAK:
+            # If score is below exit threshold, skip demotion — exit will handle removal
+            if s["decay_score"] < EXIT_THRESHOLD:
+                return
             s["tier"] = "watch"
             s["demote_streak"] = 0
             self._changes.append({

@@ -100,14 +100,15 @@ def _check_phase_e(c, v, last_close, resistance, vol_median):
     breakout_vol = float(np.max(v[-days_above:])) if days_above > 0 else float(v[-1])
     vol_confirmed = breakout_vol > vol_median * SOS_VOL_MULT
 
-    if days_above >= 2 or vol_confirmed:
-        confidence = 0.9 if vol_confirmed else 0.7
+    # Require BOTH: 2+ days above resistance AND at least one volume-confirmed day
+    if days_above >= 2 and vol_confirmed:
+        confidence = 0.9
         return {
             "phase": "E",
             "confidence": confidence,
             "next_event": "持有/追蹤趨勢，注意回測支撐",
-            "description": f"已突破壓力 ${resistance:.1f}，連續 {days_above} 天站穩" +
-                           (f" + 量能確認 ({breakout_vol/vol_median:.1f}x)" if vol_confirmed else ""),
+            "description": f"已突破壓力 ${resistance:.1f}，連續 {days_above} 天站穩"
+                           f" + 量能確認 ({breakout_vol/vol_median:.1f}x)",
         }
     return None
 

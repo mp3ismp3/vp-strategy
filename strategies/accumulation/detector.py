@@ -12,6 +12,7 @@ Also computes support/resistance levels for the tracker.
 """
 
 import numpy as np
+import pandas as pd
 
 from core.indicators import find_swing_points
 from strategies.accumulation.config import DEFAULT_LOOKBACK, SWING_LOOKBACK
@@ -222,11 +223,18 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
     rs_signal = "無 SPY 資料"
 
     if spy_df is not None and len(spy_df) >= lookback:
-        spy_tail = spy_df.tail(lookback)
-        if len(spy_tail) >= n:
-            spy_c = spy_tail["Close"].values[-n:].astype(float)
-            stock_returns = np.diff(c) / c[:-1]
-            spy_returns = np.diff(spy_c) / spy_c[:-1]
+        # Align by date index to handle halted/missing days
+        stock_close = df.tail(lookback + 10)["Close"]
+        spy_close = spy_df["Close"]
+        # Inner join on date ensures only matching trading days are compared
+        aligned = pd.DataFrame({"stock": stock_close, "spy": spy_close}).dropna()
+        aligned = aligned.tail(lookback)
+
+        if len(aligned) >= 15:
+            stock_vals = aligned["stock"].values.astype(float)
+            spy_vals = aligned["spy"].values.astype(float)
+            stock_returns = np.diff(stock_vals) / stock_vals[:-1]
+            spy_returns = np.diff(spy_vals) / spy_vals[:-1]
 
             # Beta calculation
             if len(spy_returns) > 5 and np.var(spy_returns) > 0:
