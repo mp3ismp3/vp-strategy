@@ -1,5 +1,5 @@
 """
-Multi-Strategy Scanner — scans all symbols, fuses signals, outputs JSON.
+Multi-Strategy Scanner — scans all symbols, scores each signal independently.
 
 Usage:
   python scan_all.py            # scan + Telegram
@@ -14,12 +14,12 @@ from pathlib import Path
 from config import SYMBOLS, DEFAULT_CFG
 from core.data_provider import YahooProvider
 from core.market_context import fetch_market_context
-from core.indicators import calc_atr
+from core.indicators import calc_atr, determine_bias
 from regime.engine import detect_regime, get_active_strategies
 from strategies.vp_signals import VPSignals
 from strategies.vwap_signals import VWAPSignals
 from strategies.trend_signals import TrendSignals
-from scoring.fusion import fuse_signals
+from scoring.quality import score_signal
 from scoring.holding import estimate_holding
 from notifications.telegram import send_telegram
 
@@ -29,18 +29,23 @@ RESULTS_FILE = DATA_DIR / "scan_results.json"
 ET = timezone(timedelta(hours=-4))
 
 STRATEGIES = [VPSignals(), VWAPSignals(), TrendSignals()]
-STRATEGY_MAP = {s.name: s for s in STRATEGIES}
 
 
 def scan_symbol(symbol, df, cfg, market_ctx):
-    """Run regime detection + active strategies on one symbol."""
+    """Run regime detection + strategies + quality scoring on one symbol."""
     if df is None or len(df) < cfg["vp_lookback"] + 10:
         return None
 
     df.attrs["symbol"] = symbol
+
+    # 1. Regime detection (still used for strategy activation)
     regime_state = detect_regime(df, cfg, market_ctx)
     active = get_active_strategies(regime_state)
 
+    # 2. Direction bias (new)
+    bias_info = determine_bias(df)
+
+    # 3. Collect signals from active strategies
     all_signals = []
     for strategy in STRATEGIES:
         if strategy.name not in active:
@@ -51,52 +56,74 @@ def scan_symbol(symbol, df, cfg, market_ctx):
         except Exception:
             pass
 
-    fusion = fuse_signals(all_signals, regime_state)
+    # 4. Score each signal independently
+    scored_signals = []
+    for sig in all_signals:
+        if not sig.triggered or sig.direction in ("WARNING", "NEUTRAL"):
+            continue
 
-    # Holding estimate
-    atr = calc_atr(df, cfg["atr_len"]) or 0
-    atr_avg = atr
-    if len(df) > 40:
-        h, l, c = df["High"].values, df["Low"].values, df["Close"].values
-        tr = max(h[-1] - l[-1], abs(h[-1] - c[-2]), abs(l[-1] - c[-2]))
-        trs = []
-        for i in range(-20, 0):
-            if abs(i) < len(df):
-                trs.append(max(h[i] - l[i], abs(h[i] - c[i-1]), abs(l[i] - c[i-1])))
-        atr_avg = sum(trs) / len(trs) if trs else atr
+        scoring = score_signal(sig, df, bias_info)
 
-    # Find the actual dominant StrategySignal for holding/rr
-    dominant_sig = None
-    if fusion.best_track != "—":
-        best_track_result = fusion.tracks.get(fusion.best_track)
-        if best_track_result:
-            # Find matching signal
-            for s in all_signals:
-                if s.signal_type == best_track_result.main_signal and s.triggered:
-                    dominant_sig = s
-                    break
+        # Holding estimate
+        atr = calc_atr(df, cfg["atr_len"]) or 0
+        atr_avg = atr
+        if len(df) > 40:
+            h, l, c = df["High"].values, df["Low"].values, df["Close"].values
+            trs = []
+            for i in range(-20, 0):
+                if abs(i) < len(df):
+                    trs.append(max(h[i] - l[i], abs(h[i] - c[i - 1]),
+                                   abs(l[i] - c[i - 1])))
+            atr_avg = sum(trs) / len(trs) if trs else atr
 
-    holding = estimate_holding(dominant_sig, atr, atr_avg, market_ctx.get("vix"))
-    rr = dominant_sig.rr_ratio if dominant_sig else 0.0
+        holding = estimate_holding(sig, atr, atr_avg, market_ctx.get("vix"))
+
+        scored_signals.append({
+            "ticker": symbol,
+            "signal_type": sig.signal_type,
+            "strategy": sig.strategy,
+            "direction": sig.direction,
+            "quality": scoring["quality"],
+            "direction_fit": scoring["direction_fit"],
+            "rr": scoring["rr"],
+            "rank": scoring["rank"],
+            "label": scoring["label"],
+            "entry": round(sig.entry, 2),
+            "stop": round(sig.stop, 2),
+            "target": round(sig.target, 2),
+            "holding": holding.range_str,
+            "holding_days": holding.days,
+            "holding_type": sig.holding_type,
+            "regime": regime_state.regime,
+            "bias": bias_info["bias"],
+            "bias_strength": bias_info["strength"],
+            "reasons": sig.reasons,
+            "warnings": sig.warnings,
+        })
+
+    # Return best signal for this symbol (highest rank), plus all signals
+    if not scored_signals:
+        return None
+
+    scored_signals.sort(key=lambda x: x["rank"], reverse=True)
+    best = scored_signals[0]
 
     return {
         "ticker": symbol,
-        "score": fusion.best_score,
-        "direction": fusion.direction,
-        "label": fusion.label,
-        "setup": fusion.best_setup,
-        "regime": regime_state.regime,
-        "rr": rr,
-        "holding": holding.range_str,
-        "holding_days": holding.days,
-        "holding_timeframe": holding.timeframe,
-        "holding_reasoning": holding.reasoning,
-        "best_track": fusion.best_track,
-        "cross_track_conflict": fusion.cross_track_conflict,
-        "conflict_note": fusion.conflict_note,
-        "tracks": {k: v.to_dict() for k, v in fusion.tracks.items()},
-        "signals": [s.to_dict() for s in all_signals],
-        "regime_trust": regime_state.normalized_trust,
+        "score": best["quality"],
+        "direction": best["direction"],
+        "label": best["label"],
+        "setup": best["signal_type"],
+        "regime": best["regime"],
+        "rr": best["rr"],
+        "rank": best["rank"],
+        "holding": best["holding"],
+        "holding_days": best["holding_days"],
+        "holding_timeframe": best["holding_type"],
+        "bias": best["bias"],
+        "bias_strength": best["bias_strength"],
+        "direction_fit": best["direction_fit"],
+        "signals": scored_signals,
     }
 
 
@@ -108,7 +135,7 @@ def main():
     print("  Fetching market context...")
     market_ctx = fetch_market_context(cfg)
 
-    # Download data with jitter
+    # Download data
     provider = YahooProvider(max_workers=5, jitter=(0.1, 0.3))
     print("  Downloading market data...")
     data = provider.batch_daily(SYMBOLS, period="1y")
@@ -127,8 +154,8 @@ def main():
         except Exception as e:
             print(f"  Error scanning {symbol}: {e}")
 
-    # Sort by score descending
-    results.sort(key=lambda x: x["score"], reverse=True)
+    # Sort by rank descending (quality × direction_fit × R:R)
+    results.sort(key=lambda x: x["rank"], reverse=True)
 
     # Save JSON
     DATA_DIR.mkdir(exist_ok=True)
@@ -140,41 +167,40 @@ def main():
             "sector_momentum": market_ctx.get("sector_momentum", {}),
         },
         "total_symbols": len(SYMBOLS),
-        "signals_found": sum(1 for r in results if r["score"] >= 40),
+        "signals_found": sum(1 for r in results if r["quality"] >= 45),
         "results": results,
     }
     RESULTS_FILE.write_text(json.dumps(output, indent=2, ensure_ascii=False))
     print(f"  Results saved to {RESULTS_FILE}")
 
     # Format and send Telegram
-    triggered = [r for r in results if r["score"] >= 40]
+    actionable = [r for r in results if r["quality"] >= 45]
     msg = f"<b>📊 Multi-Strategy Scan — {now.strftime('%Y-%m-%d %H:%M')} ET</b>\n"
-    msg += f"Scanned {len(SYMBOLS)} symbols | Signals: {len(triggered)}\n"
+    msg += f"Scanned {len(SYMBOLS)} symbols | Signals: {len(actionable)}\n"
     if market_ctx.get("vix"):
         vix = market_ctx["vix"]
         emoji = "🟢" if vix < 15 else "🟡" if vix < 25 else "🔴"
         msg += f"{emoji} VIX: {vix:.1f} | SPY: {market_ctx.get('spy_state', '?')}\n"
     msg += "\n"
 
-    for r in triggered[:10]:  # Top 10
-        emoji = "🟢" if r["direction"] == "LONG" else "🔴" if r["direction"] == "SHORT" else "⚪"
-        msg += f"{emoji} <b>{r['ticker']}</b> — {r['label']} ({r['score']}/100)\n"
-        msg += f"   Setup: {r['setup']} | R:R {r['rr']:.1f} | Hold: {r['holding']}\n"
-        tracks = r.get("tracks", {})
-        track_str = " | ".join(f"{k}:{v.get('score','—')}" for k, v in tracks.items() if v)
-        msg += f"   Regime: {r['regime']} | {track_str}\n"
-        if r.get("conflict_note"):
-            msg += f"   ⚠️ {r['conflict_note']}\n"
+    for r in actionable[:10]:  # Top 10
+        emoji = "🟢" if r["direction"] == "LONG" else "🔴"
+        bias_arrow = "↑" if r["bias"] == "BULL" else "↓" if r["bias"] == "BEAR" else "→"
+        msg += f"{emoji} <b>{r['ticker']}</b> — {r['label']} (Q:{r['quality']})\n"
+        msg += f"   {r['setup']} | R:R {r['rr']:.1f} | Rank {r['rank']:.2f}\n"
+        msg += f"   Hold: {r['holding']} | Bias: {bias_arrow}{r['bias']}({r['bias_strength']})\n"
+        if r.get("warnings"):
+            msg += f"   ⚠️ {r['warnings'][0]}\n"
         msg += "\n"
 
-    if not triggered:
+    if not actionable:
         msg += "✅ No actionable signals today.\n"
 
     send_telegram(msg, dry_run=DRY_RUN)
     if DRY_RUN:
         print("\n" + msg)
 
-    print(f"\nDone. {len(triggered)} actionable signals (score ≥ 40).")
+    print(f"\nDone. {len(actionable)} actionable signals (quality ≥ 45).")
 
 
 if __name__ == "__main__":

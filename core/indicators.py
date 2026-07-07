@@ -153,3 +153,86 @@ def is_atr_compressed(df, atr_len=14, lookback=20, threshold=0.7):
     if hist_atr == 0:
         return False
     return current_atr < threshold * hist_atr
+
+
+def determine_bias(df, ema_fast=20, ema_slow=50, swing_len=5, position_lookback=50):
+    """Determine directional bias using 3 independent layers.
+
+    Layer 1: EMA Stack (close vs EMA20 vs EMA50)
+    Layer 2: Higher High/Higher Low structure (swing points)
+    Layer 3: Price position in recent range (0-1)
+
+    Returns:
+        dict with 'bias' ("BULL"/"BEAR"/"NEUTRAL"), 'strength' (0-3),
+        'ema_stack', 'structure', 'position'
+    """
+    if len(df) < max(ema_slow + 5, position_lookback):
+        return {"bias": "NEUTRAL", "strength": 0, "ema_stack": 0,
+                "structure": 0, "position": 0.5}
+
+    c = df["Close"].values.astype(float)
+    h = df["High"].values.astype(float)
+    l = df["Low"].values.astype(float)
+    last_close = float(c[-1])
+
+    score = 0  # -3 to +3
+
+    # ─── Layer 1: EMA Stack ───
+    ema_f = float(df["Close"].ewm(span=ema_fast, adjust=False).mean().iloc[-1])
+    ema_s = float(df["Close"].ewm(span=ema_slow, adjust=False).mean().iloc[-1])
+
+    ema_stack = 0
+    if last_close > ema_f > ema_s:
+        ema_stack = 1
+        score += 1
+    elif last_close < ema_f < ema_s:
+        ema_stack = -1
+        score -= 1
+
+    # ─── Layer 2: HH/HL or LH/LL Structure ───
+    swing_highs, swing_lows = find_swing_points(df.tail(position_lookback), swing_len)
+
+    structure = 0
+    if len(swing_highs) >= 2 and len(swing_lows) >= 2:
+        hh = swing_highs[-1][1] > swing_highs[-2][1]  # Higher High
+        hl = swing_lows[-1][1] > swing_lows[-2][1]    # Higher Low
+        lh = swing_highs[-1][1] < swing_highs[-2][1]  # Lower High
+        ll = swing_lows[-1][1] < swing_lows[-2][1]    # Lower Low
+
+        if hh and hl:
+            structure = 1
+            score += 1
+        elif lh and ll:
+            structure = -1
+            score -= 1
+
+    # ─── Layer 3: Price Position in Range ───
+    recent_high = float(np.max(h[-position_lookback:]))
+    recent_low = float(np.min(l[-position_lookback:]))
+    price_range = recent_high - recent_low
+
+    if price_range > 0:
+        position = (last_close - recent_low) / price_range
+    else:
+        position = 0.5
+
+    if position > 0.7:
+        score += 1
+    elif position < 0.3:
+        score -= 1
+
+    # ─── Determine Bias ───
+    if score >= 2:
+        bias = "BULL"
+    elif score <= -2:
+        bias = "BEAR"
+    else:
+        bias = "NEUTRAL"
+
+    return {
+        "bias": bias,
+        "strength": abs(score),
+        "ema_stack": ema_stack,
+        "structure": structure,
+        "position": round(position, 3),
+    }
