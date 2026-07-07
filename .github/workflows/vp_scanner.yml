@@ -5,6 +5,9 @@ on:
     - cron: '5 21 * * 1-5'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -30,3 +33,11 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python accumulation.py --notify
+
+      - name: Persist accumulation state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/accum_state.json
+          git diff --cached --quiet || git commit -m "chore: update accum_state.json [skip ci]"
+          git push
