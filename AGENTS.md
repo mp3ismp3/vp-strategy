@@ -221,6 +221,28 @@ core/data_provider → core/indicators → regime/engine → strategies/* → sc
 - `data/accum_state.json` 由 CI 自動 commit，手動不要改
 - `data/scan_results.json` 不進 git
 
+## AI Agent Commit Protocol（強制）
+
+**每次 commit 前必須執行 sub-agent review，無例外。**
+
+流程：
+1. Agent 完成修改
+2. Agent 開 sub-agent（reviewer 角色）review 本次所有改動
+3. Reviewer 依據以下 checklist 逐項確認：
+   - [ ] 是否違反資料流方向（單向依賴）
+   - [ ] 是否有跨策略 import
+   - [ ] 新欄位是否有 default 值（向後相容）
+   - [ ] StrategySignal 格式是否正確（必填欄位、direction/holding_type 值域）
+   - [ ] 新 signal_type 是否已加入 TRACK_MAP
+   - [ ] config 預設值是否被改動（需 backtest 驗證）
+   - [ ] 測試是否通過（跑受影響的 test files）
+   - [ ] 是否引入新依賴（需確認必要性）
+   - [ ] commit 是否只做一件事（不混合 feature + refactor + fix）
+   - [ ] 訊息格式是否正確（type: 描述）
+4. Reviewer 回報 PASS / FAIL + 原因
+5. PASS → 執行 commit
+6. FAIL → 修正後重新 review
+
 ## 效能注意事項
 
 - `yf.download` 很慢（每 symbol ~1-2s），用 `YahooProvider.batch_daily()` batch 下載
