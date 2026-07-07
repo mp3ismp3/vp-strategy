@@ -51,11 +51,13 @@ class AccumulationTracker:
         self._changes = []
 
     def save_state(self):
-        """Persist current state to JSON file."""
+        """Persist current state to JSON file (atomic write)."""
         self._state_path.parent.mkdir(parents=True, exist_ok=True)
-        self._state_path.write_text(
+        tmp_path = self._state_path.with_suffix(".json.tmp")
+        tmp_path.write_text(
             json.dumps(self._state, indent=2, ensure_ascii=False)
         )
+        tmp_path.replace(self._state_path)
 
     # ─── Core Update Logic ───
 
@@ -108,6 +110,9 @@ class AccumulationTracker:
         s = self._state[symbol]
         prev_decay = s["decay_score"]
 
+        # Phase hysteresis: prevent daily oscillation
+        phase = self._apply_phase_hysteresis(s, phase)
+
         # Compute new decay score
         new_decay = self._compute_decay(prev_decay, raw_score, phase)
 
@@ -125,8 +130,8 @@ class AccumulationTracker:
         history.append(raw_score)
         s["raw_history"] = history[-30:]
 
-        # Reset failure state if score is recovering
-        if new_decay > prev_decay:
+        # Reset failure state only if score recovers to confirmation level
+        if new_decay >= CONFIRM_THRESHOLD:
             s["failing"] = False
             s["fail_days"] = 0
 
@@ -149,6 +154,35 @@ class AccumulationTracker:
 
         decayed = prev_score * decay_rate
         return round(max(float(raw_score), decayed), 2)
+
+    @staticmethod
+    def _apply_phase_hysteresis(state: dict, new_phase: str) -> str:
+        """Apply phase hysteresis to prevent daily oscillation.
+
+        Rules:
+          - Forward transitions (A→B→C→D→E) apply immediately.
+          - Backward transitions require 2 consecutive scans.
+          - UNKNOWN is always allowed (resets).
+        """
+        PHASE_ORDER = {"UNKNOWN": 0, "A": 1, "B": 2, "C": 3, "D": 4, "E": 5}
+        prev_phase = state.get("phase", "UNKNOWN")
+
+        prev_rank = PHASE_ORDER.get(prev_phase, 0)
+        new_rank = PHASE_ORDER.get(new_phase, 0)
+
+        if new_phase == "UNKNOWN" or new_rank >= prev_rank:
+            # Forward or same — apply immediately, reset backward counter
+            state["phase_back_count"] = 0
+            return new_phase
+        else:
+            # Backward — require 2 consecutive scans
+            back_count = state.get("phase_back_count", 0) + 1
+            state["phase_back_count"] = back_count
+            if back_count >= 2:
+                state["phase_back_count"] = 0
+                return new_phase
+            else:
+                return prev_phase  # Hold previous phase
 
     def _check_promotion(self, symbol: str):
         """Check if watch → confirmed promotion should happen."""

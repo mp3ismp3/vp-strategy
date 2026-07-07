@@ -226,6 +226,14 @@ def _check_phase_b(c, v, l, last_close, support_primary, resistance,
     if price_range > 30:  # Too wide a range, probably not consolidating
         return None
 
+    # Trend filter: reject if price is making consecutive new lows
+    # (last 10 closes all below the close from 20 bars ago = still in downtrend)
+    if n >= 20:
+        ref_close = c[n - 20]
+        recent_closes = c[-10:]
+        if all(rc < ref_close for rc in recent_closes):
+            return None
+
     # Check OBV trend (simple: is overall OBV positive?)
     obv = np.zeros(n)
     for i in range(1, n):

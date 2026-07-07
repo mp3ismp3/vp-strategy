@@ -150,6 +150,7 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
 
     # ─── 4. ATR Tightening (Percentile-based) ───
     tr = np.zeros(n)
+    tr[0] = h[0] - l[0]  # First bar uses high-low range
     tr[1:] = np.maximum(h[1:] - l[1:], np.maximum(np.abs(h[1:] - c[:-1]), np.abs(l[1:] - c[:-1])))
 
     # Rolling ATR values (10-bar windows)
