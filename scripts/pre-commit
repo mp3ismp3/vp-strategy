@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Pre-commit hook — 自動 review 每次 commit
+# 檢查項目：架構限制、測試、import 方向、schema 完整性
+set -e
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+ERRORS=0
+WARNINGS=0
+
+echo "═══════════════════════════════════════════"
+echo "  🔍 Pre-commit Review"
+echo "═══════════════════════════════════════════"
+
+# ─── 1. 禁止直接修改 CI auto-managed files ───
+if echo "$STAGED" | grep -q "^data/accum_state.json$"; then
+    echo -e "${RED}✗ data/accum_state.json 由 CI 自動管理，不應手動 commit${NC}"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# ─── 2. 檢查 import 方向違規 ───
+# regime/ 不能 import strategies/ 或 scoring/
+for f in $(echo "$STAGED" | grep "^regime/"); do
+    if [ -f "$f" ]; then
+        if grep -n "from strategies\|import strategies\|from scoring\|import scoring" "$f" 2>/dev/null; then
+            echo -e "${RED}✗ $f: regime/ 不能 import strategies/ 或 scoring/${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+done
+
+# strategies/ 不能 import scoring/
+for f in $(echo "$STAGED" | grep "^strategies/"); do
+    if [ -f "$f" ]; then
+        if grep -n "from scoring\|import scoring" "$f" 2>/dev/null; then
+            echo -e "${RED}✗ $f: strategies/ 不能 import scoring/${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+done
+
+# 策略之間不能互相 import
+for f in $(echo "$STAGED" | grep "^strategies/[^/]*_signals.py$"); do
+    if [ -f "$f" ]; then
+        other_strategies=$(echo "$STAGED" | grep "^strategies/.*_signals" | grep -v "$f" | sed 's|strategies/||;s|_signals.py||')
+        for other in $other_strategies; do
+            if grep -n "from strategies.${other}\|import.*${other}_signals" "$f" 2>/dev/null; then
+                echo -e "${RED}✗ $f: 策略之間不能互相 import${NC}"
+                ERRORS=$((ERRORS + 1))
+            fi
+        done
+        # Also check for cross-imports in general
+        basename_f=$(basename "$f" .py)
+        if grep -n "from strategies\.\(vp_signals\|vwap_signals\|trend_signals\)" "$f" 2>/dev/null | grep -v "$basename_f"; then
+            echo -e "${RED}✗ $f: 策略之間不能互相 import${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+done
+
+# ─── 3. 新的 signal_type 必須在 TRACK_MAP 中 ───
+if echo "$STAGED" | grep -q "strategies/.*_signals.py"; then
+    for f in $(echo "$STAGED" | grep "strategies/.*_signals.py"); do
+        if [ -f "$f" ]; then
+            # Extract signal_type values from staged changes
+            NEW_TYPES=$(git diff --cached "$f" | grep "^+" | grep "signal_type=" | grep -oP 'signal_type="[^"]+"' | sed 's/signal_type="//;s/"//')
+            if [ -n "$NEW_TYPES" ]; then
+                for sig_type in $NEW_TYPES; do
+                    if ! grep -q "\"$sig_type\"" core/signal.py 2>/dev/null; then
+                        echo -e "${RED}✗ signal_type \"$sig_type\" 不在 TRACK_MAP 中 (core/signal.py)${NC}"
+                        ERRORS=$((ERRORS + 1))
+                    fi
+                done
+            fi
+        fi
+    done
+fi
+
+# ─── 4. config 預設值變更警告 ───
+if echo "$STAGED" | grep -q "^config.py$"; then
+    CHANGED_LINES=$(git diff --cached config.py | grep "^[+-]" | grep -v "^[+-][+-][+-]" | grep -v "^[+-]#")
+    if echo "$CHANGED_LINES" | grep -qi "DEFAULT_CFG\|SCORING_WEIGHTS\|REGIME_THRESHOLDS\|REGIME_STRATEGY_TRUST"; then
+        echo -e "${YELLOW}⚠ config.py 預設值被修改 — commit 後務必跑 python backtest_multi.py 驗證${NC}"
+        WARNINGS=$((WARNINGS + 1))
+    fi
+fi
+
+# ─── 5. accum_state.json schema 向後相容 ───
+if echo "$STAGED" | grep -q "strategies/accumulation/tracker.py"; then
+    # Check if new fields are added without defaults
+    NEW_FIELDS=$(git diff --cached strategies/accumulation/tracker.py | grep "^+" | grep -oP 's\["[^"]+"\]' | sort -u)
+    if [ -n "$NEW_FIELDS" ]; then
+        echo -e "${YELLOW}⚠ tracker.py 有新欄位操作 — 確認新欄位有 default 值（向後相容舊 state）${NC}"
+        WARNINGS=$((WARNINGS + 1))
+    fi
+fi
+
+# ─── 6. Telegram 訊息長度 ───
+if echo "$STAGED" | grep -q "notifications/\|accumulation/notifications"; then
+    echo -e "${YELLOW}⚠ 通知格式修改 — 確認訊息 ≤ 4096 字元，用 --dry-run 測試${NC}"
+    WARNINGS=$((WARNINGS + 1))
+fi
+
+# ─── 7. 跑受影響的測試 ───
+RUN_TESTS=""
+
+if echo "$STAGED" | grep -q "^core/indicators.py$"; then
+    RUN_TESTS="$RUN_TESTS tests/test_indicators.py"
+fi
+
+if echo "$STAGED" | grep -q "^regime/"; then
+    RUN_TESTS="$RUN_TESTS tests/test_regime.py"
+fi
+
+if echo "$STAGED" | grep -q "^scoring/fusion.py$"; then
+    RUN_TESTS="$RUN_TESTS tests/test_fusion.py"
+fi
+
+if echo "$STAGED" | grep -q "^strategies/vp_signals.py$"; then
+    RUN_TESTS="$RUN_TESTS tests/test_strategies.py"
+fi
+
+if echo "$STAGED" | grep -q "^strategies/vwap_signals.py$"; then
+    RUN_TESTS="$RUN_TESTS tests/test_vwap_strategy.py"
+fi
+
+if echo "$STAGED" | grep -q "^strategies/trend_signals.py$"; then
+    RUN_TESTS="$RUN_TESTS tests/test_trend_strategy.py"
+fi
+
+if echo "$STAGED" | grep -q "^strategies/accumulation/"; then
+    RUN_TESTS="$RUN_TESTS tests/test_accumulation_tracker.py tests/test_accumulation_detector.py tests/test_phase_classifier.py tests/test_entry_triggers.py tests/test_accumulation_notifications.py"
+fi
+
+if [ -n "$RUN_TESTS" ]; then
+    echo ""
+    echo "  🧪 Running affected tests..."
+    # Deduplicate
+    RUN_TESTS=$(echo "$RUN_TESTS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    if ! pytest $RUN_TESTS -q --tb=short 2>&1; then
+        echo -e "${RED}✗ 測試失敗 — 請修復後再 commit${NC}"
+        ERRORS=$((ERRORS + 1))
+    fi
+fi
+
+# ─── 8. Python syntax check ───
+for f in $(echo "$STAGED" | grep "\.py$"); do
+    if [ -f "$f" ]; then
+        if ! python3 -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then
+            echo -e "${RED}✗ $f: Python 語法錯誤${NC}"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+done
+
+# ─── Summary ───
+echo ""
+echo "───────────────────────────────────────────"
+if [ $ERRORS -gt 0 ]; then
+    echo -e "  ${RED}✗ BLOCKED: $ERRORS error(s), $WARNINGS warning(s)${NC}"
+    echo -e "  ${RED}  用 git commit --no-verify 可跳過（不建議）${NC}"
+    exit 1
+elif [ $WARNINGS -gt 0 ]; then
+    echo -e "  ${YELLOW}⚠ PASSED with $WARNINGS warning(s)${NC}"
+else
+    echo -e "  ${GREEN}✓ All checks passed${NC}"
+fi
+echo "═══════════════════════════════════════════"
+exit 0
