@@ -1,0 +1,128 @@
+---
+description: Development guidelines for the vp-strategy Multi-Strategy Analysis Platform. Use when writing, reviewing, or modifying code in this Market Auction Theory trading system to maintain architecture integrity, data flow direction, and backward compatibility.
+alwaysApply: true
+---
+
+# VP-Strategy Development Guidelines
+
+Behavioral guidelines for AI agents working on the Multi-Strategy Analysis Platform. Combines Karpathy's 4 principles with project-specific architecture rules.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+- Identify which system (Scanner vs Accumulation) is affected — they are independent.
+- Check data flow direction before adding imports.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add a signal" → "Write test, implement detection, add to TRACK_MAP, verify backtest"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+---
+
+## Architecture Rules
+
+**Data flow is strictly unidirectional:**
+```
+core/data_provider → core/indicators → regime/engine → strategies/* → scoring/* → JSON/Telegram
+```
+
+**Forbidden patterns:**
+- No database (system is file-based JSON by design)
+- No async/await (synchronous codebase, yfinance doesn't support async)
+- No class inheritance > 2 levels
+- No cross-strategy imports (`vp_signals` cannot import `vwap_signals`)
+- No reverse dependencies (`regime/` ← `strategies/` ← `scoring/`)
+- No look-ahead bias in strategy calculations
+- No modifying `scan_results.json` schema (UI depends on it)
+- No modifying existing `accum_state.json` fields (new fields need defaults)
+- No changing GitHub Actions cron times
+- No changing `DEFAULT_CFG` / `SCORING_WEIGHTS` / `REGIME_THRESHOLDS` without backtest
+
+## Schema Contracts
+
+All strategies return `list[StrategySignal]`:
+- `direction`: `"LONG"` / `"SHORT"` / `"NEUTRAL"` / `"WARNING"`
+- `holding_type`: `"short"` / `"mid"` / `"long"`
+- `confidence`: 0.0–1.0
+- New `signal_type` → add to `TRACK_MAP` in `core/signal.py`
+
+## Testing & Verification
+
+```bash
+pytest tests/                              # All tests
+pytest tests/test_indicators.py            # After indicator changes
+pytest tests/test_accumulation_*.py        # After accumulation changes
+pytest tests/test_fusion.py                # After scoring changes
+python backtest_multi.py                   # After weight/config changes
+```
+
+- Synthetic data in tests (never `yf.download`)
+- Mock external APIs
+- New functions require tests
+
+## Performance
+
+- `YahooProvider.batch_daily()` for bulk downloads
+- Vectorized numpy/pandas (no `iterrows()`)
+- Telegram messages ≤ 4096 chars
+- Workflows ≤ 10 minutes
+
+## Git Conventions
+
+- One commit = one thing
+- Format: `type: 簡短描述` (feat/fix/refactor/chore/test)
+- Branch: `feat/xxx`, `fix/xxx`, `refactor/xxx`
+- `data/accum_state.json` — CI auto-commit only
+- Sub-agent review required before every commit
+
+---
+
+**These guidelines are working if:** fewer unnecessary diffs, clean architecture boundaries, stable backtest metrics, and backward-compatible state files.
