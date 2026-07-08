@@ -111,6 +111,7 @@ def scan_symbol(symbol, df, cfg, market_ctx):
     return {
         "ticker": symbol,
         "score": best["quality"],
+        "quality": best["quality"],
         "direction": best["direction"],
         "label": best["label"],
         "setup": best["signal_type"],
