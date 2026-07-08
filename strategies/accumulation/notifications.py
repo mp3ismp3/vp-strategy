@@ -102,9 +102,7 @@ def format_daily_report(tracker, trigger_results, market_ctx=None):
     watchlist = tracker.get_watchlist()
     lines.append(f"━━ 👀 觀察中 ({len(watchlist)}) ━━")
     if watchlist:
-        # If too many, only show top items
-        show_count = min(len(watchlist), 10)
-        for item in watchlist[:show_count]:
+        for item in watchlist:
             sym = item["symbol"]
             phase = item["phase"]
             score = item["decay_score"]
@@ -125,8 +123,6 @@ def format_daily_report(tracker, trigger_results, market_ctx=None):
                     trend_arrow = "→"
 
             lines.append(f"  {sym} | Ph.{phase} | {score:.1f}(今日{raw}){trend_arrow} | {days}天")
-        if len(watchlist) > show_count:
-            lines.append(f"  ...及另外 {len(watchlist) - show_count} 檔")
     else:
         lines.append("  (空)")
     lines.append("")
