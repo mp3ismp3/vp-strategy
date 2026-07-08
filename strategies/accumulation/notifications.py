@@ -64,7 +64,21 @@ def format_daily_report(tracker, trigger_results, market_ctx=None):
             sym = item["symbol"]
             phase = item["phase"]
             score = item["decay_score"]
+            raw = item.get("raw_score", 0)
             days = _days_since(item.get("entered_date", ""))
+
+            # Score trend from history
+            history = item.get("raw_history", [])
+            trend_arrow = ""
+            if len(history) >= 3:
+                recent_avg = sum(history[-3:]) / 3
+                older_avg = sum(history[-6:-3]) / 3 if len(history) >= 6 else recent_avg
+                if recent_avg > older_avg + 0.5:
+                    trend_arrow = "📈"
+                elif recent_avg < older_avg - 0.5:
+                    trend_arrow = "📉"
+                else:
+                    trend_arrow = "➡️"
 
             # Get trigger distance
             tr = trigger_results.get(sym, {})
@@ -75,7 +89,9 @@ def format_daily_report(tracker, trigger_results, market_ctx=None):
 
             failing_str = " ⚠️" if item.get("failing") else ""
             lines.append(
-                f"  <b>{sym}</b> | Phase {phase} | {score:.1f}分 | {days}天{failing_str}"
+                f"  <b>{sym}</b> | Phase {phase} | "
+                f"{score:.1f}分(今日{raw}) {trend_arrow} | "
+                f"追蹤 <b>{days}天</b>{failing_str}"
             )
             lines.append(f"    距觸發: {dist_str}")
     else:
@@ -92,8 +108,23 @@ def format_daily_report(tracker, trigger_results, market_ctx=None):
             sym = item["symbol"]
             phase = item["phase"]
             score = item["decay_score"]
+            raw = item.get("raw_score", 0)
             days = _days_since(item.get("entered_date", ""))
-            lines.append(f"  {sym} | Ph.{phase} | {score:.1f}分 | {days}天")
+
+            # Score trend
+            history = item.get("raw_history", [])
+            trend_arrow = ""
+            if len(history) >= 3:
+                recent_avg = sum(history[-3:]) / 3
+                older_avg = sum(history[-6:-3]) / 3 if len(history) >= 6 else recent_avg
+                if recent_avg > older_avg + 0.5:
+                    trend_arrow = "↑"
+                elif recent_avg < older_avg - 0.5:
+                    trend_arrow = "↓"
+                else:
+                    trend_arrow = "→"
+
+            lines.append(f"  {sym} | Ph.{phase} | {score:.1f}(今日{raw}){trend_arrow} | {days}天")
         if len(watchlist) > show_count:
             lines.append(f"  ...及另外 {len(watchlist) - show_count} 檔")
     else:
@@ -114,7 +145,9 @@ def format_daily_report(tracker, trigger_results, market_ctx=None):
             elif ch_type == "demoted":
                 lines.append(f"  📉 降級: {sym} → 觀察 ({ch['score']:.1f}分)")
             elif ch_type == "removed":
-                lines.append(f"  ❌ 移除: {sym} ({ch.get('reason', '')})")
+                days = _days_since(ch.get("entered_date", ""))
+                days_str = f", 追蹤{days}天" if days > 0 else ""
+                lines.append(f"  ❌ 移除: {sym} ({ch.get('reason', '')}{days_str})")
 
     # ─── Summary footer ───
     lines.append("")

@@ -275,6 +275,7 @@ class AccumulationTracker:
             "tier": s["tier"],
             "score": s["decay_score"],
             "phase": s["phase"],
+            "entered_date": s.get("entered_date", ""),
         })
         del self._state[symbol]
 
