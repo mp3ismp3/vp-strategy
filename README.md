@@ -212,8 +212,9 @@ pip install -r requirements.txt
 ### 多策略掃描
 
 ```bash
-python scan_all.py              # 掃描 52 檔 → JSON + Telegram
+python scan_all.py              # 掃描 52 檔 → JSON + Telegram + Teams
 python scan_all.py --dry-run    # 只印不發
+python scan_all.py --guide      # 發送信號使用教學到 Telegram
 ```
 
 ### 累積追蹤

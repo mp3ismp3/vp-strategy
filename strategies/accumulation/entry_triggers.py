@@ -105,11 +105,11 @@ def _check_spring(c, h, l, v, n, support_dynamic, support_primary,
                   resistance, vol_median, atr):
     """Detect Spring entry: breach of support + recovery + volume."""
     # Look back SPRING_LOOKBACK days for a breach below support_dynamic
+    # Take the MOST RECENT breach (last one found), not the earliest
     breach_idx = -1
     for i in range(max(0, n - SPRING_LOOKBACK - 1), n - 1):
         if l[i] < support_dynamic:
             breach_idx = i
-            break
 
     if breach_idx < 0:
         # No breach — check proximity to spring zone

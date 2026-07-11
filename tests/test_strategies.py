@@ -39,15 +39,33 @@ class TestVPSignals:
         assert s.detect(df, {"vp_lookback": 60, "va_pct": 0.68, "atr_len": 14, "vol_ma_len": 21, "max_sl_atr": 3.0, "long_only": False}, {}) == []
 
     def test_returns_signals(self):
+        """VP strategy should detect signals when conditions are met (Failed Auction scenario)."""
         s = VPSignals()
         df = make_df(200)
         df.attrs["symbol"] = "TEST"
-        df.iloc[-1, df.columns.get_loc("Volume")] = int(df["Volume"].mean() * 3)
-        result = s.detect(df, {"vp_lookback": 60, "va_pct": 0.68, "atr_len": 14, "vol_ma_len": 21, "max_sl_atr": 3.0, "long_only": False}, {})
+        cfg = {"vp_lookback": 60, "va_pct": 0.68, "atr_len": 14, "vol_ma_len": 21, "max_sl_atr": 3.0, "long_only": False}
+
+        # Create a Failed Auction LONG: prev close below VAL, today reclaim above VAL
+        from core.indicators import calc_vp, calc_atr
+        vp = calc_vp(df, cfg["vp_lookback"], cfg["va_pct"])
+        if vp:
+            val = vp["val"]
+            # Set prev bar: close below VAL
+            df.iloc[-2, df.columns.get_loc("Close")] = val - 2
+            df.iloc[-2, df.columns.get_loc("Low")] = val - 3
+            df.iloc[-2, df.columns.get_loc("High")] = val - 0.5
+            # Set today: bullish close above VAL with high volume
+            df.iloc[-1, df.columns.get_loc("Open")] = val - 1
+            df.iloc[-1, df.columns.get_loc("Close")] = val + 2
+            df.iloc[-1, df.columns.get_loc("Low")] = val - 1.5
+            df.iloc[-1, df.columns.get_loc("High")] = val + 3
+            df.iloc[-1, df.columns.get_loc("Volume")] = int(df["Volume"].mean() * 2)
+
+        result = s.detect(df, cfg, {})
         assert len(result) > 0
         assert result[0].ticker == "TEST"
         assert result[0].strategy.startswith("VP:")
-        assert result[0].signal_type in ("VA Rejection", "Failed Auction", "Breakout Retest", "Climax Volume")
+        assert result[0].signal_type in ("VA Rejection", "Failed Auction", "Breakout Retest")
 
 
 class TestInstitutionalTrend:

@@ -226,6 +226,8 @@ def _check_phase_b(c, v, l, last_close, support_primary, resistance,
     price_range = (max(c) - min(c)) / min(c) * 100 if min(c) > 0 else 0
     if price_range > 30:  # Too wide a range, probably not consolidating
         return None
+    if price_range < 5:  # Too narrow — likely just a slow drift, not real consolidation
+        return None
 
     # Trend filter: reject if price is making consecutive new lows
     # (last 10 closes all below the close from 20 bars ago = still in downtrend)
@@ -265,14 +267,30 @@ def _check_phase_b(c, v, l, last_close, support_primary, resistance,
                 for i in range(1, len(test_volumes))
             )
 
+    # Require at least one support test (swing low near support zone)
+    has_support_test = False
+    if len(swing_lows) >= 1:
+        for _, price in swing_lows[-3:]:
+            # Support test: swing low within 3% of primary support
+            if support_primary > 0 and abs(price - support_primary) / support_primary <= 0.03:
+                has_support_test = True
+                break
+
     confidence = 0.4
     if obv_rising:
         confidence += 0.2
     if declining_tests:
         confidence += 0.2
+    if has_support_test:
+        confidence += 0.1
     confidence = min(confidence, 0.85)
 
+    # Must have OBV rising or declining tests, AND at least one support test
     if not obv_rising and not declining_tests:
+        return None
+    if not has_support_test and not declining_tests:
+        # Without support test evidence, need both OBV rising AND some structural sign
+        # to differentiate from a simple uptrend
         return None
 
     return {
@@ -281,6 +299,7 @@ def _check_phase_b(c, v, l, last_close, support_primary, resistance,
         "next_event": "等待 Spring 或 Higher Low 形成",
         "description": ("OBV 上升" if obv_rising else "OBV 平坦") +
                        (" + 測試量遞減" if declining_tests else "") +
+                       (" + 支撐測試確認" if has_support_test else "") +
                        " — 區間吸籌中",
     }
 

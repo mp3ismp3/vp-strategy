@@ -16,7 +16,6 @@ TRACK_MAP = {
     "Compression Breakout": "mid",
     "Breakout Acceptance": "long",
     "EMA Cross": "long",
-    "Climax Volume": "short",  # warning, won't score
 }
 
 

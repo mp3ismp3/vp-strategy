@@ -81,11 +81,14 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
         obv_score = 3  # Accelerating accumulation
         obv_signal = "加速吸籌中"
     elif obv_slope_recent > 0 and obv_slope_early <= 0:
-        obv_score = 2  # Newly started
+        obv_score = 2  # Newly started (turned positive from negative/flat)
         obv_signal = "新啟動吸籌"
-    elif obv_slope_recent > 0 and obv_slope_early > 0:
-        obv_score = 2  # Steady (recent not accelerating but still positive)
+    elif obv_slope_recent > 0 and obv_slope_early > 0 and obv_slope_recent >= obv_slope_early * 0.5:
+        obv_score = 2  # Steady (recent still at least 50% of early pace)
         obv_signal = "穩定吸籌中"
+    elif obv_slope_recent > 0 and obv_slope_early > 0:
+        obv_score = 1  # Decelerating (recent positive but significantly slower)
+        obv_signal = "吸籌動能減速中"
     elif obv_slope_recent > 0:
         obv_score = 1  # Weak
         obv_signal = "微弱吸籌跡象"
@@ -109,9 +112,9 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
     close_score = 0
     if avg_close_pos >= 0.65 and wick_days >= 8:
         close_score = 3
-    elif avg_close_pos >= 0.60 or wick_days >= 6:
+    elif avg_close_pos >= 0.55 and (avg_close_pos >= 0.60 or wick_days >= 6):
         close_score = 2
-    elif avg_close_pos >= 0.55:
+    elif avg_close_pos >= 0.52 or wick_days >= 5:
         close_score = 1
 
     components["close_position"] = {

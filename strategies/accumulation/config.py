@@ -34,7 +34,7 @@ PROXIMITY_VOL_PCT = 80.0    # Alert when volume at 80%+ of required threshold
 
 # ─── Entry Trigger Parameters ───
 SPRING_LOOKBACK = 10        # Days to look back for support breach (aligned with phase classifier)
-SPRING_VOL_MULT = 1.0       # Volume > median on recovery day
+SPRING_VOL_MULT = 1.3       # Volume > 1.3x median on recovery day (confirms demand)
 LPS_VOL_MULT = 0.7          # Volume < 0.7x median on pullback (low volume)
 SOS_VOL_MULT = 1.5          # Volume > 1.5x median on breakout
 SOS_CONFIRM_DAYS = 2        # Days above resistance for confirmation

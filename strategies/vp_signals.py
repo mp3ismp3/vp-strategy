@@ -39,7 +39,6 @@ class VPSignals(BaseStrategy):
         vol_ratio = calc_vol_ratio(df, cfg["vol_ma_len"])
         high_vol = vol_ratio > 1.2
         low_vol = vol_ratio < 0.8
-        climax_vol = vol_ratio > 2.5
 
         body = abs(c - o)
         wick_up = h - max(c, o)
@@ -114,8 +113,6 @@ class VPSignals(BaseStrategy):
         vol_ma = df["Volume"].iloc[-cfg["vol_ma_len"]:].mean()
         confirmed_above, confirmed_below = False, False
         for i in range(-10, -2):
-            if i + 1 >= 0:
-                break
             b1, b2 = df.iloc[i], df.iloc[i + 1]
             if b1["Close"] > vah and b2["Close"] > vah and b1["Volume"] > vol_ma * 1.2:
                 confirmed_above, confirmed_below = True, False
@@ -148,18 +145,6 @@ class VPSignals(BaseStrategy):
                 entry=c, stop=sl, target=tp, holding_type="mid",
                 reasons=[f"Confirmed breakdown below VAL {val:.2f}", "Retested and rejected", f"Volume {vol_ratio:.1f}x avg"],
                 warnings=[], triggered=True,
-            ))
-
-        # Climax volume warning
-        if climax_vol:
-            signals.append(StrategySignal(
-                ticker=ticker, timestamp=ts, strategy="VP: Climax Volume",
-                signal_type="Climax Volume", direction="WARNING",
-                confidence=0.0, entry=c, stop=vol_ratio, target=0,
-                holding_type="short",
-                reasons=[f"Volume {vol_ratio:.1f}x avg — extreme"],
-                warnings=["Possible exhaustion or institutional activity"],
-                triggered=False,
             ))
 
         return signals

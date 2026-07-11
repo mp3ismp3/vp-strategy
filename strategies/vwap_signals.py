@@ -67,12 +67,14 @@ class VWAPSignals(BaseStrategy):
         if l <= lower + atr * 0.1 and c > lower and bull and body > 0 and wick_dn >= body * 1.5:
             sl = max(lower - atr * 0.5, c - atr * cfg["max_sl_atr"])
             tp = vwap
+            # Dynamic confidence: base 0.5 + volume contribution
+            dev_confidence = min(0.5 + vol_ratio * 0.15, 1.0)
             signals.append(StrategySignal(
                 ticker=ticker, timestamp=ts, strategy="VWAP",
                 signal_type="VWAP Deviation", direction="LONG",
-                confidence=0.7,
+                confidence=dev_confidence,
                 entry=c, stop=sl, target=tp, holding_type="short",
-                reasons=[f"Touched -2σ band {lower:.2f}", f"Rejection wick {wick_dn:.2f}"],
+                reasons=[f"Touched -2σ band {lower:.2f}", f"Rejection wick {wick_dn:.2f}", f"Volume {vol_ratio:.1f}x"],
                 warnings=["Mean reversion play — use tight stop"],
                 triggered=True,
             ))
@@ -81,12 +83,14 @@ class VWAPSignals(BaseStrategy):
         if not cfg["long_only"] and h >= upper - atr * 0.1 and c < upper and bear and body > 0 and wick_up >= body * 1.5:
             sl = min(upper + atr * 0.5, c + atr * cfg["max_sl_atr"])
             tp = vwap
+            # Dynamic confidence: base 0.5 + volume contribution
+            dev_confidence = min(0.5 + vol_ratio * 0.15, 1.0)
             signals.append(StrategySignal(
                 ticker=ticker, timestamp=ts, strategy="VWAP",
                 signal_type="VWAP Deviation", direction="SHORT",
-                confidence=0.7,
+                confidence=dev_confidence,
                 entry=c, stop=sl, target=tp, holding_type="short",
-                reasons=[f"Touched +2σ band {upper:.2f}", f"Rejection wick {wick_up:.2f}"],
+                reasons=[f"Touched +2σ band {upper:.2f}", f"Rejection wick {wick_up:.2f}", f"Volume {vol_ratio:.1f}x"],
                 warnings=["Mean reversion play — use tight stop"],
                 triggered=True,
             ))
@@ -94,7 +98,7 @@ class VWAPSignals(BaseStrategy):
         # --- Anchored VWAP Pullback LONG ---
         anchor_idx = find_swing_anchor(df)
         avwap = calc_anchored_vwap(df, anchor_idx)
-        if avwap and abs(l - avwap) / avwap <= 0.005 and c > avwap and bull and vol_ratio >= 1.0:
+        if avwap and abs(l - avwap) / avwap <= 0.005 and c > avwap and bull and vol_ratio >= 1.2:
             sl = max(avwap - atr * 0.5, c - atr * cfg["max_sl_atr"])
             tp = c + atr * 2.0
             signals.append(StrategySignal(
@@ -102,7 +106,7 @@ class VWAPSignals(BaseStrategy):
                 signal_type="AVWAP Pullback", direction="LONG",
                 confidence=0.65,
                 entry=c, stop=sl, target=tp, holding_type="mid",
-                reasons=[f"Pullback to AVWAP {avwap:.2f}", "Held support + bullish close"],
+                reasons=[f"Pullback to AVWAP {avwap:.2f}", "Held support + bullish close", f"Volume {vol_ratio:.1f}x confirms demand"],
                 warnings=[], triggered=True,
             ))
 

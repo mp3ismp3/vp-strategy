@@ -258,6 +258,7 @@ core/data_provider → core/indicators → regime/engine → strategies/* → sc
 |------|------|--------|
 | `TELEGRAM_BOT_TOKEN` | Telegram 通知 | 選用（dry-run 不需要）|
 | `TELEGRAM_CHAT_ID` | Telegram 目標群組 | 選用 |
+| `TEAMS_WEBHOOK_URL` | Microsoft Teams Incoming Webhook | 選用 |
 | `GEMINI_API_KEY` | AI 分析（選用功能）| 選用 |
 
 ## GitHub Actions Workflows

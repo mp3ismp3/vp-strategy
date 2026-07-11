@@ -96,9 +96,20 @@ def detect_regime(df, cfg: dict, market_ctx: dict) -> RegimeState:
         df, cfg["atr_len"], 20, thresholds["atr_compression"]
     )
     if comp_days >= thresholds["atr_compression_days"]:
-        regime = "compression"
-        confidence = min(comp_days / 10.0, 1.0)
+        # Check if this is compression within a trend (flag pattern)
+        # If POC is also migrating, use hybrid trust (Trend stays active)
+        poc_shift = _poc_shift(df, cfg)
+        if poc_shift > thresholds["poc_migrating_pct"]:
+            # Trending compression: flag/pennant pattern — both VWAP and Trend valid
+            regime = "compression"
+            confidence = min(comp_days / 10.0, 1.0)
+            raw_trust = {"VP": 0.5, "VWAP": 0.9, "TrendFollowing": 0.8}
+        else:
+            regime = "compression"
+            confidence = min(comp_days / 10.0, 1.0)
+            raw_trust = None  # will use default below
     else:
+        raw_trust = None  # will use default based on regime
         poc_shift = _poc_shift(df, cfg)
         outside_va = _is_price_outside_va(df, cfg)
 
@@ -119,7 +130,8 @@ def detect_regime(df, cfg: dict, market_ctx: dict) -> RegimeState:
             regime = "range"
             confidence = 0.5
 
-    raw_trust = REGIME_STRATEGY_TRUST.get(regime, REGIME_STRATEGY_TRUST["range"]).copy()
+    if raw_trust is None:
+        raw_trust = REGIME_STRATEGY_TRUST.get(regime, REGIME_STRATEGY_TRUST["range"]).copy()
     normalized_trust = _normalize_trust(raw_trust)
 
     # Compute atr_ratio for holding adjustment

@@ -80,8 +80,6 @@ class TestQualityScoring:
         """Every signal type in TRACK_MAP should have a scorer."""
         from core.signal import TRACK_MAP
         for sig_type in TRACK_MAP:
-            if sig_type == "Climax Volume":
-                continue  # WARNING signal, no score needed
             assert sig_type in QUALITY_SCORERS, f"Missing scorer for {sig_type}"
 
     def test_quality_range_0_100(self):

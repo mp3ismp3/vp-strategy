@@ -22,6 +22,8 @@ from strategies.trend_signals import TrendSignals
 from scoring.quality import score_signal
 from scoring.holding import estimate_holding
 from notifications.telegram import send_telegram
+from notifications.teams import send_teams
+from notifications.guide import format_signal_guide
 
 DRY_RUN = "--dry-run" in sys.argv
 DATA_DIR = Path(__file__).parent / "data"
@@ -200,6 +202,36 @@ def main():
     send_telegram(msg, dry_run=DRY_RUN)
     if DRY_RUN:
         print("\n" + msg)
+
+    # Format and send to Teams
+    teams_msg = f"📊 Multi-Strategy Scan — {now.strftime('%Y-%m-%d %H:%M')} ET\n"
+    teams_msg += f"Scanned {len(SYMBOLS)} symbols | Signals: {len(actionable)}\n"
+    if market_ctx.get("vix"):
+        vix = market_ctx["vix"]
+        teams_msg += f"VIX: {vix:.1f} | SPY: {market_ctx.get('spy_state', '?')}\n"
+    teams_msg += "\n"
+
+    for r in actionable[:10]:
+        emoji = "🟢" if r["direction"] == "LONG" else "🔴"
+        bias_arrow = "↑" if r["bias"] == "BULL" else "↓" if r["bias"] == "BEAR" else "→"
+        teams_msg += f"{emoji} {r['ticker']} — {r['label']} (Q:{r['quality']})\n"
+        teams_msg += f"   {r['setup']} | R:R {r['rr']:.1f} | Rank {r['rank']:.2f}\n"
+        teams_msg += f"   Hold: {r['holding']} | Bias: {bias_arrow}{r['bias']}({r['bias_strength']})\n"
+        if r.get("warnings"):
+            teams_msg += f"   ⚠️ {r['warnings'][0]}\n"
+        teams_msg += "\n"
+
+    if not actionable:
+        teams_msg += "✅ No actionable signals today.\n"
+
+    send_teams(teams_msg, title="📊 Multi-Strategy Scan Results", dry_run=DRY_RUN)
+
+    # Send signal usage guide to Telegram (--guide flag)
+    if "--guide" in sys.argv:
+        guide_msg = format_signal_guide()
+        send_telegram(guide_msg, dry_run=DRY_RUN)
+        if DRY_RUN:
+            print("\n" + guide_msg)
 
     print(f"\nDone. {len(actionable)} actionable signals (quality ≥ 45).")
 
