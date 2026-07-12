@@ -229,7 +229,7 @@ def main():
     # Send signal usage guide to Telegram (--guide flag)
     if "--guide" in sys.argv:
         guide_msg = format_signal_guide()
-        send_telegram(guide_msg, dry_run=DRY_RUN)
+        send_telegram(guide_msg, dry_run=DRY_RUN, parse_mode=None)
         if DRY_RUN:
             print("\n" + guide_msg)
 

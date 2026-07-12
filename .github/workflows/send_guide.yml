@@ -20,4 +20,4 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python -c "from notifications.telegram import send_telegram; from notifications.guide import format_signal_guide; send_telegram(format_signal_guide())"
+        run: python -c "from notifications.telegram import send_telegram; from notifications.guide import format_signal_guide; send_telegram(format_signal_guide(), parse_mode=None)"
