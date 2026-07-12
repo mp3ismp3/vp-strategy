@@ -186,9 +186,19 @@ def format_trigger_alert(symbol, trigger, phase_info=None):
         f"{emoji} 類型: <b>{type_zh.get(trigger_type, trigger_type)}</b>",
         f"💰 Entry: ${trigger['entry']} | SL: ${trigger['stop']} | TP: ${trigger['target']}",
         f"📊 R:R = 1:{trigger['rr']}",
-        f"📝 原因: {trigger.get('reason', '')}",
-        f"🎯 行動: {trigger.get('action', '')}",
     ]
+
+    if trigger.get("trailing_stop"):
+        lines.append(f"📏 Trailing Stop: ${trigger['trailing_stop']}")
+
+    lines.append(f"📝 原因: {trigger.get('reason', '')}")
+    lines.append(f"🎯 行動: {trigger.get('action', '')}")
+
+    if trigger.get("confidence_note"):
+        lines.append(f"⚠️ 注意: {trigger['confidence_note']}")
+
+    if trigger.get("sector_warning"):
+        lines.append(f"{trigger['sector_warning']}")
 
     if phase_info:
         lines.append(f"📍 階段: Phase {phase_info.get('phase', '?')} — {phase_info.get('next_event', '')}")

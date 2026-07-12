@@ -17,6 +17,7 @@ from strategies.accumulation.config import (
     ENTRY_THRESHOLD,
     EXIT_THRESHOLD,
     MAX_SCORE,
+    MAX_WATCH_DAYS,
     PROMOTION_STREAK,
     STATE_FILE,
 )
@@ -135,10 +136,14 @@ class AccumulationTracker:
             s["failing"] = False
             s["fail_days"] = 0
 
-        # Check promotion / demotion / exit
+        # Check exit first (prevents contradictory promotion+removal in same cycle)
+        self._check_exit(symbol)
+        if symbol not in self._state:
+            return
+        # Then promotion / demotion / watch expiry
         self._check_promotion(symbol)
         self._check_demotion(symbol)
-        self._check_exit(symbol)
+        self._check_watch_expiry(symbol)
 
     def _compute_decay(self, prev_score: float, raw_score: int, phase: str) -> float:
         """Calculate decayed score.
@@ -235,6 +240,26 @@ class AccumulationTracker:
         if s["decay_score"] < EXIT_THRESHOLD:
             self._remove(symbol, "分數衰減至下限自動移除")
 
+    def _check_watch_expiry(self, symbol: str):
+        """Remove symbol if it's been in watch tier for MAX_WATCH_DAYS without promotion."""
+        if symbol not in self._state:
+            return
+        s = self._state[symbol]
+        if s["tier"] != "watch":
+            return
+
+        entered = s.get("entered_date", "")
+        if not entered:
+            return
+
+        try:
+            entered_date = date.fromisoformat(entered)
+            days_watched = (date.today() - entered_date).days
+            if days_watched >= MAX_WATCH_DAYS:
+                self._remove(symbol, f"觀察 {days_watched} 天未升級，自動移除")
+        except (ValueError, TypeError):
+            pass
+
     # ─── Failure Handling ───
 
     def mark_failure(self, symbol: str, reason: str, severity: str = "soft"):
@@ -287,6 +312,22 @@ class AccumulationTracker:
             fired = self._state[symbol].get("triggers_fired", [])
             fired.append({"type": trigger_type, "date": _today_str()})
             self._state[symbol]["triggers_fired"] = fired[-10:]  # Keep last 10
+
+    def set_pending_triggers(self, symbol: str, pending: list):
+        """Store pending (unconfirmed) triggers for day-2 check."""
+        if symbol in self._state:
+            self._state[symbol]["pending_triggers"] = pending
+
+    def get_pending_triggers(self, symbol: str) -> list:
+        """Get pending triggers for a symbol (from previous day)."""
+        if symbol in self._state:
+            return self._state[symbol].get("pending_triggers", [])
+        return []
+
+    def clear_pending_triggers(self, symbol: str):
+        """Clear pending triggers after confirmation check."""
+        if symbol in self._state:
+            self._state[symbol]["pending_triggers"] = []
 
     # ─── Query Methods ───
 

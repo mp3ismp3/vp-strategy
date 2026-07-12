@@ -24,7 +24,11 @@ from strategies.accumulation.config import (
     CLOSE_POS_FAIL,
     CLOSE_POS_HARD_FAIL,
     DEFAULT_LOOKBACK,
+    ENTRY_THRESHOLD,
+    MAX_SAME_SECTOR_TRIGGERS,
+    MAX_SCORE,
     SOFT_FAIL_DAYS,
+    SPY_EMA_PERIOD,
     VOLUME_HARD_MULT,
     VOLUME_SURGE_MULT,
     VOL_MEDIAN_WINDOW,
@@ -57,8 +61,8 @@ def _download_symbol(symbol):
 
 
 def _get_market_context():
-    """Get basic market context (VIX + SPY state)."""
-    ctx = {"vix": None, "spy_state": "unknown"}
+    """Get basic market context (VIX + SPY state + SPY vs EMA50)."""
+    ctx = {"vix": None, "spy_state": "unknown", "spy_above_ema50": True}
     try:
         vix_df = yf.download("^VIX", period="5d", progress=False)
         if isinstance(vix_df.columns, pd.MultiIndex):
@@ -69,11 +73,19 @@ def _get_market_context():
         pass
 
     try:
-        spy_df = yf.download("SPY", period="1mo", progress=False)
+        spy_df = yf.download("SPY", period="4mo", progress=False)
         if isinstance(spy_df.columns, pd.MultiIndex):
             spy_df.columns = spy_df.columns.get_level_values(0)
-        if not spy_df.empty and len(spy_df) >= 5:
-            spy_5d_return = (float(spy_df["Close"].iloc[-1]) / float(spy_df["Close"].iloc[-5]) - 1) * 100
+        if not spy_df.empty and len(spy_df) >= SPY_EMA_PERIOD:
+            spy_close = spy_df["Close"].values.astype(float)
+            # Compute EMA50
+            ema = spy_close[0]
+            mult = 2.0 / (SPY_EMA_PERIOD + 1)
+            for i in range(1, len(spy_close)):
+                ema = spy_close[i] * mult + ema * (1 - mult)
+            ctx["spy_above_ema50"] = spy_close[-1] > ema
+
+            spy_5d_return = (float(spy_close[-1]) / float(spy_close[-5]) - 1) * 100
             if spy_5d_return > 1:
                 ctx["spy_state"] = "上漲趨勢"
             elif spy_5d_return < -1:
@@ -214,9 +226,9 @@ def main():
         phase_results[symbol] = phase_info
 
         # 4c. Check failure (before update, to avoid adding then immediately removing)
+        # Uses today's computed support levels (sp, sd) for more accurate failure detection
         if tracker.is_tracked(symbol):
-            tracked = tracker.get_symbol(symbol)
-            failure = check_failure(df, tracked["support_primary"], tracked["support_dynamic"])
+            failure = check_failure(df, sp, sd)
 
             if failure["is_spring"]:
                 tracker.clear_failure(symbol)
@@ -232,12 +244,22 @@ def main():
 
         # 4e. Check triggers (only for tracked symbols)
         if tracker.is_tracked(symbol):
-            triggers = check_triggers(df, phase, sp, sd, res, args.days)
+            pending = tracker.get_pending_triggers(symbol)
+            triggers = check_triggers(df, phase, sp, sd, res, args.days,
+                                      market_ctx=market_ctx,
+                                      pending_triggers=pending)
             trigger_results[symbol] = triggers
 
             # Record fired triggers
             for t in triggers.get("triggered", []):
                 tracker.record_trigger(symbol, t["type"])
+
+            # Store new pending triggers for day-2 confirmation
+            new_pending = triggers.get("pending", [])
+            if new_pending:
+                tracker.set_pending_triggers(symbol, new_pending)
+            else:
+                tracker.clear_pending_triggers(symbol)
 
         # ─── Print Output ───
         if args.debug:
@@ -246,7 +268,7 @@ def main():
             _print_phase(symbol, phase_info, raw_score)
         elif args.triggers and symbol in trigger_results:
             _print_triggers(symbol, trigger_results[symbol], phase_info)
-        elif raw_score >= 5 or tracker.is_tracked(symbol):
+        elif raw_score >= ENTRY_THRESHOLD or tracker.is_tracked(symbol):
             _print_summary(symbol, raw_score, phase_info, tracker.get_symbol(symbol))
 
     # ─── 5. Save State ───
@@ -276,10 +298,25 @@ def main():
 
     if should_notify or args.dry_run:
         from notifications.telegram import send_telegram
+        from config import SECTOR_MAP
 
-        # 7a. Trigger alerts (independent, sent first)
+        # 7a. Sector correlation filter: warn if too many triggers from same sector
+        sector_trigger_counts = {}
+        for symbol, tr in trigger_results.items():
+            if tr.get("triggered"):
+                sector = SECTOR_MAP.get(symbol, "UNKNOWN")
+                sector_trigger_counts[sector] = sector_trigger_counts.get(sector, 0) + 1
+
+        # 7b. Trigger alerts (independent, sent first)
         for symbol, tr in trigger_results.items():
             for t in tr.get("triggered", []):
+                sector = SECTOR_MAP.get(symbol, "UNKNOWN")
+                # Add sector concentration warning
+                if sector_trigger_counts.get(sector, 0) > MAX_SAME_SECTOR_TRIGGERS:
+                    t["sector_warning"] = (
+                        f"⚠️ 同板塊 ({sector}) 有 {sector_trigger_counts[sector]} 個觸發，"
+                        f"注意集中風險"
+                    )
                 msg = format_trigger_alert(symbol, t, phase_results.get(symbol))
                 if args.dry_run:
                     print(f"\n{'─' * 40}")
@@ -288,7 +325,7 @@ def main():
                 else:
                     send_telegram(msg, dry_run=not should_notify)
 
-        # 7b. Proximity alerts
+        # 7c. Proximity alerts
         for symbol, tr in trigger_results.items():
             for p in tr.get("proximity", []):
                 # Only send proximity if price is really close
@@ -301,7 +338,7 @@ def main():
                     else:
                         send_telegram(msg, dry_run=not should_notify)
 
-        # 7c. Daily report (sent last)
+        # 7d. Daily report (sent last)
         report = format_daily_report(tracker, trigger_results, market_ctx)
         if args.dry_run:
             print(f"\n{'═' * 60}")
@@ -330,7 +367,7 @@ def _print_summary(symbol, raw_score, phase_info, tracked_state):
 def _print_debug(symbol, score_result, phase_info, triggers):
     """Print detailed breakdown."""
     print(f"\n  {'─' * 50}")
-    print(f"  {symbol} — Raw Score: {score_result['raw_score']}/18")
+    print(f"  {symbol} — Raw Score: {score_result['raw_score']}/{MAX_SCORE}")
     print(f"  Phase: {phase_info['phase']} (confidence: {phase_info['confidence']:.0%})")
     print(f"  {phase_info['description']}")
     print(f"  Next: {phase_info['next_event']}")
@@ -362,7 +399,7 @@ def _print_phase(symbol, phase_info, raw_score):
     """Print phase-only output."""
     phase = phase_info["phase"]
     conf = phase_info["confidence"]
-    print(f"  {symbol:6s} | Phase {phase} ({conf:.0%}) | Score {raw_score}/18")
+    print(f"  {symbol:6s} | Phase {phase} ({conf:.0%}) | Score {raw_score}/{MAX_SCORE}")
     print(f"         {phase_info['description']}")
     print(f"         → {phase_info['next_event']}")
     print()
