@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from datetime import date
 
 from strategies.accumulation.entry_triggers import check_triggers
 
@@ -41,8 +42,11 @@ class TestOutputStructure:
         assert "triggered" in result
         assert "proximity" in result
         assert "distance" in result
+        assert "pending" in result
+        assert "gate" in result
         assert isinstance(result["triggered"], list)
         assert isinstance(result["proximity"], list)
+        assert isinstance(result["pending"], list)
 
     def test_insufficient_data(self):
         df = _make_df([100, 101, 102])
@@ -53,7 +57,7 @@ class TestOutputStructure:
 
 class TestSpringTrigger:
     def test_spring_triggered(self):
-        """Breach below support + recovery + volume = Spring triggered."""
+        """Breach below support + recovery + volume = Spring triggered (pending day-2 confirm)."""
         n = 60
         closes = np.full(n, 105.0)
         lows = np.full(n, 104.0)
@@ -72,8 +76,8 @@ class TestSpringTrigger:
         df = _make_df(closes, volumes, highs, lows)
         result = check_triggers(df, "C", 90, 103, 112)
 
-        # Should have triggered or proximity
-        all_events = result["triggered"] + result["proximity"]
+        # Spring now goes to pending (day-2 confirmation) instead of triggered
+        all_events = result["triggered"] + result["proximity"] + result.get("pending", [])
         spring_events = [e for e in all_events if e.get("type") == "SPRING"]
         assert len(spring_events) > 0
 
@@ -83,7 +87,8 @@ class TestSpringTrigger:
         closes = np.full(n, 108.0)  # Always above support=103
         df = _make_df(closes)
         result = check_triggers(df, "C", 90, 103, 112)
-        triggered_springs = [t for t in result["triggered"] if t["type"] == "SPRING"]
+        triggered_springs = [t for t in result["triggered"] + result.get("pending", [])
+                             if t["type"] == "SPRING"]
         assert len(triggered_springs) == 0
 
     def test_false_spring_not_triggered(self):
@@ -179,7 +184,7 @@ class TestLPSTrigger:
         result = check_triggers(df, "D", 90, 100, 112)
 
         # Should detect LPS or proximity
-        all_events = result["triggered"] + result["proximity"]
+        all_events = result["triggered"] + result["proximity"] + result.get("pending", [])
         lps_events = [e for e in all_events
                       if e.get("type") == "LPS" or e.get("type") == "LPS"]
         # May or may not trigger depending on swing detection
@@ -203,3 +208,270 @@ class TestTriggerEntryValues:
             assert t["stop"] < t["entry"], f"{t['type']}: stop >= entry"
             assert t["target"] > t["entry"], f"{t['type']}: target <= entry"
             assert t["rr"] > 0, f"{t['type']}: negative R:R"
+
+
+class TestMarketEnvGate:
+    """Tests for market environment gate on triggers."""
+
+    def test_vix_above_30_blocks_all(self):
+        """VIX >= 30 should block all triggers."""
+        from strategies.accumulation.entry_triggers import market_env_gate
+        result = market_env_gate("SPRING", {"vix": 32, "spy_above_ema50": True})
+        assert result["allowed"] is False
+        assert "30" in result["reason"]
+
+        result = market_env_gate("SOS_BREAKOUT", {"vix": 35, "spy_above_ema50": True})
+        assert result["allowed"] is False
+
+    def test_vix_25_to_30_blocks_spring_lps(self):
+        """VIX 25-30 blocks Spring/LPS but allows SOS."""
+        from strategies.accumulation.entry_triggers import market_env_gate
+        result = market_env_gate("SPRING", {"vix": 27, "spy_above_ema50": True})
+        assert result["allowed"] is False
+
+        result = market_env_gate("LPS", {"vix": 26, "spy_above_ema50": True})
+        assert result["allowed"] is False
+
+        result = market_env_gate("SOS_BREAKOUT", {"vix": 27, "spy_above_ema50": True})
+        assert result["allowed"] is True
+        assert result["confidence_adj"] < 1.0
+
+    def test_spy_below_ema50_reduces_confidence(self):
+        """SPY below EMA50 should reduce confidence for Spring/LPS."""
+        from strategies.accumulation.entry_triggers import market_env_gate
+        result = market_env_gate("SPRING", {"vix": 18, "spy_above_ema50": False})
+        assert result["allowed"] is True
+        assert result["confidence_adj"] == 0.6
+
+        result = market_env_gate("SOS_BREAKOUT", {"vix": 18, "spy_above_ema50": False})
+        assert result["allowed"] is True
+        assert result["confidence_adj"] == 0.8
+
+    def test_normal_market_allows_all(self):
+        """Normal market (VIX<25, SPY above EMA50) allows everything."""
+        from strategies.accumulation.entry_triggers import market_env_gate
+        result = market_env_gate("SPRING", {"vix": 15, "spy_above_ema50": True})
+        assert result["allowed"] is True
+        assert result["confidence_adj"] == 1.0
+
+    def test_no_market_ctx_allows_all(self):
+        """No market context = allow all (backwards compatible)."""
+        from strategies.accumulation.entry_triggers import market_env_gate
+        result = market_env_gate("SPRING", None)
+        assert result["allowed"] is True
+
+    def test_spring_blocked_by_high_vix(self):
+        """Spring should go to proximity (blocked) when VIX is high."""
+        n = 60
+        closes = np.full(n, 105.0)
+        lows = np.full(n, 104.0)
+        highs = np.full(n, 106.0)
+        volumes = np.full(n, 1_000_000)
+        closes[-3] = 99
+        lows[-3] = 98
+        closes[-1] = 105
+        lows[-1] = 103.5
+        highs[-1] = 106
+        volumes[-1] = 1_500_000
+
+        df = _make_df(closes, volumes, highs, lows)
+        market_ctx = {"vix": 28, "spy_above_ema50": True}
+        result = check_triggers(df, "C", 90, 103, 112, market_ctx=market_ctx)
+
+        # Should NOT be in pending (blocked)
+        assert len(result.get("pending", [])) == 0
+        # Should appear in proximity as blocked
+        blocked = [p for p in result["proximity"] if "觸發被阻" in p.get("vol_status", "")]
+        assert len(blocked) > 0
+
+
+class TestStopLossCap:
+    """Tests for MAX_STOP_LOSS_PCT cap on stop-loss."""
+
+    def test_cap_stop_loss_function(self):
+        """Stop loss should be capped at 8% of entry."""
+        from strategies.accumulation.entry_triggers import _cap_stop_loss
+        # Entry 100, stop at 85 (15% away) → should cap to 92
+        result = _cap_stop_loss(100.0, 85.0, 0.08)
+        assert result == 92.0
+
+    def test_stop_within_cap_unchanged(self):
+        """Stop loss within cap should remain unchanged."""
+        from strategies.accumulation.entry_triggers import _cap_stop_loss
+        # Entry 100, stop at 95 (5% away) → no change
+        result = _cap_stop_loss(100.0, 95.0, 0.08)
+        assert result == 95.0
+
+    def test_sos_trigger_has_trailing_stop(self):
+        """SOS trigger should include trailing_stop field."""
+        n = 60
+        closes = np.full(n, 108.0)
+        volumes = np.full(n, 1_000_000)
+        closes[-1] = 113
+        volumes[-1] = 2_000_000
+
+        df = _make_df(closes, volumes)
+        result = check_triggers(df, "D", 90, 100, 110)
+
+        for t in result["triggered"]:
+            if t["type"] == "SOS_BREAKOUT":
+                assert "trailing_stop" in t
+                assert t["trailing_stop"] < t["entry"]
+
+
+class TestDay2Confirmation:
+    """Tests for 2-day trigger confirmation mechanism."""
+
+    def test_spring_goes_to_pending(self):
+        """Spring trigger should go to pending, not triggered."""
+        n = 60
+        closes = np.full(n, 105.0)
+        lows = np.full(n, 104.0)
+        highs = np.full(n, 106.0)
+        volumes = np.full(n, 1_000_000)
+        closes[-3] = 99
+        lows[-3] = 98
+        closes[-1] = 105
+        lows[-1] = 103.5
+        highs[-1] = 106
+        volumes[-1] = 1_500_000
+
+        df = _make_df(closes, volumes, highs, lows)
+        result = check_triggers(df, "C", 90, 103, 112)
+
+        # Spring should be in pending, not triggered directly
+        assert len(result.get("pending", [])) > 0
+        pending_springs = [p for p in result["pending"] if p["type"] == "SPRING"]
+        assert len(pending_springs) == 1
+
+    def test_pending_confirmed_on_day2(self):
+        """Pending trigger confirmed when price holds above support."""
+        n = 60
+        closes = np.full(n, 106.0)  # Price above support_dynamic=103
+        lows = np.full(n, 104.0)
+        highs = np.full(n, 107.0)
+        volumes = np.full(n, 1_000_000)
+
+        df = _make_df(closes, volumes, highs, lows)
+
+        # Simulate a pending Spring trigger from yesterday
+        pending = [{"type": "SPRING", "_pending_type": "SPRING",
+                    "entry": 105.0, "stop": 97.0, "target": 115.0,
+                    "rr": 1.9, "trailing_stop": 102.0,
+                    "reason": "test", "action": "PILOT BUY"}]
+
+        result = check_triggers(df, "C", 90, 103, 112,
+                                pending_triggers=pending)
+
+        # Should now appear in triggered (confirmed)
+        assert len(result["triggered"]) >= 1
+        confirmed = [t for t in result["triggered"] if t["type"] == "SPRING"]
+        assert len(confirmed) == 1
+
+    def test_pending_not_confirmed_if_below_support(self):
+        """Pending trigger NOT confirmed when price drops below support."""
+        n = 60
+        closes = np.full(n, 101.0)  # Below support_dynamic=103
+        lows = np.full(n, 100.0)
+        highs = np.full(n, 102.0)
+        volumes = np.full(n, 1_000_000)
+
+        df = _make_df(closes, volumes, highs, lows)
+
+        pending = [{"type": "SPRING", "_pending_type": "SPRING",
+                    "entry": 105.0, "stop": 97.0, "target": 115.0,
+                    "rr": 1.9, "trailing_stop": 102.0,
+                    "reason": "test", "action": "PILOT BUY"}]
+
+        result = check_triggers(df, "C", 90, 103, 112,
+                                pending_triggers=pending)
+
+        # Should NOT be confirmed
+        confirmed_springs = [t for t in result["triggered"] if t["type"] == "SPRING"]
+        assert len(confirmed_springs) == 0
+
+    def test_sos_bypasses_pending(self):
+        """SOS should trigger directly (already has 2-day confirm built in)."""
+        n = 60
+        closes = np.full(n, 108.0)
+        volumes = np.full(n, 1_000_000)
+        closes[-1] = 113
+        volumes[-1] = 2_000_000
+
+        df = _make_df(closes, volumes)
+        result = check_triggers(df, "D", 90, 100, 110)
+
+        # SOS should be in triggered directly
+        sos = [t for t in result["triggered"] if t["type"] == "SOS_BREAKOUT"]
+        assert len(sos) == 1
+        # Should NOT be in pending
+        sos_pending = [p for p in result.get("pending", []) if p.get("type") == "SOS_BREAKOUT"]
+        assert len(sos_pending) == 0
+
+
+class TestWatchExpiry:
+    """Tests for max_watch_days auto-removal."""
+
+    def test_watch_symbol_removed_after_30_days(self):
+        """Symbol in watch tier for 30+ days should be auto-removed."""
+        from strategies.accumulation.tracker import AccumulationTracker
+        from datetime import timedelta
+        import tempfile, os
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        tmp.close()
+        try:
+            tracker = AccumulationTracker(state_path=tmp.name)
+            tracker.load_state()
+
+            # Manually add a symbol with old entered_date
+            old_date = (date.today() - timedelta(days=35)).isoformat()
+            tracker._state["TEST"] = {
+                "phase": "B", "tier": "watch", "decay_score": 8.0,
+                "raw_score": 8, "raw_history": [8],
+                "entered_date": old_date, "last_updated": old_date,
+                "support_primary": 90, "support_dynamic": 95, "resistance": 110,
+                "promote_streak": 0, "demote_streak": 0,
+                "failing": False, "fail_days": 0,
+                "triggers_fired": [], "removed_reason": None,
+            }
+
+            # Update with a score that's above EXIT but below CONFIRM
+            tracker.update("TEST", 8, "B", 90, 95, 110)
+
+            # Should have been removed due to watch expiry
+            assert not tracker.is_tracked("TEST")
+            changes = tracker.get_changes()
+            removal = [c for c in changes if c["type"] == "removed" and c["symbol"] == "TEST"]
+            assert len(removal) == 1
+            assert "30" in removal[0]["reason"] or "未升級" in removal[0]["reason"]
+        finally:
+            os.unlink(tmp.name)
+
+    def test_confirmed_not_affected_by_expiry(self):
+        """Confirmed tier symbols should NOT be affected by watch expiry."""
+        from strategies.accumulation.tracker import AccumulationTracker
+        from datetime import timedelta
+        import tempfile, os
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        tmp.close()
+        try:
+            tracker = AccumulationTracker(state_path=tmp.name)
+            tracker.load_state()
+
+            old_date = (date.today() - timedelta(days=60)).isoformat()
+            tracker._state["TEST"] = {
+                "phase": "D", "tier": "confirmed", "decay_score": 14.0,
+                "raw_score": 14, "raw_history": [14],
+                "entered_date": old_date, "last_updated": old_date,
+                "support_primary": 90, "support_dynamic": 95, "resistance": 110,
+                "promote_streak": 0, "demote_streak": 0,
+                "failing": False, "fail_days": 0,
+                "triggers_fired": [], "removed_reason": None,
+            }
+
+            tracker.update("TEST", 14, "D", 90, 95, 110)
+            assert tracker.is_tracked("TEST")
+        finally:
+            os.unlink(tmp.name)
