@@ -48,13 +48,13 @@ class TestComputeDailyScore:
     def test_score_range(self):
         df = _make_df(n=60)
         result = compute_daily_score(df, lookback=40)
-        assert 0 <= result["raw_score"] <= 18
+        assert 0 <= result["raw_score"] <= 21
 
     def test_all_components_present(self):
         df = _make_df(n=60)
         result = compute_daily_score(df, lookback=40)
         expected_keys = {"obv", "close_position", "volume_asymmetry",
-                         "tightening", "buying_streak", "relative_strength"}
+                         "tightening", "buying_streak", "relative_strength", "vsa"}
         assert set(result["components"].keys()) == expected_keys
 
     def test_each_component_has_score_and_signal(self):

@@ -1,12 +1,13 @@
 """Accumulation Detector — Daily scoring engine.
 
-Computes a raw accumulation score (0-18) from 6 indicators:
+Computes a raw accumulation score (0-21) from 7 indicators:
 1. OBV Trend (segmented slope)
 2. Close Position + Lower Wicks
 3. Volume Asymmetry (exponentially weighted)
 4. ATR Tightening (percentile-based)
 5. Buying Streak
 6. Relative Strength vs SPY (beta-adjusted)
+7. Volume Spread Analysis (stopping volume, no-demand, absorption)
 
 Also computes support/resistance levels for the tracker.
 """
@@ -112,9 +113,9 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
     close_score = 0
     if avg_close_pos >= 0.65 and wick_days >= 8:
         close_score = 3
-    elif avg_close_pos >= 0.55 and (avg_close_pos >= 0.60 or wick_days >= 6):
+    elif avg_close_pos >= 0.60 and (avg_close_pos >= 0.62 or wick_days >= 6):
         close_score = 2
-    elif avg_close_pos >= 0.52 or wick_days >= 5:
+    elif avg_close_pos >= 0.55 or wick_days >= 5:
         close_score = 1
 
     components["close_position"] = {
@@ -139,11 +140,11 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
     vol_asymmetry = rally_wt / max(pullback_wt, 1.0)
 
     vol_score = 0
-    if vol_asymmetry >= 1.4:
+    if vol_asymmetry >= 1.5:
         vol_score = 3
-    elif vol_asymmetry >= 1.2:
+    elif vol_asymmetry >= 1.3:
         vol_score = 2
-    elif vol_asymmetry >= 1.1:
+    elif vol_asymmetry >= 1.2:
         vol_score = 1
 
     components["volume_asymmetry"] = {
@@ -277,8 +278,67 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
         "detail": rs_signal,
     }
 
+    # ─── 7. Volume Spread Analysis (VSA) ───
+    vsa_score = 0
+    stopping_count = 0
+    no_demand_count = 0
+    absorption_count = 0
+
+    if n >= 10:
+        # Analyze last 20 bars for VSA patterns
+        vsa_window = min(20, n)
+        for i in range(n - vsa_window, n):
+            br = h[i] - l[i]
+            if br <= 0:
+                continue
+            cp = (c[i] - l[i]) / br
+            vol_ratio = v_clean[i] / max(vol_median, 1)
+
+            # Stopping Volume: high volume + wide bar + close in upper half on a down move
+            # Indicates demand absorbing supply at support
+            if i > 0 and c[i] < c[i - 1]:
+                if vol_ratio > 1.5 and cp > 0.5 and br > np.mean(bar_range[-vsa_window:]):
+                    stopping_count += 1
+
+            # No-Demand Bar: narrow bar + low volume + close near low on up move
+            # Indicates no real buying interest on rallies (bullish in accumulation context)
+            if i > 0 and c[i] > c[i - 1]:
+                if vol_ratio < 0.6 and br < np.mean(bar_range[-vsa_window:]) * 0.7:
+                    no_demand_count += 1
+
+            # Absorption: high volume but price doesn't move much (effort vs result)
+            # Indicates institutional buying absorbing selling pressure
+            price_change_pct = abs(c[i] - c[i - 1]) / c[i - 1] * 100 if i > 0 and c[i - 1] > 0 else 0
+            if vol_ratio > 1.8 and price_change_pct < 0.5 and cp > 0.4:
+                absorption_count += 1
+
+        # Score based on VSA pattern count
+        vsa_total = stopping_count + no_demand_count + absorption_count
+        if stopping_count >= 2 and absorption_count >= 1:
+            vsa_score = 3  # Strong VSA accumulation evidence
+            vsa_signal = f"強吸籌: stopping={stopping_count}, absorption={absorption_count}"
+        elif vsa_total >= 4:
+            vsa_score = 3
+            vsa_signal = f"多重 VSA 信號: stop={stopping_count}, no-dem={no_demand_count}, abs={absorption_count}"
+        elif stopping_count >= 1 and (no_demand_count >= 2 or absorption_count >= 1):
+            vsa_score = 2
+            vsa_signal = f"中度 VSA: stop={stopping_count}, no-dem={no_demand_count}, abs={absorption_count}"
+        elif vsa_total >= 2:
+            vsa_score = 1
+            vsa_signal = f"微弱 VSA: stop={stopping_count}, no-dem={no_demand_count}, abs={absorption_count}"
+        else:
+            vsa_signal = f"無明顯 VSA: stop={stopping_count}, no-dem={no_demand_count}, abs={absorption_count}"
+    else:
+        vsa_signal = "資料不足"
+
+    components["vsa"] = {
+        "score": vsa_score,
+        "signal": vsa_signal,
+        "detail": f"stopping={stopping_count}, no_demand={no_demand_count}, absorption={absorption_count}",
+    }
+
     # ─── Composite Score ───
-    raw_score = obv_score + close_score + vol_score + tight_score + streak_score + rs_score
+    raw_score = obv_score + close_score + vol_score + tight_score + streak_score + rs_score + vsa_score
 
     # ─── Support / Resistance Levels ───
     support_primary, support_dynamic, resistance = _compute_levels(df, lookback)

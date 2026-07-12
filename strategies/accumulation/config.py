@@ -4,10 +4,10 @@ All thresholds and parameters for the accumulation detection system.
 """
 
 # ─── Scoring Thresholds ───
-MAX_SCORE = 18          # Maximum raw score (6 indicators × 3 points each)
-ENTRY_THRESHOLD = 5     # Minimum score to enter watchlist (low bar, catch early)
-CONFIRM_THRESHOLD = 9   # Score needed to promote to confirmed tier
-EXIT_THRESHOLD = 3      # Score below which symbol is auto-removed
+MAX_SCORE = 21          # Maximum raw score (7 indicators × 3 points each)
+ENTRY_THRESHOLD = 7     # Minimum score to enter watchlist (tightened from 5)
+CONFIRM_THRESHOLD = 11  # Score needed to promote to confirmed tier (tightened from 9)
+EXIT_THRESHOLD = 4      # Score below which symbol is auto-removed
 
 # ─── Decay Rates ───
 # Exponential decay: new_score = max(raw_today, prev_score * decay_rate)
@@ -38,6 +38,22 @@ SPRING_VOL_MULT = 1.3       # Volume > 1.3x median on recovery day (confirms dem
 LPS_VOL_MULT = 0.7          # Volume < 0.7x median on pullback (low volume)
 SOS_VOL_MULT = 1.5          # Volume > 1.5x median on breakout
 SOS_CONFIRM_DAYS = 2        # Days above resistance for confirmation
+MAX_STOP_LOSS_PCT = 0.08    # Maximum stop-loss distance (8% of entry price)
+
+# ─── Market Environment Gate ───
+# Triggers are suppressed when market conditions are hostile
+VIX_BLOCK_ALL = 30          # VIX >= 30: block ALL triggers (extreme fear)
+VIX_BLOCK_SPRING_LPS = 25   # VIX 25-30: block Spring/LPS, allow only SOS
+SPY_EMA_PERIOD = 50         # SPY must be above EMA(50) for full confidence
+
+# ─── Trigger Confirmation ───
+TRIGGER_CONFIRM_DAYS = 2    # Spring/LPS need next-day hold above support to confirm
+
+# ─── Watch Limits ───
+MAX_WATCH_DAYS = 30         # Auto-remove if in watch tier for 30+ days without promotion
+
+# ─── Sector Correlation ───
+MAX_SAME_SECTOR_TRIGGERS = 3  # Max simultaneous triggers from same sector
 
 # ─── Detection Parameters ───
 DEFAULT_LOOKBACK = 40       # Default lookback period for scoring
