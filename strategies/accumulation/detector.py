@@ -340,6 +340,44 @@ def compute_daily_score(df, spy_df=None, lookback=DEFAULT_LOOKBACK):
     # ─── Composite Score ───
     raw_score = obv_score + close_score + vol_score + tight_score + streak_score + rs_score + vsa_score
 
+    # ─── OBV-Price Divergence Penalty ───
+    # Detect distribution: OBV falling while price stable/rising = institutions selling
+    divergence_penalty = 0
+    divergence_signal = ""
+
+    if n >= 20:
+        # Price slope over recent half
+        x_price = np.arange(n - half)
+        price_slope_recent = np.polyfit(x_price, c[half:], 1)[0]
+
+        # Normalize slopes for comparison (as % of price/obv range)
+        price_range = max(c[half:]) - min(c[half:])
+        price_slope_norm = price_slope_recent / max(price_range, 0.01)
+
+        obv_range = max(obv[half:]) - min(obv[half:])
+        obv_slope_norm = obv_slope_recent / max(obv_range, 1)
+
+        # Negative divergence: OBV clearly falling + price flat or rising
+        if obv_slope_recent < 0 and price_slope_norm >= -0.01:
+            # OBV is declining while price is not — distribution signal
+            if obv_slope_norm < -0.03:  # Strong OBV decline
+                divergence_penalty = 3
+                divergence_signal = "⚠️ 強派發: OBV↓ + 價格平/↑"
+            elif obv_slope_norm < -0.01:  # Moderate OBV decline
+                divergence_penalty = 2
+                divergence_signal = "⚠️ 派發跡象: OBV↓ + 價格平/↑"
+            else:
+                divergence_penalty = 1
+                divergence_signal = "⚠️ 輕微派發: OBV 微降"
+
+    raw_score = max(0, raw_score - divergence_penalty)
+
+    components["divergence"] = {
+        "score": -divergence_penalty,
+        "signal": divergence_signal if divergence_signal else "無派發跡象",
+        "detail": f"penalty={divergence_penalty}, obv_slope={obv_slope_recent:.0f}, price_slope_norm={price_slope_norm:.4f}" if n >= 20 else "insufficient_data",
+    }
+
     # ─── Support / Resistance Levels ───
     support_primary, support_dynamic, resistance = _compute_levels(df, lookback)
 

@@ -54,7 +54,8 @@ class TestComputeDailyScore:
         df = _make_df(n=60)
         result = compute_daily_score(df, lookback=40)
         expected_keys = {"obv", "close_position", "volume_asymmetry",
-                         "tightening", "buying_streak", "relative_strength", "vsa"}
+                         "tightening", "buying_streak", "relative_strength", "vsa",
+                         "divergence"}
         assert set(result["components"].keys()) == expected_keys
 
     def test_each_component_has_score_and_signal(self):
@@ -63,7 +64,10 @@ class TestComputeDailyScore:
         for name, comp in result["components"].items():
             assert "score" in comp, f"{name} missing score"
             assert "signal" in comp, f"{name} missing signal"
-            assert 0 <= comp["score"] <= 3, f"{name} score out of range"
+            if name == "divergence":
+                assert -3 <= comp["score"] <= 0, f"{name} score out of range"
+            else:
+                assert 0 <= comp["score"] <= 3, f"{name} score out of range"
 
     def test_accumulation_pattern_scores_higher(self):
         """Stock with OBV rising + tight range should score higher than random."""

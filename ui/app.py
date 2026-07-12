@@ -15,7 +15,10 @@ st.set_page_config(
 page = st.query_params.get("page", "scanner")
 ticker = st.query_params.get("ticker", None)
 
-if page == "detail" and ticker:
+if page == "accumulation":
+    from ui.accumulation_page import render_accumulation
+    render_accumulation()
+elif page == "detail" and ticker:
     from ui.detail_page import render_detail
     render_detail(ticker)
 else:
