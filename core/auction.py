@@ -294,13 +294,11 @@ def detect_poor_highs_lows(df, df_1h=None, lookback=20):
 
 
 def _merge_overlapping(result, atr):
-    """Merge Strong and Poor at same price level into contextual signals.
+    """Merge Strong and Poor at same price level, considering time order.
 
-    If a Strong and Poor exist within 0.5 ATR of each other:
-    - Strong High + Poor High nearby → "阻力弱化中" (resistance weakening)
-    - Strong Low + Poor Low nearby → "支撐弱化中" (support weakening)
-
-    The Poor entry is removed, and the Strong entry gets a 'weakening' flag.
+    Only marks as 'weakening' if Poor occurred AFTER Strong at same level:
+    - Strong first → Poor later = support/resistance weakening (losing strength)
+    - Poor first → Strong later = support/resistance strengthening (ignore)
     """
     threshold = atr * 0.5
 
@@ -312,10 +310,11 @@ def _merge_overlapping(result, atr):
         merged = False
         for sh in strong_h:
             if abs(ph["price"] - sh["price"]) < threshold:
-                # Same level tested: strong then poor = weakening
-                sh["status"] = "weakening"
-                merged = True
-                break
+                # Only weakening if Poor came AFTER Strong
+                if ph["date"] > sh["date"]:
+                    sh["status"] = "weakening"
+                    merged = True
+                    break
         if not merged:
             merged_poor_h.append(ph)
     result["poor_highs"] = merged_poor_h
@@ -328,10 +327,11 @@ def _merge_overlapping(result, atr):
         merged = False
         for sl in strong_l:
             if abs(pl["price"] - sl["price"]) < threshold:
-                # Same level tested: strong then poor = weakening
-                sl["status"] = "weakening"
-                merged = True
-                break
+                # Only weakening if Poor came AFTER Strong
+                if pl["date"] > sl["date"]:
+                    sl["status"] = "weakening"
+                    merged = True
+                    break
         if not merged:
             merged_poor_l.append(pl)
     result["poor_lows"] = merged_poor_l
@@ -385,21 +385,17 @@ def _detect_from_1h(df, df_1h, lookback, atr):
             last_close = float(session.tail(1)["Close"].iloc[0])
             ended_near_high = last_close > session_high - atr * 0.3
 
-            bars_after_high = session.loc[high_bar_idx:]
-            if len(bars_after_high) > 1:
-                min_close_after = float(bars_after_high["Close"].iloc[1:].min())
-                was_rejected = min_close_after < session_high - atr * 0.5
-            else:
-                was_rejected = False
+            # Check if session ENDED rejected (final close far from high)
+            session_ended_rejected = last_close < session_high - atr * 0.5
 
-            if has_excess or was_rejected:
-                # Strong High: clear selling rejection
+            if has_excess or session_ended_rejected:
+                # Strong High: clear selling rejection at session end
                 strong_highs.append({
                     "price": round(session_high, 2),
                     "date": str(date),
                 })
-            elif ended_near_high and not was_rejected:
-                # Poor High: no rejection, untested
+            elif ended_near_high:
+                # Poor High: session ended at high, no rejection
                 poor_highs.append({
                     "price": round(session_high, 2),
                     "date": str(date),
@@ -416,21 +412,17 @@ def _detect_from_1h(df, df_1h, lookback, atr):
             last_close = float(session.tail(1)["Close"].iloc[0])
             ended_near_low = last_close < session_low + atr * 0.3
 
-            bars_after_low = session.loc[low_bar_idx:]
-            if len(bars_after_low) > 1:
-                max_close_after = float(bars_after_low["Close"].iloc[1:].max())
-                was_bounced = max_close_after > session_low + atr * 0.5
-            else:
-                was_bounced = False
+            # Check if session ENDED bounced (final close far from low)
+            session_ended_bounced = last_close > session_low + atr * 0.5
 
-            if has_excess or was_bounced:
-                # Strong Low: clear buying support
+            if has_excess or session_ended_bounced:
+                # Strong Low: clear buying support confirmed at session end
                 strong_lows.append({
                     "price": round(session_low, 2),
                     "date": str(date),
                 })
-            elif ended_near_low and not was_bounced:
-                # Poor Low: no support shown, untested
+            elif ended_near_low:
+                # Poor Low: session ended at low, no support
                 poor_lows.append({
                     "price": round(session_low, 2),
                     "date": str(date),
