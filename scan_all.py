@@ -18,6 +18,7 @@ from config import SYMBOLS, DEFAULT_CFG
 from core.data_provider import YahooProvider
 from core.market_context import fetch_market_context
 from core.vp_multitf import compute_vp_multitf
+from core.auction import calc_va_migration, calc_initial_balance, detect_single_prints, detect_poor_highs_lows
 from notifications.telegram import send_telegram
 from notifications.teams import send_teams
 
@@ -37,9 +38,13 @@ def main():
 
     # Download data
     provider = YahooProvider(max_workers=5, jitter=(0.1, 0.3))
-    print("  Downloading market data...")
+    print("  Downloading daily data...")
     data = provider.batch_daily(SYMBOLS, period="1y")
-    print(f"  Downloaded {len(data)}/{len(SYMBOLS)} symbols")
+    print(f"  Downloaded {len(data)}/{len(SYMBOLS)} daily")
+
+    print("  Downloading 1H data (cached)...")
+    data_1h = provider.batch_intraday(SYMBOLS, period="730d", interval="1h")
+    print(f"  Downloaded {len(data_1h)}/{len(SYMBOLS)} 1H")
 
     # Compute VP multi-TF for each symbol
     vp_results = {}
@@ -47,9 +52,41 @@ def main():
         df = data.get(symbol)
         if df is None or len(df) < 60:
             continue
+        df_1h = data_1h.get(symbol)
         try:
-            result = compute_vp_multitf(df, cfg["va_pct"])
+            result = compute_vp_multitf(df, cfg["va_pct"], df_1h=df_1h)
             if result:
+                # Add auction theory elements (summary only, no histograms)
+                if df_1h is not None and len(df_1h) >= 50:
+                    mig = calc_va_migration(df, df_1h=df_1h)
+                    if mig:
+                        result["va_migration"] = {
+                            "direction": mig["direction"],
+                            "speed": mig["speed"],
+                            "poc_shift": mig["poc_shift"],
+                        }
+                    ib = calc_initial_balance(df_1h)
+                    if ib:
+                        result["ib"] = ib
+
+                    # Single prints from daily VP histogram
+                    daily_hist = result.get("daily", {}).get("histogram")
+                    if daily_hist:
+                        sp = detect_single_prints(
+                            daily_hist["volumes"], daily_hist["prices"])
+                        if sp:
+                            result["single_prints"] = sp
+
+                # Poor highs/lows (doesn't need 1H)
+                phl = detect_poor_highs_lows(df)
+                if phl["poor_highs"] or phl["poor_lows"]:
+                    result["poor_highs_lows"] = phl
+
+                # Remove histogram from output to keep JSON lean
+                for tf in ["daily", "weekly", "monthly"]:
+                    if result.get(tf) and "histogram" in result[tf]:
+                        del result[tf]["histogram"]
+
                 vp_results[symbol] = result
         except Exception as e:
             print(f"  Error computing {symbol}: {e}")

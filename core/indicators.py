@@ -114,6 +114,139 @@ def calc_vp(df, lookback, va_pct, n_bins=100, return_histogram=False):
     return result
 
 
+def calc_vp_hourly(df_1h, lookback_days=60, va_pct=0.68, n_bins=None,
+                   return_histogram=False):
+    """Calculate VP using 1H bars for higher precision.
+
+    Each 1H bar has a much narrower H-L range than daily bars, so volume
+    is assigned to fewer bins → more precise VP shape.
+
+    Args:
+        df_1h: DataFrame with 1H OHLCV data
+        lookback_days: number of trading days to include
+        va_pct: Value Area percentage (default 0.68)
+        n_bins: number of bins (None = auto via calc_dynamic_bins)
+        return_histogram: include histogram data in result
+
+    Returns same format as calc_vp.
+    """
+    if df_1h is None or len(df_1h) < 50:
+        return None
+
+    # Filter to last N trading days (~7 bars per day)
+    bars_needed = lookback_days * 7
+    d = df_1h.tail(bars_needed)
+
+    if len(d) < 50:
+        return None
+
+    # Auto bin count if not specified
+    if n_bins is None:
+        n_bins = calc_dynamic_bins(d)
+
+    return calc_vp(d, len(d), va_pct, n_bins=n_bins,
+                   return_histogram=return_histogram)
+
+
+def calc_dynamic_bins(df, atr_len=14, min_bins=50, max_bins=200):
+    """Calculate optimal bin count based on price range vs ATR.
+
+    Each bin should be approximately half an ATR wide for meaningful
+    volume node detection.
+
+    Args:
+        df: OHLCV DataFrame (daily or intraday)
+        atr_len: ATR period
+        min_bins: minimum bins
+        max_bins: maximum bins
+
+    Returns:
+        int: optimal number of bins
+    """
+    if len(df) < atr_len + 1:
+        return 100  # default fallback
+
+    atr = calc_atr(df, atr_len)
+    if atr is None or atr <= 0:
+        return 100
+
+    price_high = df["High"].values[-len(df):].max()
+    price_low = df["Low"].values[-len(df):].min()
+    price_range = price_high - price_low
+
+    if price_range <= 0:
+        return 100
+
+    # Target: each bin ≈ ATR/2 wide
+    bin_width = atr / 2
+    n_bins = int(price_range / bin_width)
+
+    return max(min_bins, min(n_bins, max_bins))
+
+
+def detect_hvn_lvn(bin_volumes, bin_prices, threshold_hvn=1.0, threshold_lvn=0.3):
+    """Detect High Volume Nodes and Low Volume Nodes from VP histogram.
+
+    HVN = bins with volume > mean + threshold_hvn * std (support/resistance)
+    LVN = bins with volume < mean * threshold_lvn between two HVNs (fast-move zones)
+
+    Args:
+        bin_volumes: list of volume per bin
+        bin_prices: list of price per bin (bin centers)
+        threshold_hvn: std multiplier for HVN detection (default 1.0)
+        threshold_lvn: fraction of mean for LVN detection (default 0.3)
+
+    Returns:
+        {"hvn": [{"price": f, "volume": f, "strength": f}],
+         "lvn": [{"price": f, "volume": f}]}
+    """
+    volumes = np.array(bin_volumes)
+    prices = np.array(bin_prices)
+
+    if len(volumes) == 0 or volumes.max() == 0:
+        return {"hvn": [], "lvn": []}
+
+    mean_vol = volumes.mean()
+    std_vol = volumes.std()
+    max_vol = volumes.max()
+
+    # HVN: peaks above mean + threshold * std
+    hvn_threshold = mean_vol + threshold_hvn * std_vol
+    hvn_mask = volumes >= hvn_threshold
+
+    hvn_list = []
+    for i in range(len(volumes)):
+        if hvn_mask[i]:
+            hvn_list.append({
+                "price": round(float(prices[i]), 2),
+                "volume": float(volumes[i]),
+                "strength": round(float(volumes[i] / max_vol), 2),
+            })
+
+    # LVN: valleys below mean * threshold, between HVNs
+    lvn_threshold = mean_vol * threshold_lvn
+    lvn_list = []
+
+    # Find LVN regions between HVN peaks
+    hvn_indices = np.where(hvn_mask)[0]
+    if len(hvn_indices) >= 2:
+        for j in range(len(hvn_indices) - 1):
+            start = hvn_indices[j] + 1
+            end = hvn_indices[j + 1]
+            if end <= start:
+                continue
+            region = volumes[start:end]
+            region_prices = prices[start:end]
+            for k in range(len(region)):
+                if region[k] < lvn_threshold:
+                    lvn_list.append({
+                        "price": round(float(region_prices[k]), 2),
+                        "volume": float(region[k]),
+                    })
+
+    return {"hvn": hvn_list, "lvn": lvn_list}
+
+
 def calc_atr(df, length):
     """Calculate Average True Range."""
     h, l, c = df["High"].values, df["Low"].values, df["Close"].values

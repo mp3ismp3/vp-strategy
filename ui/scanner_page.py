@@ -226,6 +226,9 @@ def render_scanner():
 
         # Multi-TF consensus
         _show_consensus(vp)
+
+        # Auction theory elements
+        _show_auction_info(vp)
         st.divider()
 
 
@@ -298,3 +301,58 @@ def _show_consensus(vp):
 
     else:
         st.info("⚪ 區間震盪環境 — 碰 VAL 做多、碰 VAH 做空")
+
+
+def _show_auction_info(vp):
+    """Show auction theory elements (VA migration, IB, single prints, poor highs/lows)."""
+    mig = vp.get("va_migration")
+    ib = vp.get("ib")
+    sp = vp.get("single_prints")
+    phl = vp.get("poor_highs_lows")
+
+    if not any([mig, ib, sp, phl]):
+        return
+
+    with st.expander("🏛️ Auction Analysis", expanded=False):
+        cols = st.columns(3)
+
+        # VA Migration
+        with cols[0]:
+            if mig:
+                dir_emoji = "📈" if mig["direction"] == "up" else "📉" if mig["direction"] == "down" else "➡️"
+                st.markdown(f"**VA Migration**")
+                st.markdown(f"{dir_emoji} Direction: **{mig['direction']}**")
+                st.caption(f"Speed: {mig['speed']} ATR | POC shift: ${mig['poc_shift']}")
+            else:
+                st.caption("VA Migration: N/A")
+
+        # Initial Balance
+        with cols[1]:
+            if ib:
+                today = ib["today"]
+                stats = ib["stats"]
+                type_emoji = "📊" if today["day_type"] == "balance" else "🚀"
+                st.markdown(f"**Initial Balance**")
+                st.markdown(f"{type_emoji} {today['day_type']} ({stats['today_relative']})")
+                st.caption(f"IB: ${today['ib_low']:.2f} - ${today['ib_high']:.2f} (width ${today['ib_width']:.2f})")
+                st.caption(f"Directional days: {stats['pct_directional']:.0%}")
+            else:
+                st.caption("Initial Balance: N/A")
+
+        # Single Prints + Poor Highs/Lows
+        with cols[2]:
+            if sp:
+                st.markdown(f"**Single Prints** ({len(sp)} zones)")
+                for s in sp[:2]:
+                    st.caption(f"${s['price_start']} - ${s['price_end']} (fill target)")
+            if phl:
+                ph = phl.get("poor_highs", [])
+                pl = phl.get("poor_lows", [])
+                if ph:
+                    st.markdown(f"**Poor Highs** ({len(ph)})")
+                    for p in ph[-2:]:
+                        st.caption(f"${p['price']} on {p['date']}")
+                if pl:
+                    st.markdown(f"**Poor Lows** ({len(pl)})")
+                    for p in pl[-2:]:
+                        st.caption(f"${p['price']} on {p['date']}")
