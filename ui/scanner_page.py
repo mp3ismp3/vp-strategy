@@ -354,41 +354,100 @@ def _show_auction_info(vp):
 
         # VA Migration
         with cols[0]:
+            st.markdown("**VA Migration**")
+            with st.popover("❓ 什麼是 VA Migration"):
+                st.markdown("""
+                **價值區遷移** — 追蹤市場「公允價格」的移動方向和速度。
+
+                - **Direction up** = POC 往上移，市場接受更高的價格 → 上升趨勢
+                - **Direction down** = POC 往下移，市場接受更低的價格 → 下降趨勢
+                - **Flat** = POC 不動，市場在平衡 → 區間交易環境
+
+                **Speed（速度）：**
+                - < 1.0 = 正常/慢速遷移
+                - 1.0~2.0 = 明確趨勢
+                - > 2.0 = 快速遷移（強趨勢，不要逆勢操作）
+
+                **操作含義：**
+                - up + 高 speed → 順勢做多，不要抄底
+                - down + 高 speed → 順勢做空或觀望，不要接刀
+                - flat → 區間交易，碰 VAL 做多、碰 VAH 做空
+                """)
             if mig:
                 dir_emoji = "📈" if mig["direction"] == "up" else "📉" if mig["direction"] == "down" else "➡️"
-                st.markdown(f"**VA Migration**")
                 st.markdown(f"{dir_emoji} Direction: **{mig['direction']}**")
                 st.caption(f"Speed: {mig['speed']} ATR | POC shift: ${mig['poc_shift']}")
             else:
-                st.caption("VA Migration: N/A")
+                st.caption("數據不足")
 
         # Initial Balance
         with cols[1]:
+            st.markdown("**Initial Balance**")
+            with st.popover("❓ 什麼是 Initial Balance"):
+                st.markdown("""
+                **開盤第一小時範圍** — 預測當天是趨勢日還是區間日。
+
+                - **Balance day** = 價格整天都留在第一小時的範圍內 → 做區間交易
+                - **Directional day** = 價格突破第一小時範圍 → 順突破方向做
+
+                **IB 寬度：**
+                - **Wide**（比平均寬 30%+）= 開盤就波動大，已走一段，追進要謹慎
+                - **Narrow**（比平均窄 30%+）= 能量壓縮，突破後動能可能很大
+                - **Normal** = 正常
+
+                **Directional days %：**
+                - 高（>70%）= 這檔股票經常做趨勢日，適合突破策略
+                - 低（<40%）= 這檔股票偏好區間，適合 mean reversion
+                """)
             if ib:
                 today = ib["today"]
                 stats = ib["stats"]
                 type_emoji = "📊" if today["day_type"] == "balance" else "🚀"
-                st.markdown(f"**Initial Balance**")
                 st.markdown(f"{type_emoji} {today['day_type']} ({stats['today_relative']})")
-                st.caption(f"IB: ${today['ib_low']:.2f} - ${today['ib_high']:.2f} (width ${today['ib_width']:.2f})")
+                st.caption(f"IB: ${today['ib_low']:.2f} - ${today['ib_high']:.2f} (${today['ib_width']:.2f})")
                 st.caption(f"Directional days: {stats['pct_directional']:.0%}")
             else:
-                st.caption("Initial Balance: N/A")
+                st.caption("需要 1H 數據")
 
         # Single Prints + Poor Highs/Lows
         with cols[2]:
+            st.markdown("**Price Targets**")
+            with st.popover("❓ 什麼是 Single Prints / Poor Highs/Lows"):
+                st.markdown("""
+                **Single Prints（量能稀薄區）：**
+
+                市場快速穿越、幾乎沒有交易的價格區間。
+                代表「未完成的拍賣」— 市場未來很可能回到這裡**回填**。
+                類似「跳空缺口會回補」的邏輯，但基於量而不是價格。
+
+                → 這些是磁吸目標價
+
+                ---
+
+                **Poor Highs（弱高點）：**
+
+                高點收盤在最高附近、沒有上影線拒絕 = 買方未被打敗。
+                價格很可能**再次回來測試甚至突破**這個高點。
+
+                **Poor Lows（弱低點）：**
+
+                低點收盤在最低附近、沒有下影線保護 = 賣方未被打敗。
+                價格很可能**再次下探**這個低點。
+
+                （對比：有長影線的極端值 = Strong High/Low = 不容易再回去）
+                """)
             if sp:
-                st.markdown(f"**Single Prints** ({len(sp)} zones)")
+                st.markdown(f"**Single Prints** ({len(sp)})")
                 for s in sp[:2]:
-                    st.caption(f"${s['price_start']} - ${s['price_end']} (fill target)")
+                    st.caption(f"🧲 ${s['price_start']} - ${s['price_end']} (fill target)")
             if phl:
                 ph = phl.get("poor_highs", [])
                 pl = phl.get("poor_lows", [])
                 if ph:
                     st.markdown(f"**Poor Highs** ({len(ph)})")
                     for p in ph[-2:]:
-                        st.caption(f"${p['price']} on {p['date']}")
+                        st.caption(f"⬆️ ${p['price']} on {p['date']}")
                 if pl:
                     st.markdown(f"**Poor Lows** ({len(pl)})")
                     for p in pl[-2:]:
-                        st.caption(f"${p['price']} on {p['date']}")
+                        st.caption(f"⬇️ ${p['price']} on {p['date']}")
