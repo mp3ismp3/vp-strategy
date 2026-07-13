@@ -3,28 +3,115 @@
 import numpy as np
 
 
-def calc_vp(df, lookback, va_pct):
-    """Calculate Volume Profile: POC, VAH, VAL."""
+def calc_vp(df, lookback, va_pct, n_bins=100, return_histogram=False):
+    """Calculate Volume Profile using histogram-based approach.
+
+    Bins the price range into n_bins buckets, distributes each bar's volume
+    across its high-low range, finds the peak bin (POC), then expands outward
+    from POC until va_pct of total volume is captured (Value Area).
+
+    Args:
+        df: DataFrame with OHLCV columns
+        lookback: number of bars to use
+        va_pct: fraction of volume for Value Area (e.g. 0.68)
+        n_bins: number of price bins (default 100)
+        return_histogram: if True, also return histogram data for charting
+
+    Returns:
+        {"poc": float, "vah": float, "val": float}
+        If return_histogram=True:
+        {"poc": float, "vah": float, "val": float,
+         "histogram": {"prices": list, "volumes": list}}
+    """
     d = df.tail(lookback)
-    hlc3 = (d["High"].values + d["Low"].values + d["Close"].values) / 3
-    vol = d["Volume"].values
-    sum_v = vol.sum()
-    if sum_v == 0:
+    if len(d) < 5:
         return None
-    poc = np.sum(hlc3 * vol) / sum_v
-    vw_var = np.sum(hlc3 ** 2 * vol) / sum_v - poc ** 2
-    vw_std = np.sqrt(max(vw_var, 0))
-    if va_pct <= 0.5:
-        k = va_pct * 1.35
-    elif va_pct <= 0.68:
-        k = 0.67 + (va_pct - 0.5) * 1.83
-    elif va_pct <= 0.80:
-        k = 1.0 + (va_pct - 0.68) * 2.33
-    else:
-        k = 1.28 + (va_pct - 0.80) * 2.47
-    vah = min(poc + k * vw_std, d["High"].max())
-    val_ = max(poc - k * vw_std, d["Low"].min())
-    return {"poc": poc, "vah": vah, "val": val_}
+
+    highs = d["High"].values
+    lows = d["Low"].values
+    volumes = d["Volume"].values
+    total_vol = volumes.sum()
+
+    if total_vol == 0:
+        return None
+
+    price_low = float(lows.min())
+    price_high = float(highs.max())
+    price_range = price_high - price_low
+
+    if price_range <= 0:
+        return None
+
+    # Create price bins
+    bin_size = price_range / n_bins
+    bin_volumes = np.zeros(n_bins)
+
+    # Distribute each bar's volume evenly across its high-low range
+    for i in range(len(d)):
+        bar_low = lows[i]
+        bar_high = highs[i]
+        bar_vol = volumes[i]
+        if bar_high <= bar_low or bar_vol <= 0:
+            continue
+
+        # Find which bins this bar spans
+        start_bin = int((bar_low - price_low) / bin_size)
+        end_bin = int((bar_high - price_low) / bin_size)
+        start_bin = max(0, min(start_bin, n_bins - 1))
+        end_bin = max(0, min(end_bin, n_bins - 1))
+
+        # Distribute volume evenly across spanned bins
+        n_spanned = end_bin - start_bin + 1
+        vol_per_bin = bar_vol / n_spanned
+        bin_volumes[start_bin:end_bin + 1] += vol_per_bin
+
+    # POC = price level of the bin with maximum volume
+    poc_bin = int(np.argmax(bin_volumes))
+    poc = price_low + (poc_bin + 0.5) * bin_size
+
+    # Value Area: expand from POC bin outward until va_pct volume captured
+    va_volume_target = total_vol * va_pct
+    va_volume = bin_volumes[poc_bin]
+    lower_idx = poc_bin - 1
+    upper_idx = poc_bin + 1
+
+    while va_volume < va_volume_target and (lower_idx >= 0 or upper_idx < n_bins):
+        lower_vol = bin_volumes[lower_idx] if lower_idx >= 0 else 0
+        upper_vol = bin_volumes[upper_idx] if upper_idx < n_bins else 0
+
+        if lower_vol >= upper_vol:
+            if lower_idx >= 0:
+                va_volume += bin_volumes[lower_idx]
+                lower_idx -= 1
+            elif upper_idx < n_bins:
+                va_volume += bin_volumes[upper_idx]
+                upper_idx += 1
+        else:
+            if upper_idx < n_bins:
+                va_volume += bin_volumes[upper_idx]
+                upper_idx += 1
+            elif lower_idx >= 0:
+                va_volume += bin_volumes[lower_idx]
+                lower_idx -= 1
+
+    val_ = price_low + (lower_idx + 1) * bin_size
+    vah = price_low + upper_idx * bin_size
+
+    # Clamp to actual price range
+    vah = min(vah, price_high)
+    val_ = max(val_, price_low)
+
+    result = {"poc": float(poc), "vah": float(vah), "val": float(val_)}
+
+    if return_histogram:
+        # Return bin center prices and volumes for charting
+        bin_prices = [price_low + (i + 0.5) * bin_size for i in range(n_bins)]
+        result["histogram"] = {
+            "prices": bin_prices,
+            "volumes": bin_volumes.tolist(),
+        }
+
+    return result
 
 
 def calc_atr(df, length):

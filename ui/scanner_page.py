@@ -1,107 +1,300 @@
-"""Scanner Dashboard — reads scan_results.json and displays ranking table."""
+"""Scanner Page — VP Multi-Timeframe Charts with Volume Profile Histogram.
+
+Shows candlestick + VP histogram (horizontal volume bars) for Daily/Weekly/Monthly.
+Default: Accumulation top 10. User can select any symbol.
+
+Data strategy:
+- Primary: use pre-computed scan_results.json (instant)
+- On-demand: user clicks refresh to download fresh data (cached 15 min)
+"""
 
 import json
 from pathlib import Path
 
+import numpy as np
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
+from config import SYMBOLS
+from core.data_provider import YahooProvider
+from core.indicators import calc_vp
+from core.vp_multitf import compute_vp_multitf, resample_to_weekly, resample_to_monthly
+
+STATE_FILE = Path(__file__).parent.parent / "data" / "accum_state.json"
 RESULTS_FILE = Path(__file__).parent.parent / "data" / "scan_results.json"
 
 
-def load_results():
-    if not RESULTS_FILE.exists():
-        return None
+@st.cache_data(ttl=900, show_spinner=False)
+def _download_symbol(symbol):
+    """Download single symbol data with 15-min cache. Returns DataFrame or None."""
     try:
-        return json.loads(RESULTS_FILE.read_text())
-    except (json.JSONDecodeError, IOError):
+        provider = YahooProvider(max_workers=1, jitter=(0.1, 0.2))
+        data = provider.batch_daily([symbol], period="1y")
+        return data.get(symbol)
+    except Exception:
         return None
+
+
+def _load_accum_top10():
+    """Load accumulation state and return top 10 symbols."""
+    if not STATE_FILE.exists():
+        return []
+    try:
+        state = json.loads(STATE_FILE.read_text())
+    except (json.JSONDecodeError, IOError):
+        return []
+
+    items = []
+    for sym, data in state.items():
+        if isinstance(data, dict):
+            items.append({
+                "symbol": sym,
+                "tier": data.get("tier", "watch"),
+                "decay_score": data.get("decay_score", 0),
+            })
+    items.sort(key=lambda x: (0 if x["tier"] == "confirmed" else 1, -x["decay_score"]))
+    return [item["symbol"] for item in items[:10]]
+
+
+def _make_vp_chart(df, vp_data, title, n_bars=60):
+    """Create candlestick chart with VP histogram overlay."""
+    plot_df = df.tail(n_bars)
+
+    fig = make_subplots(
+        rows=1, cols=2,
+        column_widths=[0.8, 0.2],
+        shared_yaxes=True,
+        horizontal_spacing=0.01,
+    )
+
+    # Left: Candlestick
+    fig.add_trace(go.Candlestick(
+        x=plot_df.index,
+        open=plot_df["Open"],
+        high=plot_df["High"],
+        low=plot_df["Low"],
+        close=plot_df["Close"],
+        name="Price",
+        increasing_line_color="#26a69a",
+        decreasing_line_color="#ef5350",
+    ), row=1, col=1)
+
+    if vp_data:
+        poc = vp_data["poc"]
+        vah = vp_data["vah"]
+        val = vp_data["val"]
+
+        # VP zone shading
+        fig.add_hrect(y0=val, y1=vah, fillcolor="rgba(255,165,0,0.06)",
+                      line_width=0, row=1, col=1)
+
+        # POC/VAH/VAL lines
+        fig.add_hline(y=vah, line_dash="dash", line_color="red", line_width=1,
+                      annotation_text=f"VAH {vah:.1f}", annotation_position="top left",
+                      row=1, col=1)
+        fig.add_hline(y=poc, line_dash="solid", line_color="orange", line_width=2,
+                      annotation_text=f"POC {poc:.1f}", annotation_position="top left",
+                      row=1, col=1)
+        fig.add_hline(y=val, line_dash="dash", line_color="green", line_width=1,
+                      annotation_text=f"VAL {val:.1f}", annotation_position="bottom left",
+                      row=1, col=1)
+
+        # Right: VP Histogram (horizontal bars)
+        histogram = vp_data.get("histogram")
+        if histogram:
+            prices = histogram["prices"]
+            volumes = histogram["volumes"]
+            max_vol = max(volumes) if volumes else 1
+
+            # Normalize volumes for display
+            norm_volumes = [v / max_vol for v in volumes]
+
+            # Color bars: inside VA = orange, outside = gray
+            colors = []
+            for p in prices:
+                if val <= p <= vah:
+                    colors.append("rgba(255,165,0,0.6)")
+                else:
+                    colors.append("rgba(150,150,150,0.3)")
+
+            fig.add_trace(go.Bar(
+                x=norm_volumes,
+                y=prices,
+                orientation="h",
+                marker_color=colors,
+                showlegend=False,
+                hovertemplate="$%{y:.1f}<br>Vol: %{customdata:.0f}<extra></extra>",
+                customdata=volumes,
+            ), row=1, col=2)
+
+            # POC/VAH/VAL lines on histogram side
+            fig.add_hline(y=poc, line_dash="solid", line_color="orange", line_width=1, row=1, col=2)
+            fig.add_hline(y=vah, line_dash="dash", line_color="red", line_width=1, row=1, col=2)
+            fig.add_hline(y=val, line_dash="dash", line_color="green", line_width=1, row=1, col=2)
+
+    fig.update_layout(
+        title=title,
+        height=450,
+        showlegend=False,
+        margin=dict(l=10, r=10, t=40, b=10),
+        xaxis_rangeslider_visible=False,
+        xaxis2_showticklabels=False,
+        yaxis_title="",
+    )
+
+    return fig
 
 
 def render_scanner():
-    st.title("📊 Multi-Strategy Scanner Dashboard")
+    st.title("📈 VP Multi-Timeframe Scanner")
 
-    data = load_results()
-    if not data or not data.get("results"):
-        st.warning("No scan results found. Run `python scan_all.py` first.")
+    # --- Symbol Selection ---
+    accum_top10 = _load_accum_top10()
+
+    mode = st.radio(
+        "顯示模式",
+        ["Accumulation Top 10", "自選標的"],
+        horizontal=True,
+    )
+
+    if mode == "Accumulation Top 10":
+        if accum_top10:
+            symbols_to_show = accum_top10
+        else:
+            st.info("No accumulation state. Showing defaults.")
+            symbols_to_show = SYMBOLS[:10]
+    else:
+        symbols_to_show = st.multiselect(
+            "選擇標的 (最多 5 檔避免超時)",
+            SYMBOLS,
+            default=SYMBOLS[:3],
+            max_selections=5,
+        )
+
+    if not symbols_to_show:
+        st.info("請選擇至少一個標的。")
         return
 
-    # Header info
-    col1, col2, col3 = st.columns(3)
-    ctx = data.get("market_ctx", {})
-    col1.metric("VIX", f"{ctx.get('vix', 0):.1f}" if ctx.get('vix') else "N/A")
-    col2.metric("SPY State", ctx.get("spy_state", "unknown"))
-    col3.metric("Signals Found", data.get("signals_found", 0))
+    # --- Load data per symbol (cached individually) ---
+    progress = st.progress(0, text="載入數據中...")
+    loaded = {}
+    for i, symbol in enumerate(symbols_to_show):
+        progress.progress((i + 1) / len(symbols_to_show), text=f"載入 {symbol}...")
+        df = _download_symbol(symbol)
+        if df is not None and len(df) >= 60:
+            loaded[symbol] = df
+    progress.empty()
 
-    st.caption(f"Last scan: {data.get('scan_time', 'unknown')}")
+    if not loaded:
+        st.warning("無法載入任何數據。請稍後再試。")
+        return
 
-    # Filters
-    with st.sidebar:
-        st.header("Filters")
-        min_score = st.slider("Min Score", 0, 100, 40)
-        direction_filter = st.multiselect("Direction", ["LONG", "SHORT", "NEUTRAL"], default=["LONG", "SHORT"])
-        regime_filter = st.multiselect("Regime", ["range", "trend", "expansion", "compression"], default=["range", "trend", "expansion", "compression"])
-        holding_filter = st.multiselect("Holding", ["short", "mid", "long"], default=["short", "mid", "long"])
+    # --- Render each symbol ---
+    for symbol, df in loaded.items():
+        vp = compute_vp_multitf(df, va_pct=0.68)
+        if not vp:
+            continue
 
+        # Symbol header
+        price = vp["price"]
+        st.markdown(f"## {symbol} — ${price}")
+
+        # Tabs for each timeframe
+        tab_d, tab_w, tab_m = st.tabs(["📅 日線 (60天)", "📆 周線 (52週)", "🗓️ 月線 (12月)"])
+
+        with tab_d:
+            daily_chart = _make_vp_chart(df, vp.get("daily"), f"{symbol} — 日線 VP", n_bars=60)
+            st.plotly_chart(daily_chart, use_container_width=True)
+            if vp.get("daily"):
+                _show_position_badge(vp["daily"])
+
+        with tab_w:
+            weekly_df = resample_to_weekly(df)
+            weekly_chart = _make_vp_chart(weekly_df, vp.get("weekly"), f"{symbol} — 周線 VP", n_bars=52)
+            st.plotly_chart(weekly_chart, use_container_width=True)
+            if vp.get("weekly"):
+                _show_position_badge(vp["weekly"])
+
+        with tab_m:
+            monthly_df = resample_to_monthly(df)
+            monthly_chart = _make_vp_chart(monthly_df, vp.get("monthly"), f"{symbol} — 月線 VP", n_bars=12)
+            st.plotly_chart(monthly_chart, use_container_width=True)
+            if vp.get("monthly"):
+                _show_position_badge(vp["monthly"])
+
+        # Multi-TF consensus
+        _show_consensus(vp)
         st.divider()
-        from ui.strategy_docs import render_sidebar_docs
-        render_sidebar_docs()
 
-    # Filter results
-    results = data["results"]
-    filtered = [
-        r for r in results
-        if r["score"] >= min_score
-        and r["direction"] in direction_filter
-        and r["regime"] in regime_filter
-        and r.get("holding_timeframe", "mid") in holding_filter
-    ]
 
-    if not filtered:
-        st.info("No results match current filters.")
-        return
+def _show_position_badge(tf_data):
+    """Show position badge below chart."""
+    pos = tf_data["position"]
+    pct = tf_data["position_pct"]
+    poc = tf_data["poc"]
+    vah = tf_data["vah"]
+    val = tf_data["val"]
 
-    # Build DataFrame
-    rows = []
-    for r in filtered:
-        tracks = r.get("tracks", {})
-        rows.append({
-            "Ticker": r["ticker"],
-            "Score": r["score"],
-            "Direction": r["direction"],
-            "Setup": r.get("setup", r.get("best_setup", "—")),
-            "Regime": r["regime"],
-            "R:R": r["rr"],
-            "Holding": r["holding"],
-            "Short": tracks.get("short", {}).get("score", "—") if tracks.get("short") else "—",
-            "Mid": tracks.get("mid", {}).get("score", "—") if tracks.get("mid") else "—",
-            "Long": tracks.get("long", {}).get("score", "—") if tracks.get("long") else "—",
-        })
+    col1, col2, col3, col4 = st.columns(4)
+    if pos == "above_va":
+        col1.success(f"🟢 Above VA ({pct:.0f}%)")
+    elif pos == "below_va":
+        col1.error(f"🔴 Below VA ({pct:.0f}%)")
+    else:
+        col1.info(f"⚪ Inside VA ({pct:.0f}%)")
+    col2.metric("POC", f"${poc:.2f}")
+    col3.metric("VAH", f"${vah:.2f}")
+    col4.metric("VAL", f"${val:.2f}")
 
-    df = pd.DataFrame(rows)
 
-    # Color coding
-    def color_score(val):
-        if val >= 80:
-            return "background-color: #c6efce"
-        elif val >= 60:
-            return "background-color: #ffeb9c"
-        return ""
+def _show_consensus(vp):
+    """Show multi-TF auction context and actionable insight."""
+    daily = vp.get("daily", {})
+    weekly = vp.get("weekly", {})
+    monthly = vp.get("monthly", {})
 
-    def color_direction(val):
-        if val == "LONG":
-            return "color: green"
-        elif val == "SHORT":
-            return "color: red"
-        return ""
+    d_pos = daily.get("position", "")
+    w_pos = weekly.get("position", "")
+    m_pos = monthly.get("position", "")
 
-    styled = df.style.applymap(color_score, subset=["Score"]).applymap(color_direction, subset=["Direction"])
-    st.dataframe(styled, use_container_width=True, hide_index=True)
+    positions = [d_pos, w_pos, m_pos]
+    above_count = positions.count("above_va")
+    below_count = positions.count("below_va")
+    inside_count = positions.count("inside_va")
 
-    # Click to detail
-    st.divider()
-    selected = st.selectbox("Select ticker for detailed analysis:", [r["ticker"] for r in filtered])
-    if st.button("View Detail →"):
-        st.query_params["page"] = "detail"
-        st.query_params["ticker"] = selected
-        st.rerun()
+    # --- All 3 same direction ---
+    if above_count == 3:
+        st.info("📈 三框架都在 VA 上方 — 已走一段，等回踩再找做多位置，勿追高")
+    elif below_count == 3:
+        st.info("📉 三框架都在 VA 下方 — 已跌一段，等反彈再找做空位置，勿追空")
+    elif inside_count == 3:
+        st.info("⚪ 三框架都在 VA 內 — 區間交易環境：碰 VAL 做多、碰 VAH 做空")
+
+    # --- 大方向偏多 (月或周 above) + 日線回踩 ---
+    elif (m_pos == "above_va" or w_pos == "above_va") and d_pos == "inside_va":
+        st.success("🟢 大方向偏多 + 日線回到 VA 內 — 等碰 VAL 做多（回踩公允價值買入）")
+    elif (m_pos == "above_va" or w_pos == "above_va") and d_pos == "below_va":
+        st.warning("⚠️ 大方向偏多，但日線跌破 VA — 觀察是否為 Failed Auction（跌破後快速收回＝做多機會）")
+
+    # --- 大方向偏空 (月或周 below) + 日線反彈 ---
+    elif (m_pos == "below_va" or w_pos == "below_va") and d_pos == "inside_va":
+        st.error("🔴 大方向偏空 + 日線反彈到 VA 內 — 等碰 VAH 做空（反彈至公允價值賣出）")
+    elif (m_pos == "below_va" or w_pos == "below_va") and d_pos == "above_va":
+        st.warning("⚠️ 大方向偏空，日線短暫突破 VA — 觀察是否為假突破（突破後跌回＝做空機會）")
+
+    # --- 大方向偏多 + 日線也偏多 ---
+    elif above_count == 2 and inside_count == 1:
+        st.success("🟢 偏多結構 — 2/3 框架在 VA 上方，等日線碰 VAL 或回到 VA 內找做多位置")
+
+    # --- 大方向偏空 + 日線也偏空 ---
+    elif below_count == 2 and inside_count == 1:
+        st.error("🔴 偏空結構 — 2/3 框架在 VA 下方，等日線碰 VAH 或回到 VA 內找做空位置")
+
+    # --- 真正的分歧：一個 above 一個 below ---
+    elif above_count >= 1 and below_count >= 1:
+        st.warning("⚠️ 時間框架方向衝突（有 above 也有 below）— 等方向一致再操作")
+
+    else:
+        st.info("⚪ 區間震盪環境 — 碰 VAL 做多、碰 VAH 做空")

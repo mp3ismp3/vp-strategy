@@ -34,6 +34,8 @@ class StrategySignal:
     reasons: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     triggered: bool = False
+    narrative: str = ""
+    evidence: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -50,6 +52,8 @@ class StrategySignal:
             "reasons": self.reasons,
             "warnings": self.warnings,
             "triggered": self.triggered,
+            "narrative": self.narrative,
+            "evidence": self.evidence,
         }
 
     @property
