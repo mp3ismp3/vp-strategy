@@ -2,30 +2,26 @@
 
 ## 專案概述
 
-Market Auction Theory 多策略交易分析平台。Python 3.11，無 ORM、無 DB，純文件式架構。
+Market Auction Theory 交易分析平台。Python 3.11，無 ORM、無 DB，純文件式架構。
 
 核心有兩個獨立的分析系統：
-1. **Multi-Strategy Scanner**（`scan_all.py`）— 日線 VP/VWAP/Trend 信號融合，產出 score 0-100
+1. **VP Position Viewer**（`scan_all.py`）— 日線/周線/月線 Volume Profile，顯示價格相對公允價值位置
 2. **Accumulation Tracker**（`accumulation.py`）— Wyckoff 機構吸籌追蹤，有 state persistence + decay scoring
 
 ## 系統資料流
 
 ```
-┌─────────────────── Multi-Strategy Scanner ───────────────────┐
+┌─────────────────── VP Position Viewer ───────────────────────┐
 │                                                               │
-│  YahooProvider.batch_daily(52 symbols)                        │
+│  YahooProvider.batch_daily(62 symbols, 1y)                    │
 │       ↓                                                       │
-│  fetch_market_context() → {vix, spy_state, sector_momentum}  │
+│  fetch_market_context() → {vix, spy_state}                    │
 │       ↓                                                       │
-│  detect_regime(df, cfg, market_ctx) → RegimeState             │
+│  compute_vp_multitf(df, 0.68)                                 │
+│  → calc_vp(daily, 60) / calc_vp(weekly, 52) / calc_vp(monthly, 12) │
+│  → histogram-based: bin prices → find POC → expand VA         │
 │       ↓                                                       │
-│  get_active_strategies(regime, 0.15) → ["VP","VWAP","Trend"] │
-│       ↓                                                       │
-│  各策略 .detect(df, cfg, market_ctx) → list[StrategySignal]  │
-│       ↓                                                       │
-│  fuse_signals(signals, regime) → FusionResult                 │
-│       ↓                                                       │
-│  estimate_holding(signal, atr, atr_avg, vix) → HoldingEst   │
+│  Multi-TF position: above_va / inside_va / below_va           │
 │       ↓                                                       │
 │  data/scan_results.json + Telegram                            │
 └───────────────────────────────────────────────────────────────┘
@@ -54,7 +50,7 @@ Market Auction Theory 多策略交易分析平台。Python 3.11，無 ORM、無 
 ## 最小改動原則
 
 1. **只改需要改的** — 修 bug 不要順便重構周圍的 code，加功能不要改現有介面
-2. **保持向後相容** — `StrategySignal`、`FusionResult`、`AccumulationTracker` 的 public API 不能 breaking change
+2. **保持向後相容** — `StrategySignal`、`AccumulationTracker` 的 public API 不能 breaking change
 3. **一個 commit 一件事** — 不要在同一個 commit 混合 feature + refactor + fix
 4. **不引入新依賴** — 除非功能無法用現有 lib 實現，必須先確認 requirements.txt 裡沒有替代方案
 5. **不改 config 預設值** — `DEFAULT_CFG`、`SCORING_WEIGHTS`、`REGIME_THRESHOLDS` 的預設值是經過 backtest 調出來的，改了要跑 `python backtest_multi.py` 驗證
@@ -117,16 +113,6 @@ regime: "range" / "trend" / "expansion" / "compression"
 normalized_trust: {"VP": 0.48, "VWAP": 0.38, "TrendFollowing": 0.14}  # sums to 1.0
 ```
 
-### FusionResult（scoring/fusion.py）
-```python
-tracks: {"short": TrackResult, "mid": TrackResult, "long": TrackResult}
-best_score: int(0-100)   # scanner 排序依據
-best_track: "short" / "mid" / "long"
-best_setup: "VA Rejection" / etc.
-direction: "LONG" / "SHORT" / "NEUTRAL"
-label: "Strong Long" / "Moderate Short" / "Lean Long" / "Neutral" / "Avoid"
-```
-
 ### AccumulationTracker State（per symbol）
 ```python
 {
@@ -148,11 +134,11 @@ label: "Strong Long" / "Moderate Short" / "Lean Long" / "Neutral" / "Avoid"
 
 | 目錄 | 職責 | 修改注意 |
 |------|------|---------|
-| `core/` | 資料層 + 指標計算 | 純函數，無 side effect，改了要跑 `pytest tests/test_indicators.py` |
-| `regime/` | 市場狀態判斷 | 只能依賴 `core/indicators.py` + `config.py` |
-| `strategies/` | 信號產生 | 每個策略獨立，不能互相 import |
+| `core/` | 資料層 + 指標計算 + VP 多 TF | 純函數，無 side effect，改了要跑 `pytest tests/test_indicators.py` |
+| `regime/` | 市場狀態判斷 | 只能依賴 `core/indicators.py` + `config.py`，backtest 用 |
+| `strategies/` | 信號產生 | 每個策略獨立，不能互相 import，backtest 用 |
 | `strategies/accumulation/` | Wyckoff 累積追蹤 | 有 state persistence，改 tracker 要跑全部 `test_accumulation_*.py` |
-| `scoring/` | 融合 + 評分 + 持有時間 | 權重改動要跑 backtest 驗證 |
+| `scoring/` | Legacy 評分 | backtest 用，改動要跑 backtest 驗證 |
 | `ui/` | Streamlit 展示 | read-only，不做計算，不寫文件 |
 | `notifications/` | Telegram 通知 | 只負責格式化 + 發送 |
 | `tests/` | pytest 測試 | 新功能必須有對應測試 |
@@ -197,22 +183,17 @@ core/data_provider → core/indicators → regime/engine → strategies/* → sc
 3. 確認 `save_state` / `load_state` round-trip 正常
 4. State schema 新增欄位要給 default 值（向後相容舊 state）
 
-### 修改 Fusion Engine
-1. 改 `scoring/fusion.py`
-2. 跑 `pytest tests/test_fusion.py`
-3. 注意 `FusionResult` 的 backward compat 欄位（score, direction, label 等是 alias）
-
 ### 修改通知格式
 1. 改 `notifications/telegram.py` 或 `strategies/accumulation/notifications.py`
 2. 確認訊息 ≤ 4096 字元
 3. 用 `--dry-run` 測試，不要直接發
 
-### 新增策略到 Scanner
-1. 在 `strategies/` 建立新 class 繼承 `BaseStrategy`
-2. 在 `scan_all.py` 的 `STRATEGIES` list 加入 instance
-3. 在 `config.py` 的 `REGIME_STRATEGY_TRUST` 四個 regime 都加上 trust 值
-4. 在 `config.py` 的 `SCORING_WEIGHTS` 加入權重（需重新調整使總和 = 1.0）
-5. 跑 backtest 驗證
+### 修改 VP Scanner
+1. VP 計算邏輯在 `core/indicators.py` 的 `calc_vp()`
+2. 多時間框架在 `core/vp_multitf.py`
+3. 主流程在 `scan_all.py`
+4. 改了要跑 `pytest tests/test_indicators.py`
+5. 不改 `calc_vp` 的回傳格式（`{"poc", "vah", "val"}`）
 
 ## Git 規範
 
