@@ -386,7 +386,7 @@ def _show_auction_info(vp):
             c1, c2 = st.columns([4, 1])
             c1.markdown("**Price Targets**")
             with c2.popover("❓"):
-                st.markdown("Single Prints = 量能稀薄區，回填目標。Poor Highs/Lows = 弱極端值，無影線拒絕，價格會再回來測試。")
+                st.markdown("Single Prints = 量能稀薄區，回填目標。Poor Highs/Lows = 弱極端值，阻力/支撐未經考驗，容易被穿越。")
             if sp:
                 st.markdown(f"**Single Prints** ({len(sp)})")
                 for s in sp[:2]:
