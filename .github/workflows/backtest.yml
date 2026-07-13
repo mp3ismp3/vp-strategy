@@ -3,24 +3,11 @@ name: Backtest
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: 'Mode'
-        default: 'backtest'
-        type: choice
-        options:
-          - backtest
-          - optimize
-          - backtest_1h
-          - optimize_1h
-          - analyze_filters
-          - analyze_exits
-          - analyze_exits_1h
-          - analyze_filters_1h
       days:
         description: 'Days to backtest'
         default: '365'
       symbols:
-        description: 'Symbols (comma-separated, empty=all/top10)'
+        description: 'Symbols (comma-separated, empty=all)'
         default: ''
       max_hold:
         description: 'Max holding days'
@@ -40,56 +27,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install yfinance pandas numpy requests
+        run: pip install -r requirements.txt
 
       - name: Run backtest
-        if: ${{ github.event.inputs.mode == 'backtest' }}
         run: |
-          python backtest.py \
+          python backtest_multi.py \
             --days ${{ github.event.inputs.days }} \
             --max-hold ${{ github.event.inputs.max_hold }} \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run optimization
-        if: ${{ github.event.inputs.mode == 'optimize' }}
-        run: |
-          python optimize.py \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run 1H backtest
-        if: ${{ github.event.inputs.mode == 'backtest_1h' }}
-        run: |
-          python backtest_1h.py \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run 1H optimization
-        if: ${{ github.event.inputs.mode == 'optimize_1h' }}
-        run: |
-          python optimize_1h.py \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run filter analysis
-        if: ${{ github.event.inputs.mode == 'analyze_filters' }}
-        run: |
-          python analyze_filters.py \
-            --days ${{ github.event.inputs.days }} \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run exit analysis
-        if: ${{ github.event.inputs.mode == 'analyze_exits' }}
-        run: |
-          python analyze_exits.py \
-            --days ${{ github.event.inputs.days }} \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run 1H exit analysis
-        if: ${{ github.event.inputs.mode == 'analyze_exits_1h' }}
-        run: |
-          python analyze_exits_1h.py \
-            ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
-
-      - name: Run 1H filter analysis
-        if: ${{ github.event.inputs.mode == 'analyze_filters_1h' }}
-        run: |
-          python analyze_filters_1h.py \
             ${{ github.event.inputs.symbols && format('--symbols {0}', github.event.inputs.symbols) || '' }}
