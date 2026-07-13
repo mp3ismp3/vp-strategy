@@ -77,8 +77,8 @@ def main():
                         if sp:
                             result["single_prints"] = sp
 
-                # Poor highs/lows (doesn't need 1H)
-                phl = detect_poor_highs_lows(df)
+                # Poor highs/lows (uses 1H if available for accuracy)
+                phl = detect_poor_highs_lows(df, df_1h=df_1h)
                 if phl["poor_highs"] or phl["poor_lows"]:
                     result["poor_highs_lows"] = phl
 

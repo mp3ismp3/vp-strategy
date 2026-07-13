@@ -229,7 +229,7 @@ def render_scanner():
                 if sp:
                     vp["single_prints"] = sp
 
-        phl = detect_poor_highs_lows(df)
+        phl = detect_poor_highs_lows(df, df_1h=df_1h)
         if phl["poor_highs"] or phl["poor_lows"]:
             vp["poor_highs_lows"] = phl
 
