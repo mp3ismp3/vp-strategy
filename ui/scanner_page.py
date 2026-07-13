@@ -370,7 +370,19 @@ def _show_auction_info(vp):
             c1, c2 = st.columns([4, 1])
             c1.markdown("**Initial Balance**")
             with c2.popover("❓"):
-                st.markdown("開盤第一小時範圍。突破=趨勢日（順勢做），未突破=區間日。Wide=已走一段，Narrow=壓縮中。")
+                st.markdown(
+                    "**Initial Balance (IB)** = 開盤第一小時的最高與最低價形成的範圍。\n\n"
+                    "**Day Type 判讀：**\n"
+                    "- **balance** — 價格整天都在 IB 範圍內，適合區間操作（碰 IB High 做空、碰 IB Low 做多）\n"
+                    "- **directional_up** — 突破 IB High，趨勢日偏多，順勢做多，不要逆勢放空\n"
+                    "- **directional_down** — 跌破 IB Low，趨勢日偏空，順勢做空，不要逆勢做多\n"
+                    "- **double_break** — 兩側都突破，高波動日，謹慎觀望或縮小倉位\n\n"
+                    "**IB 寬度（today_relative）：**\n"
+                    "- **wide** — IB > 均值 1.3x，開盤已走一大段，追單風險高\n"
+                    "- **narrow** — IB < 均值 0.7x，壓縮狀態，突破後容易有大行情\n"
+                    "- **normal** — 正常範圍\n\n"
+                    "**Directional days %** = 過去 20 天有多少比例是趨勢日，越高代表近期市場越活躍。"
+                )
             if ib:
                 today = ib["today"]
                 stats = ib["stats"]
