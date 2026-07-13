@@ -21,6 +21,7 @@ from config import SYMBOLS
 from core.data_provider import YahooProvider
 from core.indicators import calc_vp
 from core.vp_multitf import compute_vp_multitf, resample_to_weekly, resample_to_monthly
+from core.auction import calc_va_migration, calc_initial_balance, detect_single_prints, detect_poor_highs_lows
 
 STATE_FILE = Path(__file__).parent.parent / "data" / "accum_state.json"
 RESULTS_FILE = Path(__file__).parent.parent / "data" / "scan_results.json"
@@ -33,6 +34,16 @@ def _download_symbol(symbol):
         provider = YahooProvider(max_workers=1, jitter=(0.1, 0.2))
         data = provider.batch_daily([symbol], period="1y")
         return data.get(symbol)
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _download_1h(symbol):
+    """Download 1H data for a symbol with 15-min cache. Returns DataFrame or None."""
+    try:
+        provider = YahooProvider(max_workers=1, jitter=(0.1, 0.2))
+        return provider.get_intraday(symbol, period="730d", interval="1h")
     except Exception:
         return None
 
@@ -196,6 +207,31 @@ def render_scanner():
         vp = compute_vp_multitf(df, va_pct=0.68)
         if not vp:
             continue
+
+        # Compute auction elements
+        df_1h = _download_1h(symbol)
+        if df_1h is not None and len(df_1h) >= 50:
+            mig = calc_va_migration(df, df_1h=df_1h)
+            if mig:
+                vp["va_migration"] = {
+                    "direction": mig["direction"],
+                    "speed": mig["speed"],
+                    "poc_shift": mig["poc_shift"],
+                }
+            ib = calc_initial_balance(df_1h)
+            if ib:
+                vp["ib"] = ib
+
+            # Single prints from daily histogram
+            daily_hist = vp.get("daily", {}).get("histogram")
+            if daily_hist:
+                sp = detect_single_prints(daily_hist["volumes"], daily_hist["prices"])
+                if sp:
+                    vp["single_prints"] = sp
+
+        phl = detect_poor_highs_lows(df)
+        if phl["poor_highs"] or phl["poor_lows"]:
+            vp["poor_highs_lows"] = phl
 
         # Symbol header
         price = vp["price"]
