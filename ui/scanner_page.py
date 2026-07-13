@@ -392,13 +392,23 @@ def _show_auction_info(vp):
                 for s in sp[:2]:
                     st.caption(f"🧲 ${s['price_start']} - ${s['price_end']} (fill target)")
             if phl:
+                sh = phl.get("strong_highs", [])
+                sl = phl.get("strong_lows", [])
                 ph = phl.get("poor_highs", [])
                 pl = phl.get("poor_lows", [])
+                if sh:
+                    st.markdown(f"**Strong Highs** ({len(sh)})")
+                    for p in sh[-2:]:
+                        st.caption(f"🔴 ${p['price']} ({p['date']}) — 阻力")
+                if sl:
+                    st.markdown(f"**Strong Lows** ({len(sl)})")
+                    for p in sl[-2:]:
+                        st.caption(f"🟢 ${p['price']} ({p['date']}) — 支撐")
                 if ph:
                     st.markdown(f"**Poor Highs** ({len(ph)})")
                     for p in ph[-2:]:
-                        st.caption(f"⬆️ ${p['price']} on {p['date']}")
+                        st.caption(f"⬆️ ${p['price']} ({p['date']}) — 弱阻力")
                 if pl:
                     st.markdown(f"**Poor Lows** ({len(pl)})")
                     for p in pl[-2:]:
-                        st.caption(f"⬇️ ${p['price']} on {p['date']}")
+                        st.caption(f"⬇️ ${p['price']} ({p['date']}) — 弱支撐")

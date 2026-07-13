@@ -259,18 +259,10 @@ def detect_single_prints(bin_volumes, bin_prices, threshold=0.10,
 
 
 def detect_poor_highs_lows(df, df_1h=None, lookback=20):
-    """Detect poor highs and poor lows using 1H session analysis.
+    """Detect poor AND strong highs/lows using 1H session analysis.
 
-    A "poor high" means the session ended near its high without being
-    tested/rejected — no excess (selling tail) at the top.
-
-    Professional criteria (using 1H bars):
-    1. Is a local high (highest in 5 days)
-    2. Last 1-2 bars of the session stayed near the high (no pullback)
-    3. No upper wick > 0.5 ATR on the session high bar (no excess)
-    4. Volume at least median level (meaningful move, not just noise)
-
-    Falls back to daily-only logic if 1H data unavailable.
+    Poor = no excess (untested extreme, easy to break through)
+    Strong = has excess (tested and rejected, real support/resistance)
 
     Args:
         df: Daily OHLCV DataFrame
@@ -279,28 +271,32 @@ def detect_poor_highs_lows(df, df_1h=None, lookback=20):
 
     Returns:
         {"poor_highs": [{"price": f, "date": str}],
-         "poor_lows": [{"price": f, "date": str}]}
+         "poor_lows": [{"price": f, "date": str}],
+         "strong_highs": [{"price": f, "date": str}],
+         "strong_lows": [{"price": f, "date": str}]}
     """
     if df is None or len(df) < lookback:
-        return {"poor_highs": [], "poor_lows": []}
+        return {"poor_highs": [], "poor_lows": [], "strong_highs": [], "strong_lows": []}
 
     from core.indicators import calc_atr
     atr = calc_atr(df, 14)
     if atr is None or atr <= 0:
-        return {"poor_highs": [], "poor_lows": []}
+        return {"poor_highs": [], "poor_lows": [], "strong_highs": [], "strong_lows": []}
 
     # If we have 1H data, use session-level analysis
     if df_1h is not None and len(df_1h) >= 50:
-        return _detect_poor_from_1h(df, df_1h, lookback, atr)
+        return _detect_from_1h(df, df_1h, lookback, atr)
 
-    # Fallback: daily-only (less accurate)
-    return _detect_poor_from_daily(df, lookback, atr)
+    # Fallback: daily-only
+    return _detect_from_daily(df, lookback, atr)
 
 
-def _detect_poor_from_1h(df, df_1h, lookback, atr):
-    """Detect poor highs/lows using intraday session analysis."""
+def _detect_from_1h(df, df_1h, lookback, atr):
+    """Detect poor AND strong highs/lows using intraday session analysis."""
     poor_highs = []
     poor_lows = []
+    strong_highs = []
+    strong_lows = []
 
     df_1h = df_1h.copy()
     df_1h["date"] = df_1h.index.date
@@ -317,11 +313,11 @@ def _detect_poor_from_1h(df, df_1h, lookback, atr):
         session_low = float(session["Low"].min())
         session_vol = float(session["Volume"].sum())
 
-        # Skip low volume sessions (noise)
+        # Skip low volume sessions
         if session_vol < median_vol * 0.5:
             continue
 
-        # Check if this is a local high/low (highest/lowest in 5-day window)
+        # Check if this is a local high/low
         date_idx = df.index.get_indexer([pd.Timestamp(date)], method="nearest")[0]
         if date_idx < 0 or date_idx >= len(df):
             continue
@@ -330,72 +326,83 @@ def _detect_poor_from_1h(df, df_1h, lookback, atr):
         local_high = df["High"].iloc[window_start:window_end].max()
         local_low = df["Low"].iloc[window_start:window_end].min()
 
-        # --- Poor High Detection ---
+        # --- High Analysis ---
         if session_high >= local_high * 0.998:
-            # Find the bar that made the high
             high_bar_idx = session["High"].idxmax()
             high_bar = session.loc[high_bar_idx]
 
-            # Check 1: No excess (upper wick < 0.5 ATR)
             upper_wick = float(high_bar["High"]) - max(float(high_bar["Close"]), float(high_bar["Open"]))
             has_excess = upper_wick > atr * 0.5
 
-            # Check 2: Session ended near the high (last 2 bars close > session_high - 0.3 ATR)
-            last_bars = session.tail(2)
-            last_close = float(last_bars["Close"].iloc[-1])
+            last_close = float(session.tail(1)["Close"].iloc[0])
             ended_near_high = last_close > session_high - atr * 0.3
 
-            # Check 3: No strong rejection after the high (no bar closed below session_high - 0.5 ATR)
             bars_after_high = session.loc[high_bar_idx:]
             if len(bars_after_high) > 1:
                 min_close_after = float(bars_after_high["Close"].iloc[1:].min())
-                no_rejection = min_close_after > session_high - atr * 0.5
+                was_rejected = min_close_after < session_high - atr * 0.5
             else:
-                no_rejection = True  # High was the last bar
+                was_rejected = False
 
-            if not has_excess and ended_near_high and no_rejection:
+            if has_excess or was_rejected:
+                # Strong High: clear selling rejection
+                strong_highs.append({
+                    "price": round(session_high, 2),
+                    "date": str(date),
+                })
+            elif ended_near_high and not was_rejected:
+                # Poor High: no rejection, untested
                 poor_highs.append({
                     "price": round(session_high, 2),
                     "date": str(date),
                 })
 
-        # --- Poor Low Detection ---
+        # --- Low Analysis ---
         if session_low <= local_low * 1.002:
-            # Find the bar that made the low
             low_bar_idx = session["Low"].idxmin()
             low_bar = session.loc[low_bar_idx]
 
-            # Check 1: No excess (lower wick < 0.5 ATR)
             lower_wick = min(float(low_bar["Close"]), float(low_bar["Open"])) - float(low_bar["Low"])
             has_excess = lower_wick > atr * 0.5
 
-            # Check 2: Session ended near the low
-            last_bars = session.tail(2)
-            last_close = float(last_bars["Close"].iloc[-1])
+            last_close = float(session.tail(1)["Close"].iloc[0])
             ended_near_low = last_close < session_low + atr * 0.3
 
-            # Check 3: No strong bounce after the low
             bars_after_low = session.loc[low_bar_idx:]
             if len(bars_after_low) > 1:
                 max_close_after = float(bars_after_low["Close"].iloc[1:].max())
-                no_bounce = max_close_after < session_low + atr * 0.5
+                was_bounced = max_close_after > session_low + atr * 0.5
             else:
-                no_bounce = True
+                was_bounced = False
 
-            if not has_excess and ended_near_low and no_bounce:
+            if has_excess or was_bounced:
+                # Strong Low: clear buying support
+                strong_lows.append({
+                    "price": round(session_low, 2),
+                    "date": str(date),
+                })
+            elif ended_near_low and not was_bounced:
+                # Poor Low: no support shown, untested
                 poor_lows.append({
                     "price": round(session_low, 2),
                     "date": str(date),
                 })
 
-    return {"poor_highs": poor_highs, "poor_lows": poor_lows}
+    return {
+        "poor_highs": poor_highs,
+        "poor_lows": poor_lows,
+        "strong_highs": strong_highs,
+        "strong_lows": strong_lows,
+    }
 
 
-def _detect_poor_from_daily(df, lookback, atr):
-    """Fallback: detect poor highs/lows from daily bars only (less accurate)."""
+def _detect_from_daily(df, lookback, atr):
+    """Fallback: detect poor and strong highs/lows from daily bars only."""
     recent = df.tail(lookback)
     poor_highs = []
     poor_lows = []
+    strong_highs = []
+    strong_lows = []
 
     for i in range(len(recent)):
         row = recent.iloc[i]
@@ -407,24 +414,45 @@ def _detect_poor_from_daily(df, lookback, atr):
         upper_wick = h - max(c, o)
         lower_wick = min(c, o) - l
 
-        # Poor high: close near high + no excess (upper wick < 0.3 ATR) + is local high
-        if (c > h - atr * 0.2) and (upper_wick < atr * 0.3):
-            idx = len(df) - lookback + i
-            local_window = df["High"].iloc[max(0, idx - 2):min(len(df), idx + 3)]
-            if h >= local_window.max() * 0.998:
+        idx = len(df) - lookback + i
+        window_start = max(0, idx - 2)
+        window_end = min(len(df), idx + 3)
+
+        # --- High Analysis ---
+        local_high = df["High"].iloc[window_start:window_end].max()
+        if h >= local_high * 0.998:
+            if upper_wick > atr * 0.5:
+                # Strong High: clear rejection
+                strong_highs.append({
+                    "price": round(float(h), 2),
+                    "date": str(recent.index[i].date()),
+                })
+            elif c > h - atr * 0.2 and upper_wick < atr * 0.3:
+                # Poor High: no rejection
                 poor_highs.append({
                     "price": round(float(h), 2),
                     "date": str(recent.index[i].date()),
                 })
 
-        # Poor low: close near low + no excess (lower wick < 0.3 ATR) + is local low
-        if (c < l + atr * 0.2) and (lower_wick < atr * 0.3):
-            idx = len(df) - lookback + i
-            local_window = df["Low"].iloc[max(0, idx - 2):min(len(df), idx + 3)]
-            if l <= local_window.min() * 1.002:
+        # --- Low Analysis ---
+        local_low = df["Low"].iloc[window_start:window_end].min()
+        if l <= local_low * 1.002:
+            if lower_wick > atr * 0.5:
+                # Strong Low: clear support
+                strong_lows.append({
+                    "price": round(float(l), 2),
+                    "date": str(recent.index[i].date()),
+                })
+            elif c < l + atr * 0.2 and lower_wick < atr * 0.3:
+                # Poor Low: no support
                 poor_lows.append({
                     "price": round(float(l), 2),
                     "date": str(recent.index[i].date()),
                 })
 
-    return {"poor_highs": poor_highs, "poor_lows": poor_lows}
+    return {
+        "poor_highs": poor_highs,
+        "poor_lows": poor_lows,
+        "strong_highs": strong_highs,
+        "strong_lows": strong_lows,
+    }
