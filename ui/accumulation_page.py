@@ -239,12 +239,77 @@ def _create_accumulation_chart(symbol, df, state_info):
 
 def render_accumulation():
     """Render the accumulation tracker visualization page."""
-    st.title("🔍 Accumulation Tracker — Top 10")
+    st.title("🔍 Accumulation Tracker")
 
     state = _load_state()
     if not state:
         st.warning("⚠️ 無追蹤狀態 — 請先執行 `python accumulation.py` 產生 data/accum_state.json")
         return
+
+    # ─── Manual Symbol Lookup ───
+    st.subheader("🔎 查詢個股")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        lookup_symbol = st.text_input(
+            "輸入 Symbol（如 ZS, NVDA, AMD）",
+            placeholder="ZS",
+            key="lookup_input",
+        ).upper().strip()
+    with col2:
+        st.write("")  # spacer
+        lookup_btn = st.button("查看圖表", key="lookup_btn")
+
+    if lookup_btn and lookup_symbol:
+        state_info = state.get(lookup_symbol)
+        if state_info and isinstance(state_info, dict):
+            # Use tracked state info
+            item = {
+                "symbol": lookup_symbol,
+                "tier": state_info.get("tier", "watch"),
+                "decay_score": state_info.get("decay_score", 0),
+                "phase": state_info.get("phase", "?"),
+                "support_primary": state_info.get("support_primary"),
+                "support_dynamic": state_info.get("support_dynamic"),
+                "resistance": state_info.get("resistance"),
+                "raw_history": state_info.get("raw_history", []),
+            }
+        else:
+            # Not tracked — show chart without state info
+            item = {
+                "symbol": lookup_symbol,
+                "tier": "未追蹤",
+                "decay_score": 0,
+                "phase": "?",
+                "support_primary": None,
+                "support_dynamic": None,
+                "resistance": None,
+                "raw_history": [],
+            }
+
+        with st.spinner(f"Loading {lookup_symbol}..."):
+            df = _download_data(lookup_symbol)
+
+        if df is None or df.empty:
+            st.error(f"❌ 無法下載 {lookup_symbol} 數據，請確認 symbol 是否正確")
+        else:
+            fig = _create_accumulation_chart(lookup_symbol, df, item)
+            st.plotly_chart(fig, use_container_width=True, key=f"chart_lookup_{lookup_symbol}")
+
+            phase_desc = {
+                "A": "🛑 Phase A — 停止下跌",
+                "B": "🔨 Phase B — 區間震盪吸籌中",
+                "C": "🌊 Phase C — 彈簧測試（假跌破洗盤）",
+                "D": "📈 Phase D — Higher Lows，趨勢啟動",
+                "E": "🚀 Phase E — 突破確認，已起飛",
+                "UNKNOWN": "❓ 不在明確吸籌結構中",
+                "?": "— 未追蹤",
+            }
+            st.caption(phase_desc.get(item["phase"], f"Phase {item['phase']}"))
+
+        st.divider()
+
+    # ─── Top 10 ───
+    st.subheader("📊 Top 10 追蹤標的")
 
     top_symbols = _get_top_symbols(state, n=10)
 
