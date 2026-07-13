@@ -350,22 +350,14 @@ def _show_auction_info(vp):
         return
 
     with st.expander("🏛️ Auction Analysis", expanded=False):
-        with st.popover("❓"):
-            st.markdown("""
-**VA Migration** — 公允價格移動方向+速度。up=趨勢多，down=趨勢空，flat=區間。Speed > 2 = 強趨勢不要逆勢。
-
-**Initial Balance** — 開盤第一小時範圍。突破=趨勢日（順勢做），未突破=區間日。Wide=已走一段，Narrow=壓縮中。
-
-**Single Prints** — 量能稀薄區，市場快速穿越未接受，未來很可能回填（磁吸目標）。
-
-**Poor Highs/Lows** — 弱極端值，無影線拒絕=未完成的測試，價格會再回來。
-            """)
-
         cols = st.columns(3)
 
         # VA Migration
         with cols[0]:
-            st.markdown("**VA Migration**")
+            c1, c2 = st.columns([4, 1])
+            c1.markdown("**VA Migration**")
+            with c2.popover("❓"):
+                st.markdown("公允價格移動方向+速度。up=趨勢多，down=趨勢空，flat=區間。Speed > 2 = 強趨勢不要逆勢。")
             if mig:
                 dir_emoji = "📈" if mig["direction"] == "up" else "📉" if mig["direction"] == "down" else "➡️"
                 st.markdown(f"{dir_emoji} Direction: **{mig['direction']}**")
@@ -375,7 +367,10 @@ def _show_auction_info(vp):
 
         # Initial Balance
         with cols[1]:
-            st.markdown("**Initial Balance**")
+            c1, c2 = st.columns([4, 1])
+            c1.markdown("**Initial Balance**")
+            with c2.popover("❓"):
+                st.markdown("開盤第一小時範圍。突破=趨勢日（順勢做），未突破=區間日。Wide=已走一段，Narrow=壓縮中。")
             if ib:
                 today = ib["today"]
                 stats = ib["stats"]
@@ -388,7 +383,10 @@ def _show_auction_info(vp):
 
         # Single Prints + Poor Highs/Lows
         with cols[2]:
-            st.markdown("**Price Targets**")
+            c1, c2 = st.columns([4, 1])
+            c1.markdown("**Price Targets**")
+            with c2.popover("❓"):
+                st.markdown("Single Prints = 量能稀薄區，回填目標。Poor Highs/Lows = 弱極端值，無影線拒絕，價格會再回來測試。")
             if sp:
                 st.markdown(f"**Single Prints** ({len(sp)})")
                 for s in sp[:2]:
