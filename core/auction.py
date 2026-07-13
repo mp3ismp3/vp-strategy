@@ -285,10 +285,58 @@ def detect_poor_highs_lows(df, df_1h=None, lookback=20):
 
     # If we have 1H data, use session-level analysis
     if df_1h is not None and len(df_1h) >= 50:
-        return _detect_from_1h(df, df_1h, lookback, atr)
+        result = _detect_from_1h(df, df_1h, lookback, atr)
+    else:
+        result = _detect_from_daily(df, lookback, atr)
 
-    # Fallback: daily-only
-    return _detect_from_daily(df, lookback, atr)
+    # Merge overlapping Strong/Poor at same price level (< 0.5 ATR apart)
+    return _merge_overlapping(result, atr)
+
+
+def _merge_overlapping(result, atr):
+    """Merge Strong and Poor at same price level into contextual signals.
+
+    If a Strong and Poor exist within 0.5 ATR of each other:
+    - Strong High + Poor High nearby → "阻力弱化中" (resistance weakening)
+    - Strong Low + Poor Low nearby → "支撐弱化中" (support weakening)
+
+    The Poor entry is removed, and the Strong entry gets a 'weakening' flag.
+    """
+    threshold = atr * 0.5
+
+    # Process Highs
+    strong_h = result["strong_highs"]
+    poor_h = result["poor_highs"]
+    merged_poor_h = []
+    for ph in poor_h:
+        merged = False
+        for sh in strong_h:
+            if abs(ph["price"] - sh["price"]) < threshold:
+                # Same level tested: strong then poor = weakening
+                sh["status"] = "weakening"
+                merged = True
+                break
+        if not merged:
+            merged_poor_h.append(ph)
+    result["poor_highs"] = merged_poor_h
+
+    # Process Lows
+    strong_l = result["strong_lows"]
+    poor_l = result["poor_lows"]
+    merged_poor_l = []
+    for pl in poor_l:
+        merged = False
+        for sl in strong_l:
+            if abs(pl["price"] - sl["price"]) < threshold:
+                # Same level tested: strong then poor = weakening
+                sl["status"] = "weakening"
+                merged = True
+                break
+        if not merged:
+            merged_poor_l.append(pl)
+    result["poor_lows"] = merged_poor_l
+
+    return result
 
 
 def _detect_from_1h(df, df_1h, lookback, atr):

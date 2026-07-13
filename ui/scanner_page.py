@@ -399,11 +399,13 @@ def _show_auction_info(vp):
                 if sh:
                     st.markdown(f"**Strong Highs** ({len(sh)})")
                     for p in sh[-2:]:
-                        st.caption(f"🔴 ${p['price']} ({p['date']}) — 阻力")
+                        status = " ⚠️弱化中" if p.get("status") == "weakening" else ""
+                        st.caption(f"🔴 ${p['price']} ({p['date']}) — 阻力{status}")
                 if sl:
                     st.markdown(f"**Strong Lows** ({len(sl)})")
                     for p in sl[-2:]:
-                        st.caption(f"🟢 ${p['price']} ({p['date']}) — 支撐")
+                        status = " ⚠️弱化中" if p.get("status") == "weakening" else ""
+                        st.caption(f"🟢 ${p['price']} ({p['date']}) — 支撐{status}")
                 if ph:
                     st.markdown(f"**Poor Highs** ({len(ph)})")
                     for p in ph[-2:]:
