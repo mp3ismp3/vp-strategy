@@ -3,6 +3,12 @@
 Run: streamlit run ui/app.py
 """
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path so `from ui.xxx` works
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
 
 st.set_page_config(
@@ -80,6 +86,7 @@ st.markdown(
         <a href="/" target="_self">HOME</a>
         <a href="/?page=scanner" target="_self">SCANNER</a>
         <a href="/?page=accumulation" target="_self">ACCUMULATION</a>
+        <a href="/?page=fusion" target="_self">FUSION</a>
     </div>
     """,
     unsafe_allow_html=True,
@@ -94,6 +101,9 @@ if page == "scanner":
 elif page == "accumulation":
     from ui.accumulation_page import render_accumulation
     render_accumulation()
+elif page == "fusion":
+    from ui.fusion_page import render_fusion
+    render_fusion()
 else:
     # Home
     st.markdown(
@@ -108,6 +118,7 @@ else:
         <div class="bottom-nav">
             <a href="/?page=scanner" target="_self">SCANNER</a>
             <a href="/?page=accumulation" target="_self">ACCUMULATION</a>
+            <a href="/?page=fusion" target="_self">FUSION</a>
         </div>
         """,
         unsafe_allow_html=True,
