@@ -4,9 +4,17 @@ import path from "path";
 
 export async function GET() {
   try {
-    // 讀取分析結果 JSON（相對於專案根目錄往上兩層到 vp-strategy/data/）
-    const dataPath = path.join(process.cwd(), "../../data/scan_results.json");
-    const raw = await fs.readFile(dataPath, "utf-8");
+    // Try local data path first (dev), then public dir (Vercel)
+    let raw: string;
+    const localPath = path.join(process.cwd(), "../../data/scan_results.json");
+    const publicPath = path.join(process.cwd(), "public/scan_results.json");
+
+    try {
+      raw = await fs.readFile(localPath, "utf-8");
+    } catch {
+      raw = await fs.readFile(publicPath, "utf-8");
+    }
+
     const data = JSON.parse(raw);
 
     // 轉換格式給前端用

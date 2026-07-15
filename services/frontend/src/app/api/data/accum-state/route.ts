@@ -4,8 +4,16 @@ import path from "path";
 
 export async function GET() {
   try {
-    const dataPath = path.join(process.cwd(), "../../data/accum_state.json");
-    const raw = await fs.readFile(dataPath, "utf-8");
+    let raw: string;
+    const localPath = path.join(process.cwd(), "../../data/accum_state.json");
+    const publicPath = path.join(process.cwd(), "public/accum_state.json");
+
+    try {
+      raw = await fs.readFile(localPath, "utf-8");
+    } catch {
+      raw = await fs.readFile(publicPath, "utf-8");
+    }
+
     const data = JSON.parse(raw);
 
     // 轉換 dict → array

@@ -6,8 +6,16 @@ export async function GET(req: NextRequest) {
   const ticker = req.nextUrl.searchParams.get("ticker");
 
   try {
-    const dataPath = path.join(process.cwd(), "../../data/frontend_charts.json");
-    const raw = await fs.readFile(dataPath, "utf-8");
+    let raw: string;
+    const localPath = path.join(process.cwd(), "../../data/frontend_charts.json");
+    const publicPath = path.join(process.cwd(), "public/frontend_charts.json");
+
+    try {
+      raw = await fs.readFile(localPath, "utf-8");
+    } catch {
+      raw = await fs.readFile(publicPath, "utf-8");
+    }
+
     const data = JSON.parse(raw);
 
     if (ticker) {

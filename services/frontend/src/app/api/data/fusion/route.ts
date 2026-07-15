@@ -36,13 +36,25 @@ function getMacroDirection(vp: any): string {
 
 export async function GET() {
   try {
-    const scanPath = path.join(process.cwd(), "../../data/scan_results.json");
-    const accumPath = path.join(process.cwd(), "../../data/accum_state.json");
+    let scanRaw: string;
+    let accumRaw: string;
 
-    const [scanRaw, accumRaw] = await Promise.all([
-      fs.readFile(scanPath, "utf-8"),
-      fs.readFile(accumPath, "utf-8"),
-    ]);
+    const scanLocal = path.join(process.cwd(), "../../data/scan_results.json");
+    const scanPublic = path.join(process.cwd(), "public/scan_results.json");
+    const accumLocal = path.join(process.cwd(), "../../data/accum_state.json");
+    const accumPublic = path.join(process.cwd(), "public/accum_state.json");
+
+    try {
+      scanRaw = await fs.readFile(scanLocal, "utf-8");
+    } catch {
+      scanRaw = await fs.readFile(scanPublic, "utf-8");
+    }
+
+    try {
+      accumRaw = await fs.readFile(accumLocal, "utf-8");
+    } catch {
+      accumRaw = await fs.readFile(accumPublic, "utf-8");
+    }
 
     const scanData = JSON.parse(scanRaw);
     const accumState = JSON.parse(accumRaw);
