@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plan } from "@/types/user";
 import { hasAccess, isSubscriptionActive } from "@/lib/plans";
@@ -12,8 +13,27 @@ interface PaywallProps {
 
 export function Paywall({ requiredPlan, children }: PaywallProps) {
   const { data: session, status } = useSession();
+  const [realPlan, setRealPlan] = useState<string | null>(null);
+  const [realStatus, setRealStatus] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (session) {
+      // Always fetch real-time plan from DB
+      fetch("/api/user/plan")
+        .then((res) => res.json())
+        .then((data) => {
+          setRealPlan(data.plan);
+          setRealStatus(data.subscriptionStatus);
+          setChecking(false);
+        })
+        .catch(() => setChecking(false));
+    } else {
+      setChecking(false);
+    }
+  }, [session]);
+
+  if (status === "loading" || checking) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
@@ -36,9 +56,8 @@ export function Paywall({ requiredPlan, children }: PaywallProps) {
     );
   }
 
-  const user = session.user as any;
-  const userPlan: Plan = user?.plan || "free";
-  const subscriptionStatus = user?.subscriptionStatus || "inactive";
+  const userPlan = (realPlan || "free") as Plan;
+  const subscriptionStatus = realStatus || "inactive";
 
   if (!isSubscriptionActive(subscriptionStatus) && userPlan !== "free") {
     return (
