@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  telegram-bot:
+    build: ../services/telegram-bot
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - ../data:/app/data:ro  # 讀取分析結果 JSON

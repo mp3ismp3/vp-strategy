@@ -35,10 +35,22 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python accumulation.py --notify
 
-      - name: Persist accumulation state
+      - name: Export frontend chart data
+        run: python export_frontend_data.py
+
+      - name: Notify subscribers (Telegram DM)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install python-telegram-bot supabase python-dotenv
+          python services/telegram-bot/notification_router.py
+
+      - name: Persist state and chart data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f data/accum_state.json
-          git diff --cached --quiet || git commit -m "chore: update accum_state.json [skip ci]"
+          git add -f data/accum_state.json data/frontend_charts.json
+          git diff --cached --quiet || git commit -m "chore: update accum_state.json + frontend_charts.json [skip ci]"
           git push
