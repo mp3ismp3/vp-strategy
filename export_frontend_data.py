@@ -27,16 +27,21 @@ OUTPUT_FILE = DATA_DIR / "frontend_charts.json"
 
 def _df_to_ohlc(df: pd.DataFrame, n_bars: int) -> list[dict]:
     """Convert last n_bars of DataFrame to OHLC list for frontend."""
+    import math
     tail = df.tail(n_bars)
     records = []
     for ts, row in tail.iterrows():
+        o, h, l, c, v = float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"]), float(row["Volume"])
+        # Skip bars with NaN
+        if math.isnan(o) or math.isnan(h) or math.isnan(l) or math.isnan(c):
+            continue
         records.append({
             "time": ts.strftime("%Y-%m-%d"),
-            "open": round(float(row["Open"]), 2),
-            "high": round(float(row["High"]), 2),
-            "low": round(float(row["Low"]), 2),
-            "close": round(float(row["Close"]), 2),
-            "volume": int(row["Volume"]),
+            "open": round(o, 2),
+            "high": round(h, 2),
+            "low": round(l, 2),
+            "close": round(c, 2),
+            "volume": int(v) if not math.isnan(v) else 0,
         })
     return records
 
@@ -120,7 +125,10 @@ def main():
 
     # Save
     DATA_DIR.mkdir(exist_ok=True)
-    OUTPUT_FILE.write_text(json.dumps(charts, indent=2, ensure_ascii=False))
+    # Replace NaN with null for valid JSON
+    json_str = json.dumps(charts, indent=2, ensure_ascii=False)
+    json_str = json_str.replace(": NaN", ": null")
+    OUTPUT_FILE.write_text(json_str)
     size_mb = OUTPUT_FILE.stat().st_size / 1024 / 1024
     print(f"\n  Saved {len(charts)} symbols to {OUTPUT_FILE} ({size_mb:.1f} MB)")
 

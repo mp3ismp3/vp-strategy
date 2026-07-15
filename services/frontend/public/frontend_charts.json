@@ -1,6 +1,6 @@
 {
   "AAPL": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -474,21 +474,13 @@
           "low": 315.78,
           "close": 317.31,
           "volume": 43257800
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 36328962
         }
       ],
       "poc": 312.36,
       "vah": 317.61,
       "val": 286.09,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           265.65,
@@ -1019,7 +1011,7 @@
       "vah": 298.9,
       "val": 243.66,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           201.32,
@@ -1330,7 +1322,7 @@
       "vah": 290.31,
       "val": 242.44,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           201.32,
@@ -1540,7 +1532,7 @@
     }
   },
   "MSFT": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -2014,21 +2006,13 @@
           "low": 384.15,
           "close": 390.99,
           "volume": 28914900
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 27858198
         }
       ],
       "poc": 416.5,
       "vah": 433.11,
       "val": 384.16,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           350.07,
@@ -2593,7 +2577,7 @@
       "vah": 478.38,
       "val": 355.26,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           350.21,
@@ -2612,7 +2596,7 @@
           376.45,
           378.47,
           380.49,
-          382.51,
+          382.5,
           384.52,
           386.54,
           388.56,
@@ -2645,7 +2629,7 @@
           443.06,
           445.08,
           447.1,
-          449.12,
+          449.11,
           451.13,
           453.15,
           455.17,
@@ -2904,7 +2888,7 @@
       "vah": 473.84,
       "val": 355.23,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           350.21,
@@ -3114,7 +3098,7 @@
     }
   },
   "GOOGL": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -3588,21 +3572,13 @@
           "low": 351.75,
           "close": 352.51,
           "volume": 15901700
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 18258427
         }
       ],
       "poc": 385.71,
       "vah": 403.38,
       "val": 354.97,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           332.07,
@@ -4151,7 +4127,7 @@
       "vah": 395.0,
       "val": 272.49,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           186.73,
@@ -4462,7 +4438,7 @@
       "vah": 377.41,
       "val": 269.09,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           188.39,
@@ -4672,7 +4648,7 @@
     }
   },
   "AMZN": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -5146,21 +5122,13 @@
           "low": 244.18,
           "close": 247.31,
           "volume": 34636100
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 30103335
         }
       ],
       "poc": 262.76,
       "vah": 274.48,
       "val": 242.88,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           226.06,
@@ -5695,7 +5663,7 @@
       "vah": 249.66,
       "val": 213.34,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           196.41,
@@ -6006,7 +5974,7 @@
       "vah": 246.36,
       "val": 211.69,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           196.41,
@@ -7009,7 +6977,7 @@
         {
           "time": "2026-01-11",
           "open": 649.85,
-          "high": 664.34,
+          "high": 664.33,
           "low": 634.59,
           "close": 651.9,
           "volume": 59691000
@@ -7756,7 +7724,7 @@
     }
   },
   "NVDA": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -8230,21 +8198,13 @@
           "low": 203.0,
           "close": 203.53,
           "volume": 121411000
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 124363999
         }
       ],
       "poc": 201.49,
       "vah": 216.91,
       "val": 196.34,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           190.27,
@@ -8775,7 +8735,7 @@
       "vah": 193.54,
       "val": 169.64,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           164.21,
@@ -9086,7 +9046,7 @@
       "vah": 197.16,
       "val": 168.92,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           164.21,
@@ -9296,7 +9256,7 @@
     }
   },
   "TSLA": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -9770,21 +9730,13 @@
           "low": 391.37,
           "close": 394.76,
           "volume": 32809200
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 23374603
         }
       ],
       "poc": 393.52,
       "vah": 417.65,
       "val": 371.17,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           364.91,
@@ -10315,7 +10267,7 @@
       "vah": 458.63,
       "val": 374.2,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           298.83,
@@ -10626,7 +10578,7 @@
       "vah": 462.65,
       "val": 378.22,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           298.83,
@@ -10836,7 +10788,7 @@
     }
   },
   "AVGO": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -11310,21 +11262,13 @@
           "low": 383.42,
           "close": 384.05,
           "volume": 21294500
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 20117716
         }
       ],
       "poc": 415.64,
       "vah": 424.46,
       "val": 376.59,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           357.69,
@@ -11865,7 +11809,7 @@
       "vah": 378.15,
       "val": 297.8,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           272.13,
@@ -12176,7 +12120,7 @@
       "vah": 384.74,
       "val": 294.59,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           280.63,
@@ -12386,7 +12330,7 @@
     }
   },
   "AMD": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -12860,21 +12804,13 @@
           "low": 526.92,
           "close": 534.39,
           "volume": 22957400
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 21197800
         }
       ],
       "poc": 519.08,
       "vah": 559.72,
       "val": 397.17,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           275.26,
@@ -13405,7 +13341,7 @@
       "vah": 266.81,
       "val": 162.29,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           151.4,
@@ -13716,7 +13652,7 @@
       "vah": 249.39,
       "val": 149.22,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           151.4,
@@ -13926,7 +13862,7 @@
     }
   },
   "INTC": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -14400,21 +14336,13 @@
           "low": 101.79,
           "close": 103.12,
           "volume": 100988800
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 91105659
         }
       ],
       "poc": 108.02,
       "vah": 132.53,
       "val": 103.12,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           65.52,
@@ -14987,7 +14915,7 @@
       "vah": 54.75,
       "val": 18.97,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           19.59,
@@ -15298,7 +15226,7 @@
       "vah": 57.22,
       "val": 18.97,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           19.59,
@@ -15508,7 +15436,7 @@
     }
   },
   "QCOM": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -15982,21 +15910,13 @@
           "low": 181.81,
           "close": 183.98,
           "volume": 13007300
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 13089478
         }
       ],
       "poc": 202.46,
       "vah": 232.4,
       "val": 174.13,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           132.86,
@@ -16585,7 +16505,7 @@
       "vah": 190.25,
       "val": 125.66,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           122.23,
@@ -16896,7 +16816,7 @@
       "vah": 195.75,
       "val": 131.16,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           122.23,
@@ -17106,7 +17026,7 @@
     }
   },
   "MU": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -17580,21 +17500,13 @@
           "low": 902.6,
           "close": 937.0,
           "volume": 35536200
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 30820913
         }
       ],
       "poc": 928.4,
       "vah": 1244.63,
       "val": 746.95,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           441.08,
@@ -18183,7 +18095,7 @@
       "vah": 506.27,
       "val": 103.21,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           108.97,
@@ -18494,7 +18406,7 @@
       "vah": 529.3,
       "val": 103.21,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           108.97,
@@ -18704,7 +18616,7 @@
     }
   },
   "MRVL": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -19178,21 +19090,13 @@
           "low": 215.28,
           "close": 217.53,
           "volume": 25615300
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 20697914
         }
       ],
       "poc": 165.48,
       "vah": 284.92,
       "val": 144.4,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           134.57,
@@ -19763,7 +19667,7 @@
       "vah": 184.81,
       "val": 61.31,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           62.65,
@@ -20074,7 +19978,7 @@
       "vah": 195.55,
       "val": 61.31,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           62.65,
@@ -21924,7 +21828,7 @@
     }
   },
   "TSM": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -22398,21 +22302,13 @@
           "low": 420.29,
           "close": 421.58,
           "volume": 14329800
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 14275793
         }
       ],
       "poc": 438.84,
       "vah": 444.57,
       "val": 394.08,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           365.4,
@@ -22573,7 +22469,7 @@
         {
           "time": "2025-09-07",
           "open": 223.68,
-          "high": 241.88,
+          "high": 241.87,
           "low": 223.16,
           "close": 240.75,
           "volume": 41471900
@@ -22943,7 +22839,7 @@
       "vah": 401.68,
       "val": 254.76,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           222.54,
@@ -23254,7 +23150,7 @@
       "vah": 404.25,
       "val": 262.49,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           222.54,
@@ -23464,7 +23360,7 @@
     }
   },
   "ASML": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -23938,21 +23834,13 @@
           "low": 1718.08,
           "close": 1726.04,
           "volume": 1419800
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 2528275
         }
       ],
       "poc": 1769.56,
       "vah": 1950.14,
       "val": 1539.16,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           1371.03,
@@ -24485,7 +24373,7 @@
       "vah": 1432.33,
       "val": 679.89,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           686.49,
@@ -24796,7 +24684,7 @@
       "vah": 1551.13,
       "val": 904.3,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           686.49,
@@ -25006,7 +24894,7 @@
     }
   },
   "AMAT": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -25480,21 +25368,13 @@
           "low": 568.15,
           "close": 575.39,
           "volume": 7561700
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 6512818
         }
       ],
       "poc": 590.54,
       "vah": 669.49,
       "val": 429.71,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           379.99,
@@ -25737,7 +25617,7 @@
           "open": 226.14,
           "high": 230.3,
           "low": 215.11,
-          "close": 227.73,
+          "close": 227.74,
           "volume": 29899000
         },
         {
@@ -26049,7 +25929,7 @@
       "vah": 376.42,
       "val": 153.78,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           156.71,
@@ -26360,7 +26240,7 @@
       "vah": 376.42,
       "val": 153.78,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           156.71,
@@ -26570,7 +26450,7 @@
     }
   },
   "LRCX": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -27044,21 +26924,13 @@
           "low": 326.9,
           "close": 329.92,
           "volume": 9770500
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 10698736
         }
       ],
       "poc": 320.0,
       "vah": 402.04,
       "val": 289.0,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           243.42,
@@ -27597,7 +27469,7 @@
       "vah": 236.62,
       "val": 90.44,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           92.18,
@@ -27908,7 +27780,7 @@
       "vah": 237.51,
       "val": 91.96,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           93.69,
@@ -28118,7 +27990,7 @@
     }
   },
   "KLAC": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -28592,21 +28464,13 @@
           "low": 218.89,
           "close": 222.25,
           "volume": 9947500
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 9032656
         }
       ],
       "poc": 243.01,
       "vah": 279.29,
       "val": 227.8,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           165.77,
@@ -29159,7 +29023,7 @@
       "vah": 159.2,
       "val": 82.87,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           83.99,
@@ -29470,7 +29334,7 @@
       "vah": 161.45,
       "val": 82.87,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           83.99,
@@ -29680,7 +29544,7 @@
     }
   },
   "ON": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -30154,21 +30018,13 @@
           "low": 90.09,
           "close": 90.37,
           "volume": 9568900
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 7632596
         }
       ],
       "poc": 102.61,
       "vah": 116.83,
       "val": 87.53,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           80.21,
@@ -30727,7 +30583,7 @@
       "vah": 82.51,
       "val": 44.56,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           45.01,
@@ -31038,7 +30894,7 @@
       "vah": 85.22,
       "val": 44.56,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           45.01,
@@ -48374,7 +48230,7 @@
     }
   },
   "FTNT": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -48848,21 +48704,13 @@
           "low": 155.72,
           "close": 160.62,
           "volume": 4099000
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 4685098
         }
       ],
       "poc": 146.2,
       "vah": 167.27,
       "val": 115.32,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           81.51,
@@ -49469,7 +49317,7 @@
       "vah": 87.25,
       "val": 75.83,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           70.6,
@@ -49780,7 +49628,7 @@
       "vah": 88.2,
       "val": 74.88,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           70.6,
@@ -53002,7 +52850,7 @@
     }
   },
   "CRM": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -53476,21 +53324,13 @@
           "low": 165.92,
           "close": 171.22,
           "volume": 14020700
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 13507821
         }
       ],
       "poc": 182.08,
       "vah": 191.83,
       "val": 164.53,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           146.97,
@@ -54021,7 +53861,7 @@
       "vah": 235.34,
       "val": 146.32,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           146.95,
@@ -54332,7 +54172,7 @@
       "vah": 233.75,
       "val": 146.32,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           146.93,
@@ -57622,7 +57462,7 @@
     }
   },
   "ADBE": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -58096,21 +57936,13 @@
           "low": 225.0,
           "close": 230.61,
           "volume": 4624000
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 5823312
         }
       ],
       "poc": 243.64,
       "vah": 266.13,
       "val": 207.18,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           190.9,
@@ -58651,7 +58483,7 @@
       "vah": 333.37,
       "val": 190.12,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           191.05,
@@ -58962,7 +58794,7 @@
       "vah": 370.86,
       "val": 251.57,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           191.02,
@@ -59172,7 +59004,7 @@
     }
   },
   "ORCL": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -59646,21 +59478,13 @@
           "low": 131.35,
           "close": 131.54,
           "volume": 56690300
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 52647895
         }
       ],
       "poc": 183.94,
       "vah": 207.37,
       "val": 144.55,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           128.1,
@@ -60337,7 +60161,7 @@
       "vah": 217.64,
       "val": 135.56,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           132.4,
@@ -60648,7 +60472,7 @@
       "vah": 219.75,
       "val": 133.45,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           132.4,
@@ -60858,7 +60682,7 @@
     }
   },
   "IBM": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -61332,21 +61156,13 @@
           "low": 289.1,
           "close": 290.23,
           "volume": 5024200
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 67422893
         }
       ],
       "poc": 227.96,
       "vah": 274.8,
       "val": 212.34,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           213.54,
@@ -61877,7 +61693,7 @@
       "vah": 312.04,
       "val": 245.97,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           212.94,
@@ -62188,7 +62004,7 @@
       "vah": 313.24,
       "val": 245.97,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           212.94,
@@ -62398,7 +62214,7 @@
     }
   },
   "INTU": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -62872,21 +62688,13 @@
           "low": 278.7,
           "close": 289.76,
           "volume": 6564700
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 5302343
         }
       ],
       "poc": 310.32,
       "vah": 332.03,
       "val": 263.06,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           254.12,
@@ -63114,7 +62922,7 @@
           "time": "2025-10-05",
           "open": 692.27,
           "high": 696.14,
-          "low": 660.93,
+          "low": 660.94,
           "close": 672.39,
           "volume": 9929700
         },
@@ -63451,7 +63259,7 @@
       "vah": 533.72,
       "val": 251.72,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           254.49,
@@ -63762,7 +63570,7 @@
       "vah": 502.49,
       "val": 251.72,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           254.39,
@@ -70226,7 +70034,7 @@
     }
   },
   "SMCI": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -70700,21 +70508,13 @@
           "low": 27.22,
           "close": 27.66,
           "volume": 22796300
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 22410958
         }
       ],
       "poc": 29.13,
       "vah": 34.14,
       "val": 26.68,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           25.51,
@@ -71389,7 +71189,7 @@
       "vah": 41.78,
       "val": 20.34,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           19.69,
@@ -71700,7 +71500,7 @@
       "vah": 43.43,
       "val": 21.48,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           19.68,
@@ -79636,7 +79436,7 @@
     }
   },
   "NRG": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -80110,21 +79910,13 @@
           "low": 137.57,
           "close": 139.48,
           "volume": 1486100
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 1790710
         }
       ],
       "poc": 137.03,
       "vah": 145.25,
       "val": 120.11,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           120.59,
@@ -80661,7 +80453,7 @@
       "vah": 170.68,
       "val": 144.35,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           120.46,
@@ -80972,7 +80764,7 @@
       "vah": 170.68,
       "val": 142.28,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           120.46,
@@ -81182,7 +80974,7 @@
     }
   },
   "ETN": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -81656,21 +81448,13 @@
           "low": 397.1,
           "close": 402.85,
           "volume": 1682900
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 1918562
         }
       ],
       "poc": 407.03,
       "vah": 421.54,
       "val": 395.28,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           368.33,
@@ -82201,7 +81985,7 @@
       "vah": 384.81,
       "val": 318.96,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           310.73,
@@ -82512,7 +82296,7 @@
       "vah": 394.95,
       "val": 335.42,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           310.73,
@@ -82722,7 +82506,7 @@
     }
   },
   "PWR": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -83196,21 +82980,13 @@
           "low": 642.5,
           "close": 646.7,
           "volume": 756900
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 873901
         }
       ],
       "poc": 708.78,
       "vah": 771.74,
       "val": 679.86,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           586.28,
@@ -83761,7 +83537,7 @@
       "vah": 571.41,
       "val": 362.7,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           364.83,
@@ -83800,7 +83576,7 @@
           505.39,
           509.65,
           513.91,
-          518.16,
+          518.17,
           522.42,
           526.68,
           530.94,
@@ -84072,7 +83848,7 @@
       "vah": 579.92,
       "val": 362.7,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           364.83,
@@ -84111,7 +83887,7 @@
           505.39,
           509.65,
           513.91,
-          518.16,
+          518.17,
           522.42,
           526.68,
           530.94,
@@ -85922,7 +85698,7 @@
     }
   },
   "FSLR": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -86396,21 +86172,13 @@
           "low": 217.19,
           "close": 221.03,
           "volume": 1820500
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 1435954
         }
       ],
       "poc": 233.23,
       "vah": 283.22,
       "val": 203.99,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           186.07,
@@ -86985,7 +86753,7 @@
       "vah": 249.45,
       "val": 183.91,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           172.73,
@@ -87296,7 +87064,7 @@
       "vah": 254.49,
       "val": 183.69,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           177.19,
@@ -87506,7 +87274,7 @@
     }
   },
   "SPY": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -87980,21 +87748,13 @@
           "low": 748.0,
           "close": 749.17,
           "volume": 44013600
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 35135286
         }
       ],
       "poc": 737.68,
       "vah": 756.17,
       "val": 730.81,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           702.81,
@@ -88535,7 +88295,7 @@
       "vah": 692.77,
       "val": 638.77,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           613.23,
@@ -88846,7 +88606,7 @@
       "vah": 694.23,
       "val": 640.23,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           613.23,
@@ -89056,7 +88816,7 @@
     }
   },
   "QQQ": {
-    "price": NaN,
+    "price": null,
     "daily": {
       "ohlc": [
         {
@@ -89530,21 +89290,13 @@
           "low": 710.08,
           "close": 711.74,
           "volume": 36552400
-        },
-        {
-          "time": "2026-07-14",
-          "open": NaN,
-          "high": NaN,
-          "low": NaN,
-          "close": NaN,
-          "volume": 29441202
         }
       ],
       "poc": 712.11,
       "vah": 740.28,
       "val": 698.55,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           643.25,
@@ -89820,7 +89572,7 @@
           "time": "2025-12-14",
           "open": 624.93,
           "high": 626.92,
-          "low": 609.14,
+          "low": 609.13,
           "close": 611.39,
           "volume": 269081300
         },
@@ -90077,7 +89829,7 @@
       "vah": 628.55,
       "val": 568.91,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           550.03,
@@ -90388,7 +90140,7 @@
       "vah": 634.52,
       "val": 568.91,
       "position": "inside_va",
-      "position_pct": NaN,
+      "position_pct": null,
       "histogram": {
         "prices": [
           550.03,
