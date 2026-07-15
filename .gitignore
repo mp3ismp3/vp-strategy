@@ -2,3 +2,10 @@ __pycache__/
 vp_state.json
 data/scan_results.json
 data/cache/
+
+# Environment files (secrets)
+.env
+.env.*
+.env.local
+!.env.example
+!.env.local.example
