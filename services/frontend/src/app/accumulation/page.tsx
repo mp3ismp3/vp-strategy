@@ -86,7 +86,6 @@ function AccumulationContent() {
             ticker={selectedState.ticker}
             phase={selectedState.phase}
             decay_score={selectedState.decay_score}
-            raw_score={selectedState.raw_score}
             support_primary={selectedState.support_primary}
             support_dynamic={selectedState.support_dynamic}
             resistance={selectedState.resistance}
