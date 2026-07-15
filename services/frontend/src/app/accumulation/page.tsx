@@ -169,7 +169,7 @@ function AccumulationContent() {
                   <td className="py-3 px-4">
                     {s.triggers_fired.length > 0 ? (
                       <Badge className="bg-orange-100 text-orange-800">
-                        {s.triggers_fired.join(", ")}
+                        {s.triggers_fired.map((t: any) => typeof t === "string" ? t : t.type).join(", ")}
                       </Badge>
                     ) : (
                       <span className="text-gray-400 text-sm">—</span>

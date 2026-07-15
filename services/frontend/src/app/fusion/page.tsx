@@ -115,7 +115,7 @@ function FusionContent() {
                   <span>Resistance: ${sig.resistance?.toFixed(2)}</span>
                   {sig.triggers_fired.length > 0 && (
                     <Badge className="bg-orange-100 text-orange-800">
-                      {sig.triggers_fired.join(", ")}
+                      {sig.triggers_fired.map((t: any) => typeof t === "string" ? t : t.type).join(", ")}
                     </Badge>
                   )}
                 </div>
