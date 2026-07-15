@@ -12,10 +12,22 @@ function AccumulationContent() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/data/accum-state")
+    fetch("/accum_state.json")
       .then((res) => res.json())
       .then((data) => {
-        setStates(data.states || []);
+        const transformed = Object.entries(data).map(([ticker, info]: [string, any]) => ({
+          ticker,
+          phase: info.phase || "UNKNOWN",
+          tier: info.tier || "watch",
+          decay_score: info.decay_score || 0,
+          raw_score: info.raw_score || 0,
+          support_primary: info.support_primary || 0,
+          support_dynamic: info.support_dynamic || 0,
+          resistance: info.resistance || 0,
+          failing: info.failing || false,
+          triggers_fired: info.triggers_fired || [],
+        }));
+        setStates(transformed);
         setLoading(false);
       })
       .catch(() => setLoading(false));

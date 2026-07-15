@@ -88,7 +88,7 @@ def main():
             monthly_df = resample_to_monthly(df)
 
             chart_data = {
-                "price": vp["price"],
+                "price": vp["price"] if vp["price"] == vp["price"] else float(df["Close"].dropna().iloc[-1]),
                 "daily": {
                     "ohlc": _df_to_ohlc(df, 60),
                     "poc": vp["daily"]["poc"],

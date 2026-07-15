@@ -46,17 +46,29 @@ export function VPChart({ ticker }: VPChartProps) {
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly">("daily");
 
   useEffect(() => {
-    fetch(`/api/data/chart-data?ticker=${ticker}`)
+    // Fetch from static public file directly (works on Vercel)
+    fetch("/frontend_charts.json")
       .then((res) => res.json())
-      .then((d) => {
-        if (d.error) {
-          setData(null);
-        } else {
+      .then((allData) => {
+        const d = allData[ticker.toUpperCase()];
+        if (d) {
           setData(d);
+        } else {
+          setData(null);
         }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        // Fallback to API route (local dev)
+        fetch(`/api/data/chart-data?ticker=${ticker}`)
+          .then((res) => res.json())
+          .then((d) => {
+            if (d.error) setData(null);
+            else setData(d);
+            setLoading(false);
+          })
+          .catch(() => setLoading(false));
+      });
   }, [ticker]);
 
   if (loading) {
