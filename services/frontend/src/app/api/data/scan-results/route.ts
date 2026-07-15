@@ -4,15 +4,22 @@ import path from "path";
 
 export async function GET() {
   try {
-    // Try local data path first (dev), then public dir (Vercel)
-    let raw: string;
-    const localPath = path.join(process.cwd(), "../../data/scan_results.json");
-    const publicPath = path.join(process.cwd(), "public/scan_results.json");
+    // Try multiple paths: local dev → Vercel serverless
+    let raw: string = "";
+    const paths = [
+      path.join(process.cwd(), "../../data/scan_results.json"),  // local dev
+      path.join(process.cwd(), "data/scan_results.json"),         // Vercel
+    ];
 
-    try {
-      raw = await fs.readFile(localPath, "utf-8");
-    } catch {
-      raw = await fs.readFile(publicPath, "utf-8");
+    for (const p of paths) {
+      try {
+        raw = await fs.readFile(p, "utf-8");
+        break;
+      } catch {}
+    }
+
+    if (!raw) {
+      return NextResponse.json({ results: [], error: "Data file not found" }, { status: 404 });
     }
 
     const data = JSON.parse(raw);

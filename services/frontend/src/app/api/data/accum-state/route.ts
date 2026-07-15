@@ -4,14 +4,21 @@ import path from "path";
 
 export async function GET() {
   try {
-    let raw: string;
-    const localPath = path.join(process.cwd(), "../../data/accum_state.json");
-    const publicPath = path.join(process.cwd(), "public/accum_state.json");
+    let raw: string = "";
+    const paths = [
+      path.join(process.cwd(), "../../data/accum_state.json"),
+      path.join(process.cwd(), "data/accum_state.json"),
+    ];
 
-    try {
-      raw = await fs.readFile(localPath, "utf-8");
-    } catch {
-      raw = await fs.readFile(publicPath, "utf-8");
+    for (const p of paths) {
+      try {
+        raw = await fs.readFile(p, "utf-8");
+        break;
+      } catch {}
+    }
+
+    if (!raw) {
+      return NextResponse.json({ states: [], error: "Data file not found" }, { status: 404 });
     }
 
     const data = JSON.parse(raw);

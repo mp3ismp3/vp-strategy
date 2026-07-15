@@ -36,24 +36,27 @@ function getMacroDirection(vp: any): string {
 
 export async function GET() {
   try {
-    let scanRaw: string;
-    let accumRaw: string;
+    let scanRaw: string = "";
+    let accumRaw: string = "";
 
-    const scanLocal = path.join(process.cwd(), "../../data/scan_results.json");
-    const scanPublic = path.join(process.cwd(), "public/scan_results.json");
-    const accumLocal = path.join(process.cwd(), "../../data/accum_state.json");
-    const accumPublic = path.join(process.cwd(), "public/accum_state.json");
+    const scanPaths = [
+      path.join(process.cwd(), "../../data/scan_results.json"),
+      path.join(process.cwd(), "data/scan_results.json"),
+    ];
+    const accumPaths = [
+      path.join(process.cwd(), "../../data/accum_state.json"),
+      path.join(process.cwd(), "data/accum_state.json"),
+    ];
 
-    try {
-      scanRaw = await fs.readFile(scanLocal, "utf-8");
-    } catch {
-      scanRaw = await fs.readFile(scanPublic, "utf-8");
+    for (const p of scanPaths) {
+      try { scanRaw = await fs.readFile(p, "utf-8"); break; } catch {}
+    }
+    for (const p of accumPaths) {
+      try { accumRaw = await fs.readFile(p, "utf-8"); break; } catch {}
     }
 
-    try {
-      accumRaw = await fs.readFile(accumLocal, "utf-8");
-    } catch {
-      accumRaw = await fs.readFile(accumPublic, "utf-8");
+    if (!scanRaw || !accumRaw) {
+      return NextResponse.json({ signals: [], error: "Data files not found" }, { status: 404 });
     }
 
     const scanData = JSON.parse(scanRaw);

@@ -6,14 +6,21 @@ export async function GET(req: NextRequest) {
   const ticker = req.nextUrl.searchParams.get("ticker");
 
   try {
-    let raw: string;
-    const localPath = path.join(process.cwd(), "../../data/frontend_charts.json");
-    const publicPath = path.join(process.cwd(), "public/frontend_charts.json");
+    let raw: string = "";
+    const paths = [
+      path.join(process.cwd(), "../../data/frontend_charts.json"),
+      path.join(process.cwd(), "data/frontend_charts.json"),
+    ];
 
-    try {
-      raw = await fs.readFile(localPath, "utf-8");
-    } catch {
-      raw = await fs.readFile(publicPath, "utf-8");
+    for (const p of paths) {
+      try {
+        raw = await fs.readFile(p, "utf-8");
+        break;
+      } catch {}
+    }
+
+    if (!raw) {
+      return NextResponse.json({ error: "Data file not found" }, { status: 404 });
     }
 
     const data = JSON.parse(raw);
