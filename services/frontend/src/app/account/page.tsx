@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export default function AccountPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const user = session?.user as any;
   const [bindingTelegram, setBindingTelegram] = useState(false);
   const [bindToken, setBindToken] = useState("");
@@ -49,6 +49,14 @@ export default function AccountPage() {
       window.location.href = data.url;
     }
   };
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
 
   if (!session) return null;
 
