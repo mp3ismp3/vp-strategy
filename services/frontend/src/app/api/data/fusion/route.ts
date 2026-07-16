@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
 
 // Confidence matrix (replicated from fusion_report.py)
 const CONFIDENCE_MATRIX: Record<string, { stars: number; label: string; action: string }> = {
@@ -36,32 +35,32 @@ function getMacroDirection(vp: any): string {
 
 export async function GET() {
   try {
-    let scanRaw: string = "";
-    let accumRaw: string = "";
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
 
-    const scanPaths = [
-      path.join(process.cwd(), "../../data/scan_results.json"),
-      path.join(process.cwd(), "data/scan_results.json"),
-    ];
-    const accumPaths = [
-      path.join(process.cwd(), "../../data/accum_state.json"),
-      path.join(process.cwd(), "data/accum_state.json"),
-    ];
+    // Fetch scan data
+    const { data: scanRow } = await supabase
+      .from("scan_data")
+      .select("vp_data, market_ctx")
+      .eq("id", "latest")
+      .single();
 
-    for (const p of scanPaths) {
-      try { scanRaw = await fs.readFile(p, "utf-8"); break; } catch {}
-    }
-    for (const p of accumPaths) {
-      try { accumRaw = await fs.readFile(p, "utf-8"); break; } catch {}
-    }
+    // Fetch accum data
+    const { data: accumRows } = await supabase
+      .from("accum_data")
+      .select("ticker, state");
 
-    if (!scanRaw || !accumRaw) {
-      return NextResponse.json({ signals: [], error: "Data files not found" }, { status: 404 });
+    if (!scanRow || !accumRows) {
+      return NextResponse.json({ signals: [], error: "No data" }, { status: 404 });
     }
 
-    const scanData = JSON.parse(scanRaw);
-    const accumState = JSON.parse(accumRaw);
-    const vpData = scanData.vp_data || {};
+    const vpData = scanRow.vp_data || {};
+    const accumState: Record<string, any> = {};
+    for (const row of accumRows) {
+      accumState[row.ticker] = row.state;
+    }
 
     const signals: any[] = [];
 

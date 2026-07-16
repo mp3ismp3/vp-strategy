@@ -46,29 +46,26 @@ export function VPChart({ ticker }: VPChartProps) {
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly">("daily");
 
   useEffect(() => {
-    // Fetch from static public file directly (works on Vercel)
-    fetch("/frontend_charts.json")
-      .then((res) => res.json())
-      .then((allData) => {
-        const d = allData[ticker.toUpperCase()];
-        if (d) {
-          setData(d);
-        } else {
-          setData(null);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        // Fallback to API route (local dev)
-        fetch(`/api/data/chart-data?ticker=${ticker}`)
-          .then((res) => res.json())
-          .then((d) => {
-            if (d.error) setData(null);
-            else setData(d);
-            setLoading(false);
-          })
-          .catch(() => setLoading(false));
-      });
+    // Read from Supabase chart_data
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      supabase
+        .from("chart_data")
+        .select("data")
+        .eq("ticker", ticker.toUpperCase())
+        .single()
+        .then(({ data: row, error }) => {
+          if (error || !row) {
+            setData(null);
+          } else {
+            setData(row.data);
+          }
+          setLoading(false);
+        });
+    });
   }, [ticker]);
 
   if (loading) {

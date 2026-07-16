@@ -35,16 +35,23 @@ export function AccumChart({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/frontend_charts.json")
-      .then((res) => res.json())
-      .then((data) => {
-        const symbolData = data[ticker];
-        if (symbolData?.daily?.ohlc) {
-          setOhlc(symbolData.daily.ohlc);
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      supabase
+        .from("chart_data")
+        .select("data")
+        .eq("ticker", ticker.toUpperCase())
+        .single()
+        .then(({ data: row, error }) => {
+          if (row?.data?.daily?.ohlc) {
+            setOhlc(row.data.daily.ohlc);
+          }
+          setLoading(false);
+        });
+    });
   }, [ticker]);
 
   if (loading) {

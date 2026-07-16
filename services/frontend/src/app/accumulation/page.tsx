@@ -13,25 +13,35 @@ function AccumulationContent() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/accum_state.json")
-      .then((res) => res.json())
-      .then((data) => {
-        const transformed = Object.entries(data).map(([ticker, info]: [string, any]) => ({
-          ticker,
-          phase: info.phase || "UNKNOWN",
-          tier: info.tier || "watch",
-          decay_score: info.decay_score || 0,
-          raw_score: info.raw_score || 0,
-          support_primary: info.support_primary || 0,
-          support_dynamic: info.support_dynamic || 0,
-          resistance: info.resistance || 0,
-          failing: info.failing || false,
-          triggers_fired: info.triggers_fired || [],
-        }));
-        setStates(transformed);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      supabase
+        .from("accum_data")
+        .select("ticker, state")
+        .then(({ data, error }) => {
+          if (error || !data) {
+            setLoading(false);
+            return;
+          }
+          const transformed = data.map((row: any) => ({
+            ticker: row.ticker,
+            phase: row.state?.phase || "UNKNOWN",
+            tier: row.state?.tier || "watch",
+            decay_score: row.state?.decay_score || 0,
+            raw_score: row.state?.raw_score || 0,
+            support_primary: row.state?.support_primary || 0,
+            support_dynamic: row.state?.support_dynamic || 0,
+            resistance: row.state?.resistance || 0,
+            failing: row.state?.failing || false,
+            triggers_fired: row.state?.triggers_fired || [],
+          }));
+          setStates(transformed);
+          setLoading(false);
+        });
+    });
   }, []);
 
   if (loading) {
