@@ -129,3 +129,8 @@ GRANT ALL ON public.users TO service_role;
 GRANT ALL ON public.subscription_events TO service_role;
 GRANT ALL ON public.telegram_bind_tokens TO service_role;
 GRANT ALL ON public.scan_results TO service_role;
+
+-- anon role 公開讀（前端用 anon key 讀取）
+GRANT SELECT ON public.scan_data TO anon;
+GRANT SELECT ON public.chart_data TO anon;
+GRANT SELECT ON public.accum_data TO anon;
