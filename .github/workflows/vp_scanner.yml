@@ -38,22 +38,27 @@ jobs:
       - name: Export frontend chart data
         run: python export_frontend_data.py
 
+      - name: Upload data to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install supabase
+          python upload_to_supabase.py
+
       - name: Notify subscribers (Telegram DM)
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          pip install python-telegram-bot supabase python-dotenv
+          pip install python-telegram-bot python-dotenv
           python services/telegram-bot/notification_router.py
 
-      - name: Persist state and chart data
+      - name: Persist accumulation state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          cp data/scan_results.json services/frontend/public/
-          cp data/accum_state.json services/frontend/public/
-          cp data/frontend_charts.json services/frontend/public/
-          git add -f data/accum_state.json data/frontend_charts.json services/frontend/public/scan_results.json services/frontend/public/accum_state.json services/frontend/public/frontend_charts.json
-          git diff --cached --quiet || git commit -m "chore: update scan data + frontend charts [skip ci]"
+          git add -f data/accum_state.json
+          git diff --cached --quiet || git commit -m "chore: update accum_state.json [skip ci]"
           git push
