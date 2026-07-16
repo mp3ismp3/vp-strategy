@@ -5,6 +5,7 @@ import { Paywall } from "@/components/Paywall";
 import { ScanResult } from "@/types/signal";
 import { VPChart } from "@/components/charts/VPChart";
 import { Badge } from "@/components/ui/badge";
+import { StrategyGuide } from "@/components/StrategyGuide";
 
 function ScannerContent() {
   const [results, setResults] = useState<ScanResult[]>([]);
@@ -88,35 +89,8 @@ function ScannerContent() {
         </div>
       </div>
 
-      {/* Strategy Guide (collapsible) */}
-      <details className="mb-6 bg-blue-50 rounded-xl border border-blue-200">
-        <summary className="cursor-pointer p-4 font-bold text-blue-900 hover:bg-blue-100 rounded-xl">
-          📖 拍賣理論操作指南（點擊展開）
-        </summary>
-        <div className="px-5 pb-5">
-          <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-800">
-            <div>
-              <p className="font-semibold mb-1">🟢 做多時機：</p>
-              <ul className="space-y-1 ml-4 list-disc">
-                <li><b>VA Rejection</b> — 價格跌到 VAL 被拒絕（買方守住）</li>
-                <li><b>Failed Auction</b> — 跌破 VA 又快速收回（下方沒人接受）</li>
-                <li><b>Breakout Retest</b> — 突破 VAH 後回踩守住（接受新價值）</li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-semibold mb-1">🔴 做空 / 觀望時機：</p>
-              <ul className="space-y-1 ml-4 list-disc">
-                <li><b>VAH Rejection</b> — 價格漲到 VAH 被壓回</li>
-                <li><b>Failed Breakout</b> — 突破 VAH 又跌回（假突破）</li>
-                <li><b>遠超 100%</b> — 已漲一段，別追高，等回踩</li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-3 text-xs text-blue-600">
-            💡 百分比意義：0% = VAL（支撐）、100% = VAH（壓力）、50% = POC（公允價值）。超過 100% = Above VA，低於 0% = Below VA。
-          </div>
-        </div>
-      </details>
+      {/* Strategy Guide (floating button + modal) */}
+      <StrategyGuide type="scanner" />
 
       {/* Chart Area */}
       {selectedResult && (
