@@ -45,9 +45,10 @@ export default function HomePage() {
                 日線 / 周線 / 月線 Volume Profile，一眼看出價格相對公允價值的位置。
               </p>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li>✓ 62 檔美股即時掃描</li>
+                <li>✓ 免費看 Mega Cap Tech 7 檔</li>
+                <li>✓ Pro 解鎖全部 78 檔 AI 美股</li>
                 <li>✓ 多時間框架共識分析</li>
-                <li>✓ VA Rejection / Failed Auction / Breakout 偵測</li>
+                <li>✓ K 線圖 + VP Histogram</li>
               </ul>
             </div>
 
@@ -62,6 +63,7 @@ export default function HomePage() {
                 <li>✓ 6 指標每日評分（0-18）</li>
                 <li>✓ Wyckoff Phase A-E 自動分類</li>
                 <li>✓ Spring / LPS / SOS 入場觸發</li>
+                <li>✓ Pro 方案解鎖</li>
               </ul>
             </div>
           </div>
