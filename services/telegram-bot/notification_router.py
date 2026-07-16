@@ -166,11 +166,15 @@ def format_accum_triggers() -> str:
         return ""
 
     msg = "<b>⚡ Accumulation Triggers</b>\n\n"
-    for t in triggered:
+    for item in triggered:
+        trigger_names = ', '.join(
+            tr['type'] if isinstance(tr, dict) else tr
+            for tr in item['triggers']
+        )
         msg += (
-            f"<b>{t['symbol']}</b> — Phase {t['phase']}\n"
-            f"  Triggers: {', '.join(t['triggers'])}\n"
-            f"  Support: ${t['support']:.2f} | Resistance: ${t['resistance']:.2f}\n\n"
+            f"<b>{item['symbol']}</b> — Phase {item['phase']}\n"
+            f"  Triggers: {trigger_names}\n"
+            f"  Support: ${item['support']:.2f} | Resistance: ${item['resistance']:.2f}\n\n"
         )
 
     return msg
