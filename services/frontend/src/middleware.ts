@@ -10,5 +10,5 @@ export default withAuth({
 });
 
 export const config = {
-  matcher: ["/scanner", "/accumulation", "/fusion", "/account"],
+  matcher: ["/accumulation", "/fusion", "/account"],
 };

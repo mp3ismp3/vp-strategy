@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Paywall } from "@/components/Paywall";
 import { ScanResult } from "@/types/signal";
 import { VPChart } from "@/components/charts/VPChart";
@@ -9,11 +10,25 @@ import { StrategyGuide } from "@/components/StrategyGuide";
 import { SYMBOL_CATEGORIES, ALL_CATEGORIES } from "@/lib/categories";
 
 function ScannerContent() {
+  const { data: session } = useSession();
   const [results, setResults] = useState<ScanResult[]>([]);
   const [scanTime, setScanTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [userPlan, setUserPlan] = useState<string>("free");
+
+  // Fetch real-time plan
+  useEffect(() => {
+    if (session) {
+      fetch("/api/user/plan")
+        .then((res) => res.json())
+        .then((data) => setUserPlan(data.plan || "free"))
+        .catch(() => {});
+    } else {
+      setUserPlan("free");
+    }
+  }, [session]);
 
   useEffect(() => {
     // Read from Supabase
@@ -76,9 +91,16 @@ function ScannerContent() {
     return <Badge className="bg-gray-100 text-gray-800">Inside VA</Badge>;
   };
 
+  const FREE_SYMBOLS = SYMBOL_CATEGORIES["Mega Cap Tech"] || [];
+
+  // Filter by plan: free only sees Mega Cap Tech
+  const planFilteredResults = userPlan === "free"
+    ? results.filter((r) => FREE_SYMBOLS.includes(r.ticker))
+    : results;
+
   const filteredResults = selectedCategory === "all"
-    ? results
-    : results.filter((r) => (SYMBOL_CATEGORIES[selectedCategory] || []).includes(r.ticker));
+    ? planFilteredResults
+    : planFilteredResults.filter((r) => (SYMBOL_CATEGORIES[selectedCategory] || []).includes(r.ticker));
 
   const bullish = filteredResults.filter((r) => r.consensus === "bullish");
   const bearish = filteredResults.filter((r) => r.consensus === "bearish");
@@ -108,6 +130,16 @@ function ScannerContent() {
       </div>
 
       {/* Category Filter */}
+      {userPlan === "free" && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center">
+          <span className="text-sm text-yellow-800">
+            🔒 免費方案只顯示 Mega Cap Tech（7 檔）。升級 Pro 解鎖全部 78 檔。
+          </span>
+          <a href="/pricing" className="text-sm font-medium bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800">
+            升級
+          </a>
+        </div>
+      )}
       <div className="mb-4">
         <select
           value={selectedCategory}
@@ -281,9 +313,5 @@ function ScannerContent() {
 }
 
 export default function ScannerPage() {
-  return (
-    <Paywall requiredPlan="pro">
-      <ScannerContent />
-    </Paywall>
-  );
+  return <ScannerContent />;
 }
