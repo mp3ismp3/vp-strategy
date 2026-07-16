@@ -184,14 +184,14 @@ async def main():
     if "--scan" in sys.argv:
         msg = format_scan_summary()
         if msg:
-            await broadcast(msg, min_plan="pro")
+            await broadcast(msg, min_plan="premium")
         else:
             print("  No scan data to send.")
 
     elif "--accum" in sys.argv:
         msg = format_accum_triggers()
         if msg:
-            await broadcast(msg, min_plan="pro")
+            await broadcast(msg, min_plan="premium")
         else:
             print("  No triggers to send.")
 
@@ -199,11 +199,11 @@ async def main():
         # Send both
         scan_msg = format_scan_summary()
         if scan_msg:
-            await broadcast(scan_msg, min_plan="pro")
+            await broadcast(scan_msg, min_plan="premium")
 
         accum_msg = format_accum_triggers()
         if accum_msg:
-            await broadcast(accum_msg, min_plan="pro")
+            await broadcast(accum_msg, min_plan="premium")
 
 
 if __name__ == "__main__":
