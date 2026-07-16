@@ -62,17 +62,8 @@ CREATE TABLE IF NOT EXISTS public.scan_results (
 -- ============================================
 -- 5. RLS Policies
 -- ============================================
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-
--- 用戶讀自己
-CREATE POLICY "Users can read own data" ON public.users
-    FOR SELECT USING (auth.uid() = id);
-
--- 用戶更新自己
-CREATE POLICY "Users can update own data" ON public.users
-    FOR UPDATE USING (auth.uid() = id);
-
--- Service role 可以做任何事（預設行為，不需額外 policy）
+-- Users 表：關閉 RLS（service_role 需要直接讀寫，app 層控制存取）
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 
 -- scan_results 公開讀（付費牆在 app 層控制）
 ALTER TABLE public.scan_results ENABLE ROW LEVEL SECURITY;
