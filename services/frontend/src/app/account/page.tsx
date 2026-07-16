@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,28 @@ export default function AccountPage() {
   const user = session?.user as any;
   const [bindingTelegram, setBindingTelegram] = useState(false);
   const [bindToken, setBindToken] = useState("");
+  const [planInfo, setPlanInfo] = useState<any>(null);
+
+  // Fetch real-time plan info
+  useEffect(() => {
+    if (session) {
+      fetch("/api/user/plan")
+        .then((res) => res.json())
+        .then((data) => setPlanInfo(data))
+        .catch(() => {});
+    }
+  }, [session]);
+
+  const getTrialDaysLeft = () => {
+    if (!planInfo?.trialEnd) return null;
+    const end = new Date(planInfo.trialEnd);
+    const now = new Date();
+    const days = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : null;
+  };
+
+  const trialDaysLeft = getTrialDaysLeft();
+  const isPastDue = planInfo?.subscriptionStatus === "past_due";
 
   const handleBindTelegram = async () => {
     setBindingTelegram(true);
@@ -61,9 +83,33 @@ export default function AccountPage() {
           <CardTitle>訂閱方案</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Past due warning */}
+          {isPastDue && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-800 font-medium">
+                ⚠️ 付款失敗 — 請更新付款方式以繼續使用服務
+              </p>
+              <button
+                onClick={handleManageSubscription}
+                className="mt-2 text-sm bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700"
+              >
+                更新卡號
+              </button>
+            </div>
+          )}
+
+          {/* Trial days remaining */}
+          {trialDaysLeft && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                🎉 免費試用中 — 剩餘 <span className="font-bold">{trialDaysLeft} 天</span>
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-between items-center">
             <span className="text-gray-600">目前方案</span>
-            <Badge className="capitalize text-sm">{user?.plan || "free"}</Badge>
+            <Badge className="capitalize text-sm">{planInfo?.plan || user?.plan || "free"}</Badge>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-600">狀態</span>

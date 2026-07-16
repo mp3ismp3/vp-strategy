@@ -82,6 +82,13 @@ export async function POST(req: NextRequest) {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = subscription.customer as string;
 
+      // Get user's telegram_user_id before updating plan
+      const { data: userBeforeUpdate } = await supabase
+        .from("users")
+        .select("telegram_user_id")
+        .eq("stripe_customer_id", customerId)
+        .single();
+
       await supabase
         .from("users")
         .update({
@@ -90,6 +97,21 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq("stripe_customer_id", customerId);
+
+      // Send Telegram notification if user has bound their account
+      if (userBeforeUpdate?.telegram_user_id && process.env.TELEGRAM_BOT_TOKEN) {
+        await fetch(
+          `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: userBeforeUpdate.telegram_user_id,
+              text: "📢 你的訂閱已結束，通知已暫停。\n\n隨時可到網站重新訂閱，恢復即時交易信號。\n👉 https://vp-strategy-nu.vercel.app/pricing",
+            }),
+          }
+        );
+      }
 
       // Log event
       await supabase.from("subscription_events").insert({

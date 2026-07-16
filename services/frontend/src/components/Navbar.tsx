@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,23 @@ export function Navbar() {
   const { data: session } = useSession();
   const user = session?.user as any;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [trialDays, setTrialDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (session) {
+      fetch("/api/user/plan")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.trialEnd && data.subscriptionStatus === "trialing") {
+            const days = Math.ceil(
+              (new Date(data.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            );
+            setTrialDays(days > 0 ? days : null);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [session]);
 
   const navLinks = [
     { href: "/scanner", label: "Scanner" },
@@ -54,6 +71,11 @@ export function Navbar() {
             {session ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2">
+                  {trialDays && (
+                    <Badge className="bg-blue-100 text-blue-800 text-xs">
+                      試用 {trialDays}天
+                    </Badge>
+                  )}
                   <Badge variant="outline" className="capitalize hidden sm:inline-flex">
                     {user?.plan || "free"}
                   </Badge>

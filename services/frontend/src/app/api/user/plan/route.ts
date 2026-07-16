@@ -13,12 +13,14 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from("users")
-    .select("plan, subscription_status")
+    .select("plan, subscription_status, trial_end, current_period_end")
     .eq("email", session.user.email)
     .single();
 
   return NextResponse.json({
     plan: data?.plan || "free",
     subscriptionStatus: data?.subscription_status || "inactive",
+    trialEnd: data?.trial_end || null,
+    currentPeriodEnd: data?.current_period_end || null,
   });
 }
