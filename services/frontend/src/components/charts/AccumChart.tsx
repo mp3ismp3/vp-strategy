@@ -187,7 +187,7 @@ export function AccumChart({
 
   const layout: any = {
     height: 550,
-    margin: { l: 50, r: 20, t: 40, b: 30 },
+    margin: { l: 50, r: 70, t: 40, b: 30 },
     showlegend: false,
     paper_bgcolor: "white",
     plot_bgcolor: "white",
@@ -204,14 +204,14 @@ export function AccumChart({
     shapes,
     annotations: [
       ...(support_primary ? [{
-        x: 1.01, xref: "paper", y: support_primary, yref: "y",
+        x: 1.02, xref: "paper", y: support_primary, yref: "y",
         text: `SP $${support_primary.toFixed(0)}`, showarrow: false,
-        font: { size: 9, color: "red" }, xanchor: "left",
+        font: { size: 9, color: "white" }, bgcolor: "red", borderpad: 2, xanchor: "left",
       }] : []),
       ...(resistance ? [{
-        x: 1.01, xref: "paper", y: resistance, yref: "y",
+        x: 1.02, xref: "paper", y: resistance, yref: "y",
         text: `R $${resistance.toFixed(0)}`, showarrow: false,
-        font: { size: 9, color: "green" }, xanchor: "left",
+        font: { size: 9, color: "white" }, bgcolor: "#4caf50", borderpad: 2, xanchor: "left",
       }] : []),
     ],
   };
