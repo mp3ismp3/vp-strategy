@@ -13,7 +13,6 @@ function ScannerContent() {
   const [scanTime, setScanTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"signal" | "category">("signal");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   useEffect(() => {
@@ -77,9 +76,13 @@ function ScannerContent() {
     return <Badge className="bg-gray-100 text-gray-800">Inside VA</Badge>;
   };
 
-  const bullish = results.filter((r) => r.consensus === "bullish");
-  const bearish = results.filter((r) => r.consensus === "bearish");
-  const neutral = results.filter(
+  const filteredResults = selectedCategory === "all"
+    ? results
+    : results.filter((r) => (SYMBOL_CATEGORIES[selectedCategory] || []).includes(r.ticker));
+
+  const bullish = filteredResults.filter((r) => r.consensus === "bullish");
+  const bearish = filteredResults.filter((r) => r.consensus === "bearish");
+  const neutral = filteredResults.filter(
     (r) => r.consensus !== "bullish" && r.consensus !== "bearish"
   );
 
@@ -104,35 +107,21 @@ function ScannerContent() {
         </div>
       </div>
 
-      {/* View Mode + Category Filter */}
-      <div className="mb-4 flex flex-wrap gap-3 items-center">
-        <div className="flex rounded-md overflow-hidden border">
-          <button
-            onClick={() => setViewMode("signal")}
-            className={`px-3 py-1.5 text-sm font-medium ${viewMode === "signal" ? "bg-black text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
-          >
-            按信號
-          </button>
-          <button
-            onClick={() => setViewMode("category")}
-            className={`px-3 py-1.5 text-sm font-medium ${viewMode === "category" ? "bg-black text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
-          >
-            按類別
-          </button>
-        </div>
-
-        {viewMode === "category" && (
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="border rounded-md px-3 py-1.5 text-sm"
-          >
-            <option value="all">全部類別</option>
-            {ALL_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-        )}
+      {/* Category Filter */}
+      <div className="mb-4">
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="border rounded-md px-3 py-2 text-sm"
+        >
+          <option value="all">全部類別（{results.length} 檔）</option>
+          {ALL_CATEGORIES.map((cat) => {
+            const count = results.filter((r) => (SYMBOL_CATEGORIES[cat] || []).includes(r.ticker)).length;
+            return (
+              <option key={cat} value={cat}>{cat}（{count}）</option>
+            );
+          })}
+        </select>
       </div>
 
       {/* Strategy Guide (floating button + modal) */}
@@ -175,49 +164,6 @@ function ScannerContent() {
       )}
 
       {/* Results Grid */}
-      {viewMode === "category" ? (
-        // Category View
-        <div className="grid gap-6">
-          {(selectedCategory === "all" ? ALL_CATEGORIES : [selectedCategory]).map((cat) => {
-            const categoryTickers = SYMBOL_CATEGORIES[cat] || [];
-            const categoryResults = results.filter((r) => categoryTickers.includes(r.ticker));
-            if (categoryResults.length === 0) return null;
-
-            return (
-              <div key={cat} className="bg-white rounded-xl p-6 border">
-                <h2 className="text-lg font-bold mb-4">{cat}（{categoryResults.length} 檔）</h2>
-                <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {categoryResults.map((r) => (
-                    <button
-                      key={r.ticker}
-                      onClick={() => setSelectedTicker(r.ticker)}
-                      className={`rounded-lg p-4 border text-left hover:shadow-md transition ${
-                        r.consensus === "bullish" ? "bg-green-50 border-green-200" :
-                        r.consensus === "bearish" ? "bg-red-50 border-red-200" :
-                        "bg-gray-50 border-gray-200"
-                      } ${selectedTicker === r.ticker ? "ring-2 ring-black" : ""}`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold">{r.ticker}</span>
-                        <span className="text-sm text-gray-600">${r.price.toFixed(2)}</span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-2 flex gap-1">
-                        {positionBadge(r.daily.position)}
-                        {positionBadge(r.weekly.position)}
-                        {positionBadge(r.monthly.position)}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        D:{r.daily.pct_from_poc.toFixed(0)}% W:{r.weekly.pct_from_poc.toFixed(0)}% M:{r.monthly.pct_from_poc.toFixed(0)}%
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        // Signal View (original)
       <div className="grid gap-6">
         {/* Bullish */}
         {bullish.length > 0 && (
@@ -330,7 +276,6 @@ function ScannerContent() {
           </div>
         )}
       </div>
-      )}
     </div>
   );
 }
