@@ -6,7 +6,7 @@ import { ScanResult } from "@/types/signal";
 import { VPChart } from "@/components/charts/VPChart";
 import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
-import { SYMBOL_CATEGORIES, TICKER_TO_CATEGORY, ALL_CATEGORIES } from "@/lib/categories";
+import { SYMBOL_CATEGORIES, ALL_CATEGORIES } from "@/lib/categories";
 
 function ScannerContent() {
   const [results, setResults] = useState<ScanResult[]>([]);
