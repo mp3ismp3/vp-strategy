@@ -86,3 +86,55 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_stripe_customer ON public.users(stripe_customer_id);
 CREATE INDEX IF NOT EXISTS idx_users_telegram ON public.users(telegram_user_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_events_user ON public.subscription_events(user_id);
+
+-- ============================================
+-- 7. Scan Data 表（VP 掃描結果，覆蓋更新）
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.scan_data (
+    id TEXT PRIMARY KEY DEFAULT 'latest',
+    vp_data JSONB,
+    market_ctx JSONB,
+    scan_time TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.scan_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read scan_data" ON public.scan_data
+    FOR SELECT USING (true);
+GRANT ALL ON public.scan_data TO service_role;
+
+-- ============================================
+-- 8. Chart Data 表（K 線 + VP Histogram，每 ticker 一筆）
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.chart_data (
+    ticker TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.chart_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read chart_data" ON public.chart_data
+    FOR SELECT USING (true);
+GRANT ALL ON public.chart_data TO service_role;
+
+-- ============================================
+-- 9. Accumulation Data 表（每 ticker 一筆）
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.accum_data (
+    ticker TEXT PRIMARY KEY,
+    state JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.accum_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Anyone can read accum_data" ON public.accum_data
+    FOR SELECT USING (true);
+GRANT ALL ON public.accum_data TO service_role;
+
+-- ============================================
+-- 10. 補充權限（所有表）
+-- ============================================
+GRANT ALL ON public.users TO service_role;
+GRANT ALL ON public.subscription_events TO service_role;
+GRANT ALL ON public.telegram_bind_tokens TO service_role;
+GRANT ALL ON public.scan_results TO service_role;
