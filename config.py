@@ -15,6 +15,16 @@ SYMBOLS = [
     "DELL", "HPE", "SMCI", "VRT", "ANET",
     # AI Power / Energy
     "VST", "CEG", "TLN", "NRG", "ETN", "PWR", "GEV", "FSLR",
+    # AI Quantum / Robotics / Emerging
+    "SERV", "IONQ", "RGTI", "QUBT",
+    # AI Infra / Networking
+    "CSCO", "JNPR", "CIEN", "LITE",
+    # AI Healthcare
+    "ISRG", "VEEV", "DXCM",
+    # AI Cybersecurity
+    "S", "CYBR", "OKTA",
+    # AI Enterprise / Automation
+    "MNDY", "DOCN", "TWLO", "TTD",
     # ETFs
     "SPY", "QQQ",
     # Misc Tech / AI Adjacent
@@ -39,6 +49,12 @@ SECTOR_MAP = {
     "ETN": "XLK", "PWR": "XLK", "GEV": "XLK", "FSLR": "XLK",
     "SPY": "SPY", "QQQ": "QQQ",
     "UBER": "XLK", "XYZ": "XLK", "SHOP": "IGV", "COIN": "XLK", "AMZN": "XLK",
+    # New AI stocks
+    "SERV": "XLK", "IONQ": "XLK", "RGTI": "XLK", "QUBT": "XLK",
+    "CSCO": "XLK", "JNPR": "XLK", "CIEN": "XLK", "LITE": "XLK",
+    "ISRG": "XLK", "VEEV": "IGV", "DXCM": "XLK",
+    "S": "IGV", "CYBR": "IGV", "OKTA": "IGV",
+    "MNDY": "IGV", "DOCN": "IGV", "TWLO": "IGV", "TTD": "IGV",
 }
 
 DEFAULT_CFG = {
