@@ -106,6 +106,15 @@ export default function AccountPage() {
             綁定 Telegram 後，即時交易信號會直接私訊給你。
           </p>
 
+          <div className="bg-gray-50 rounded-lg p-3 text-sm">
+            <p className="font-medium mb-1">步驟：</p>
+            <ol className="list-decimal ml-4 space-y-1 text-gray-600">
+              <li>打開 Bot → <a href="https://t.me/vp_signal_alert_bot" target="_blank" className="text-blue-600 underline">t.me/vp_signal_alert_bot</a></li>
+              <li>點下方「綁定 Telegram」取得綁定碼</li>
+              <li>在 Bot 對話中發送 <code>/start 綁定碼</code></li>
+            </ol>
+          </div>
+
           {bindToken ? (
             <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
               <p className="text-sm font-medium mb-2">
