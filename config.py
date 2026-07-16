@@ -18,11 +18,11 @@ SYMBOLS = [
     # AI Quantum / Robotics / Emerging
     "SERV", "IONQ", "RGTI", "QUBT",
     # AI Infra / Networking
-    "CSCO", "JNPR", "CIEN", "LITE",
+    "CSCO", "CIEN", "LITE",
     # AI Healthcare
     "ISRG", "VEEV", "DXCM",
     # AI Cybersecurity
-    "S", "CYBR", "OKTA",
+    "S", "OKTA",
     # AI Enterprise / Automation
     "MNDY", "DOCN", "TWLO", "TTD",
     # ETFs
@@ -68,9 +68,9 @@ SECTOR_MAP = {
     "UBER": "XLK", "XYZ": "XLK", "SHOP": "IGV", "COIN": "XLK", "AMZN": "XLK",
     # New AI stocks
     "SERV": "XLK", "IONQ": "XLK", "RGTI": "XLK", "QUBT": "XLK",
-    "CSCO": "XLK", "JNPR": "XLK", "CIEN": "XLK", "LITE": "XLK",
+    "CSCO": "XLK", "CIEN": "XLK", "LITE": "XLK",
     "ISRG": "XLK", "VEEV": "IGV", "DXCM": "XLK",
-    "S": "IGV", "CYBR": "IGV", "OKTA": "IGV",
+    "S": "IGV", "OKTA": "IGV",
     "MNDY": "IGV", "DOCN": "IGV", "TWLO": "IGV", "TTD": "IGV",
 }
 
