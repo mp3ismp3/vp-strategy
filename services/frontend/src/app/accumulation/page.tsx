@@ -62,6 +62,34 @@ function AccumulationContent() {
         </p>
       </div>
 
+      {/* Strategy Guide */}
+      <div className="mb-6 bg-purple-50 rounded-xl p-5 border border-purple-200">
+        <h3 className="font-bold text-purple-900 mb-3">📖 Wyckoff 吸籌階段 & 入場時機</h3>
+        <div className="grid md:grid-cols-2 gap-4 text-sm text-purple-800">
+          <div>
+            <p className="font-semibold mb-1">階段說明：</p>
+            <ul className="space-y-1 ml-4 list-disc">
+              <li><b>Phase A</b> — 大跌停止，出現賣出高潮</li>
+              <li><b>Phase B</b> — 區間震盪吸籌，OBV 上升</li>
+              <li><b>Phase C</b> — Spring 假跌破（最佳入場區）</li>
+              <li><b>Phase D</b> — Higher Lows，趨勢啟動</li>
+              <li><b>Phase E</b> — 突破阻力，已起飛</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-semibold mb-1">入場觸發：</p>
+            <ul className="space-y-1 ml-4 list-disc">
+              <li><b>🌊 Spring</b>（Phase C）— 跌破支撐後收回 + 量確認 → PILOT BUY 10-25%</li>
+              <li><b>📈 LPS</b>（Phase D）— 回踩量縮守住前低 → ADD 25-40%</li>
+              <li><b>🚀 SOS Breakout</b>（Phase D）— 突破阻力 + 量 &gt; 1.5x → FULL POSITION</li>
+            </ul>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-purple-600">
+          💡 Score 0-18 分：≥12 強烈吸籌、9-11 可能吸籌、&lt;9 觀察中。Confirmed = 連續多天高分。
+        </div>
+      </div>
+
       {/* Chart Area */}
       {selectedState && (
         <div className="mb-8 bg-white rounded-xl border p-4">
