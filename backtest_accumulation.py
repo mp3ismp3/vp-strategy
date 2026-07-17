@@ -26,6 +26,7 @@ import pandas as pd
 import yfinance as yf
 
 from config import SYMBOLS
+from core.indicators import calc_vp
 from strategies.accumulation.config import (
     DECAY_RATE_FAST,
     DECAY_RATE_SLOW,
@@ -121,7 +122,9 @@ class AccumulationBacktester:
         for i in range(start_idx, end_idx):
             entry = {"idx": i, "raw_score": 0, "phase": "UNKNOWN",
                      "support_primary": 0, "support_dynamic": 0,
-                     "resistance": 0, "triggered": [], "pending_out": []}
+                     "resistance": 0, "triggered": [], "pending_out": [],
+                     "vp_position": "unknown", "spy_above_ema50": True,
+                     "rsi2": 50.0}
 
             if i < 60:
                 signals.append(entry)
@@ -131,6 +134,41 @@ class AccumulationBacktester:
             spy_slice = spy_df.iloc[:i + 1] if len(spy_df) > i else spy_df
 
             try:
+                # ─── RSI(2) ───
+                if len(df_slice) >= 3:
+                    closes = df_slice["Close"].values.astype(float)
+                    # RSI with period=2
+                    deltas = np.diff(closes[-3:])  # last 2 changes
+                    gains = np.where(deltas > 0, deltas, 0)
+                    losses = np.where(deltas < 0, -deltas, 0)
+                    avg_gain = np.mean(gains) if len(gains) > 0 else 0
+                    avg_loss = np.mean(losses) if len(losses) > 0 else 0.0001
+                    if avg_loss == 0:
+                        entry["rsi2"] = 100.0
+                    else:
+                        rs = avg_gain / avg_loss
+                        entry["rsi2"] = 100.0 - (100.0 / (1.0 + rs))
+                # ─── VP Position (daily 60-bar) ───
+                if len(df_slice) >= 60:
+                    vp = calc_vp(df_slice, 60, 0.68)
+                    if vp:
+                        price = float(df_slice["Close"].iloc[-1])
+                        if price > vp["vah"]:
+                            entry["vp_position"] = "above_va"
+                        elif price < vp["val"]:
+                            entry["vp_position"] = "below_va"
+                        else:
+                            entry["vp_position"] = "inside_va"
+
+                # ─── SPY EMA50 ───
+                if len(spy_slice) >= 50:
+                    spy_close = spy_slice["Close"].values.astype(float)
+                    ema = spy_close[0]
+                    mult = 2.0 / 51.0
+                    for k in range(1, len(spy_close)):
+                        ema = spy_close[k] * mult + ema * (1 - mult)
+                    entry["spy_above_ema50"] = spy_close[-1] > ema
+
                 result = compute_daily_score(df_slice.tail(130), spy_slice.tail(130))
                 if not isinstance(result, dict):
                     signals.append(entry)
@@ -171,12 +209,15 @@ class AccumulationBacktester:
     def replay_with_thresholds(self, df: pd.DataFrame, signals: list[dict],
                                start_idx: int, end_idx: int,
                                cfg: BacktestConfig,
-                               confirmed_only: bool = False) -> list[Trade]:
+                               confirmed_only: bool = False,
+                               use_filters: bool = False,
+                               rsi_threshold: float = 0) -> list[Trade]:
         """
         Replay pre-computed signals with different threshold params.
-        This is FAST — just threshold logic + trade simulation.
         
         If confirmed_only=True, only generates trades when tier == "confirmed".
+        If use_filters=True, applies VP position + SPY EMA50 filters.
+        If rsi_threshold > 0, only enters when RSI(2) <= threshold (e.g. 20).
         """
         trades = []
         tracking = False
@@ -229,10 +270,48 @@ class AccumulationBacktester:
             if not triggered_list:
                 continue
 
+            # ─── VP + SPY Filters (research-based) ───
+            if use_filters:
+                # Filter 1: SPY trend — only block in severe downtrend
+                # (SPY below EMA50 AND falling > 3% in 10 days = crash, skip)
+                # Mild pullbacks are fine — accumulation thrives in dips
+                if not sig.get("spy_above_ema50", True):
+                    # Only block if SPY is significantly below EMA50
+                    # We already set spy_above_ema50 = False when below,
+                    # but accumulation signals during mild corrections are valuable
+                    # So we only filter LPS/SOS, not Spring (Spring IS the dip buy)
+                    trig_type_check = triggered_list[0].get("type", "") if triggered_list else ""
+                    if "SPRING" not in trig_type_check:
+                        continue  # Block LPS/SOS in downtrend, allow Spring
+
+                # Filter 2: VP position must MATCH trigger type
+                # Spring = wash out → best at/below VAL or inside VA (near value)
+                # LPS    = pullback → best inside VA (fair value zone)
+                # SOS    = breakout → should NOT be below VA
+                vp_pos = sig.get("vp_position", "unknown")
+                if vp_pos != "unknown" and triggered_list:
+                    first_type = triggered_list[0].get("type", "")
+                    # Spring when above_va = price already extended, not a real wash out
+                    if "SPRING" in first_type and vp_pos == "above_va":
+                        continue
+                    # SOS below_va = not a real breakout
+                    if "SOS" in first_type and vp_pos == "below_va":
+                        continue
+
             for trig in triggered_list:
                 if not isinstance(trig, dict):
                     continue
                 trig_type = trig.get("type", "")
+
+                # ─── RSI(2) Filter ───
+                # Only enter when short-term is oversold (panic selling exhausted)
+                if rsi_threshold > 0:
+                    rsi_val = sig.get("rsi2", 50.0)
+                    # Spring/LPS: require RSI oversold (confirms wash out)
+                    # SOS: skip RSI filter (breakout doesn't need oversold)
+                    if "SPRING" in trig_type or "LPS" in trig_type:
+                        if rsi_val > rsi_threshold:
+                            continue
 
                 if "SPRING" in trig_type:
                     max_hold = cfg.max_hold_spring
@@ -268,13 +347,17 @@ class AccumulationBacktester:
     def simulate_tracking(self, df: pd.DataFrame, spy_df: pd.DataFrame,
                           start_idx: int, end_idx: int,
                           cfg: BacktestConfig,
-                          confirmed_only: bool = False) -> list[Trade]:
+                          confirmed_only: bool = False,
+                          use_filters: bool = False,
+                          rsi_threshold: float = 0) -> list[Trade]:
         """
         Full simulation (precompute + replay). Used for single runs.
         """
         signals = self.precompute_signals(df, spy_df, start_idx, end_idx)
         return self.replay_with_thresholds(
-            df, signals, start_idx, end_idx, cfg, confirmed_only=confirmed_only
+            df, signals, start_idx, end_idx, cfg,
+            confirmed_only=confirmed_only, use_filters=use_filters,
+            rsi_threshold=rsi_threshold,
         )
 
     def _simulate_trade(self, df: pd.DataFrame, entry_idx: int,
@@ -341,7 +424,9 @@ class AccumulationBacktester:
     def walk_forward(self, data: dict, symbols: list[str],
                      cfg: BacktestConfig, exclude_holdout: bool = True,
                      precomputed: dict = None,
-                     confirmed_only: bool = False) -> dict:
+                     confirmed_only: bool = False,
+                     use_filters: bool = False,
+                     rsi_threshold: float = 0) -> dict:
         """
         Run walk-forward backtest across rolling windows.
         
@@ -407,6 +492,8 @@ class AccumulationBacktester:
                     trades = self.replay_with_thresholds(
                         df, window_signals, w["train_start"], w["test_end"], cfg,
                         confirmed_only=confirmed_only,
+                        use_filters=use_filters,
+                        rsi_threshold=rsi_threshold,
                     )
                 else:
                     trades = self.simulate_tracking(
@@ -414,6 +501,9 @@ class AccumulationBacktester:
                         start_idx=w["train_start"],
                         end_idx=w["test_end"],
                         cfg=cfg,
+                        confirmed_only=confirmed_only,
+                        use_filters=use_filters,
+                        rsi_threshold=rsi_threshold,
                     )
 
                 # Only count trades that ENTERED during test period
@@ -443,7 +533,9 @@ class AccumulationBacktester:
 
     def holdout_test(self, data: dict, symbols: list[str],
                      cfg: BacktestConfig,
-                     confirmed_only: bool = False) -> dict:
+                     confirmed_only: bool = False,
+                     use_filters: bool = False,
+                     rsi_threshold: float = 0) -> dict:
         """Run on final holdout period (never seen during walk-forward)."""
         spy_df = data.get("__SPY__")
         if spy_df is None:
@@ -474,6 +566,8 @@ class AccumulationBacktester:
                 end_idx=holdout_end,
                 cfg=cfg,
                 confirmed_only=confirmed_only,
+                use_filters=use_filters,
+                rsi_threshold=rsi_threshold,
             )
 
             holdout_start_date = str(df.index[holdout_start].date())
@@ -773,6 +867,10 @@ def main():
                         help="CONFIRM_THRESHOLD (default: 11)")
     parser.add_argument("--confirmed-only", action="store_true",
                         help="Only trade when tier=confirmed (skip watch tier)")
+    parser.add_argument("--filters", action="store_true",
+                        help="Apply VP position + SPY EMA50 filters")
+    parser.add_argument("--rsi", type=float, default=0,
+                        help="RSI(2) threshold for entry (e.g. 20, 30). 0=disabled")
     args = parser.parse_args()
 
     symbols = args.symbols.split(",") if args.symbols else SYMBOLS[:30]
@@ -818,8 +916,11 @@ def main():
     else:
         # Single run: walk-forward + holdout
         confirmed_only = args.confirmed_only
+        use_filters = args.filters
+        rsi_threshold = args.rsi
         result = backtester.walk_forward(
-            data, symbols, config, confirmed_only=confirmed_only
+            data, symbols, config, confirmed_only=confirmed_only,
+            use_filters=use_filters, rsi_threshold=rsi_threshold,
         )
         print_report(result, config, label="WALK-FORWARD")
 
@@ -827,7 +928,8 @@ def main():
         print(f"\n{'━'*65}")
         print(f"  Running final holdout validation...")
         holdout_result = backtester.holdout_test(
-            data, symbols, config, confirmed_only=confirmed_only
+            data, symbols, config, confirmed_only=confirmed_only,
+            use_filters=use_filters, rsi_threshold=rsi_threshold,
         )
         print_report(holdout_result, config, label="HOLDOUT (UNSEEN DATA)")
 
