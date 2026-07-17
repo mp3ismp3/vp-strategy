@@ -27,11 +27,40 @@ def _load_state():
 def render_strategy():
     """Render the strategy overview page."""
 
-    st.markdown("# 📊 Accumulation + RSI(2) Strategy")
+    st.markdown("# 📊 Strategy Lab")
+    st.markdown("回測驗證過的交易策略。每個策略獨立運作，可單獨或組合使用。")
+    st.markdown("---")
+
+    # ─── Strategy Selector ───
+    strategies = [
+        "Wyckoff Accumulation + RSI(2)",
+        # Future: add more here
+        # "VP Mean Reversion",
+        # "SPX-VIX Divergence",
+        # "Trend Following EMA Cross",
+    ]
+
+    selected = st.selectbox("選擇策略", strategies, index=0)
+
+    if selected == "Wyckoff Accumulation + RSI(2)":
+        _render_wyckoff_rsi_strategy()
+
+
+# ─── Strategy #1: Wyckoff Accumulation + RSI(2) ─────────────────────────────
+
+def _render_wyckoff_rsi_strategy():
+    """Strategy #1: Wyckoff Accumulation + RSI(2) mean reversion entry."""
+
+    st.markdown("## 🏛️ Wyckoff Accumulation + RSI(2)")
+    st.markdown("""
+    **類型：** Swing (10-20 天) | **方向：** Long only | **頻率：** ~30 筆/年
+
+    三層確認：機構在買（Accumulation）→ 結構到位（Spring/LPS）→ 短線超賣（RSI）
+    """)
     st.markdown("---")
 
     # ─── Strategy Rules ───
-    st.markdown("## 策略規則")
+    st.markdown("### 策略規則")
 
     col1, col2, col3 = st.columns(3)
 
