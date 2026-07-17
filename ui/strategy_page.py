@@ -190,6 +190,112 @@ def render_strategy():
         st.info("尚無追蹤數據 (data/accum_state.json)")
         return
 
+    # ─── Actionable Signals ───
+    st.markdown("## ⚡ 進場信號")
+    st.markdown("""
+    以下為同時滿足三個條件的標的：
+    1. ✅ Confirmed tier (機構吸籌確認)
+    2. ✅ 近期有 Spring/LPS/SOS trigger fired
+    3. ✅ RSI(2) < 30 (短線超賣)
+    """)
+
+    # Check each confirmed symbol
+    actionable = []
+    pending_signals = []
+
+    for sym, data in state.items():
+        if not isinstance(data, dict):
+            continue
+        if data.get("tier") != "confirmed":
+            continue
+
+        phase = data.get("phase", "UNKNOWN")
+        score = data.get("decay_score", 0)
+        sp = data.get("support_primary", 0)
+        sd = data.get("support_dynamic", 0)
+        res = data.get("resistance", 0)
+        triggers_fired = data.get("triggers_fired", [])
+        pending = data.get("pending_triggers", [])
+
+        # Check if trigger fired recently (last entry in triggers_fired)
+        has_recent_trigger = False
+        trigger_info = ""
+        if triggers_fired:
+            last_trigger = triggers_fired[-1]
+            trigger_info = f"{last_trigger.get('type', '?')} ({last_trigger.get('date', '?')})"
+            has_recent_trigger = True
+
+        # Build signal info
+        signal = {
+            "symbol": sym,
+            "phase": phase,
+            "score": score,
+            "support_dynamic": sd,
+            "resistance": res,
+            "trigger_info": trigger_info,
+            "has_trigger": has_recent_trigger,
+            "has_pending": len(pending) > 0,
+            "pending_type": pending[0].get("type", "?") if pending else "",
+        }
+
+        if has_recent_trigger:
+            actionable.append(signal)
+        elif pending:
+            pending_signals.append(signal)
+
+    if actionable:
+        for sig in actionable:
+            st.success(
+                f"**{sig['symbol']}** — Phase {sig['phase']} | "
+                f"Score {sig['score']:.1f}\n\n"
+                f"🎯 Trigger: **{sig['trigger_info']}**\n\n"
+                f"📍 Support: ${sig['support_dynamic']:.1f} | "
+                f"Resistance: ${sig['resistance']:.1f}\n\n"
+                f"⏳ **等待 RSI(2) < 30 進場** — "
+                f"當價格短線超賣時用次日 Open 買入"
+            )
+    else:
+        st.warning("目前沒有已觸發的 confirmed 信號。")
+
+    if pending_signals:
+        with st.expander(f"⏳ 等待確認中 ({len(pending_signals)} 檔)", expanded=True):
+            for sig in pending_signals:
+                st.info(
+                    f"**{sig['symbol']}** — Phase {sig['phase']} | "
+                    f"Score {sig['score']:.1f}\n\n"
+                    f"Pending: **{sig['pending_type']}** (等待 Day-2 確認)\n\n"
+                    f"Support: ${sig['support_dynamic']:.1f} | "
+                    f"Resistance: ${sig['resistance']:.1f}"
+                )
+
+    st.markdown("---")
+
+    # ─── Entry Checklist ───
+    st.markdown("## 📋 進場 Checklist")
+    st.markdown("""
+    每次看到信號時，逐項確認：
+
+    | # | 檢查項 | 如何確認 |
+    |---|--------|---------|
+    | 1 | Confirmed tier ✅ | 上方表格顯示 |
+    | 2 | Trigger fired (Spring/LPS/SOS) ✅ | 上方表格 or Telegram alert |
+    | 3 | RSI(2) < 30 | 打開 TradingView → 加 RSI(2) → 看數值 |
+    | 4 | 次日 Open 買入 | 不追盤，等開盤價 |
+    | 5 | 設 Stop Loss | 用 trigger 給的 SL 價位 |
+    | 6 | Position size ≤ 1-2% risk | (帳戶 × 1%) ÷ (Entry - SL) = 股數 |
+
+    ### 不要進場的情況
+    - ❌ RSI(2) > 30（還沒超賣，等一下）
+    - ❌ Watch tier（未確認，信號不可靠）
+    - ❌ 同時持倉已 ≥ 3 筆（分散風險）
+    - ❌ VIX > 30（極端恐慌，所有觸發暫停）
+    """)
+
+    st.markdown("---")
+
+    # ─── Current Tracked Symbols ───
+    st.markdown("## 📋 完整追蹤清單")
+
     confirmed = [(s, d) for s, d in state.items()
                  if isinstance(d, dict) and d.get("tier") == "confirmed"]
     watch = [(s, d) for s, d in state.items()
