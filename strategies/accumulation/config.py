@@ -6,7 +6,7 @@ All thresholds and parameters for the accumulation detection system.
 # ─── Scoring Thresholds ───
 MAX_SCORE = 21          # Maximum raw score (7 indicators × 3 points each)
 ENTRY_THRESHOLD = 7     # Minimum score to enter watchlist (tightened from 5)
-CONFIRM_THRESHOLD = 11  # Score needed to promote to confirmed tier (tightened from 9)
+CONFIRM_THRESHOLD = 12  # Score needed to promote to confirmed tier (backtest validated: plateau 0.15 Sharpe)
 EXIT_THRESHOLD = 4      # Score below which symbol is auto-removed
 
 # ─── Decay Rates ───
