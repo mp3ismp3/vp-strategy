@@ -38,6 +38,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/scanner", label: "Scanner" },
     { href: "/accumulation", label: "Accumulation" },
+    { href: "/strategy", label: "Strategy" },
     { href: "/fusion", label: "Fusion" },
     { href: "/pricing", label: "Pricing" },
   ];
