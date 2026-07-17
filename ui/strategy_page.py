@@ -7,7 +7,6 @@ Read-only — no computation, no file writes.
 import json
 from pathlib import Path
 
-import numpy as np
 import streamlit as st
 
 
