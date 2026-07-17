@@ -107,147 +107,175 @@ class AccumulationBacktester:
         print(f"  Downloaded {len(data) - 1}/{len(symbols)} symbols")
         return data
 
-    def simulate_tracking(self, df: pd.DataFrame, spy_df: pd.DataFrame,
-                          start_idx: int, end_idx: int,
-                          cfg: BacktestConfig) -> list[Trade]:
+    def precompute_signals(self, df: pd.DataFrame, spy_df: pd.DataFrame,
+                           start_idx: int, end_idx: int) -> list[dict]:
         """
-        Simulate accumulation tracking over a date range.
+        Pre-compute daily scores, phases, and triggers for every bar.
+        This is the expensive part — only needs to run ONCE per symbol.
         
-        Key fixes vs old version:
-          1. Correctly parses check_triggers() return dict
-          2. Entry at next-day Open (no look-ahead)
-          3. Uses trigger's SL/TP values (consistent with live)
-          4. Decay rate switches by phase (consistent with live)
+        Returns list of dicts (one per bar from start_idx to end_idx).
         """
-        trades = []
-        if len(df) < end_idx or len(spy_df) < start_idx:
-            return trades
-
-        # Per-symbol tracking state
-        tracking = False
-        decay_score = 0.0
-        promote_streak = 0
-        tier = "watch"
-        phase = "UNKNOWN"
-        pending_triggers = []  # Day-2 confirmation queue
+        signals = []
+        pending_triggers_precompute = []
 
         for i in range(start_idx, end_idx):
+            entry = {"idx": i, "raw_score": 0, "phase": "UNKNOWN",
+                     "support_primary": 0, "support_dynamic": 0,
+                     "resistance": 0, "triggered": [], "pending_out": []}
+
             if i < 60:
+                signals.append(entry)
                 continue
 
-            # Data up to current bar only (no look-ahead)
             df_slice = df.iloc[:i + 1]
             spy_slice = spy_df.iloc[:i + 1] if len(spy_df) > i else spy_df
 
             try:
                 result = compute_daily_score(df_slice.tail(130), spy_slice.tail(130))
                 if not isinstance(result, dict):
+                    signals.append(entry)
                     continue
 
                 raw_score = result.get("raw_score", 0)
-                support_primary = result.get("support_primary", 0)
-                support_dynamic = result.get("support_dynamic", 0)
-                resistance = result.get("resistance", 0)
+                sp = result.get("support_primary", 0)
+                sd = result.get("support_dynamic", 0)
+                res = result.get("resistance", 0)
 
-                # ─── Entry/exit tracking ───
-                if not tracking:
-                    if raw_score >= cfg.entry_threshold:
-                        tracking = True
-                        decay_score = float(raw_score)
-                    continue
+                entry["raw_score"] = raw_score
+                entry["support_primary"] = sp
+                entry["support_dynamic"] = sd
+                entry["resistance"] = res
 
-                # ─── Decay: switch rate by phase (matches live) ───
-                if phase in ("C", "D", "E"):
-                    decay_rate = DECAY_RATE_FAST
-                else:
-                    decay_rate = DECAY_RATE_SLOW
-                decay_score = max(float(raw_score), decay_score * decay_rate)
-
-                # Exit if score too low
-                if decay_score < 3:
-                    tracking = False
-                    decay_score = 0.0
-                    promote_streak = 0
-                    tier = "watch"
-                    continue
-
-                # ─── Promotion (fixed streak=2) ───
-                if decay_score >= cfg.confirm_threshold:
-                    promote_streak += 1
-                else:
-                    promote_streak = 0
-                if promote_streak >= cfg.promotion_streak:
-                    tier = "confirmed"
-
-                # ─── Phase classification ───
-                phase_result = classify_phase(
-                    df_slice.tail(130), support_primary, support_dynamic, resistance
-                )
+                # Phase classification
+                phase_result = classify_phase(df_slice.tail(130), sp, sd, res)
                 if isinstance(phase_result, dict):
-                    phase = phase_result.get("phase", "UNKNOWN")
+                    entry["phase"] = phase_result.get("phase", "UNKNOWN")
 
-                # ─── Check triggers (FIXED: correct dict parsing + pending) ───
+                # Triggers (with pending from previous bar)
                 triggers_result = check_triggers(
-                    df_slice.tail(60), phase,
-                    support_primary, support_dynamic, resistance,
-                    pending_triggers=pending_triggers,
+                    df_slice.tail(60), entry["phase"],
+                    sp, sd, res,
+                    pending_triggers=pending_triggers_precompute,
                 )
-
-                if not isinstance(triggers_result, dict):
-                    continue
-
-                triggered_list = triggers_result.get("triggered", [])
-
-                # Store new pending for next iteration (day-2 confirmation)
-                pending_triggers = triggers_result.get("pending", [])
-
-                if not triggered_list:
-                    continue
-
-                # ─── Process each triggered signal ───
-                for trig in triggered_list:
-                    if not isinstance(trig, dict):
-                        continue
-
-                    trig_type = trig.get("type", "")
-
-                    # Determine max hold by trigger type
-                    if "SPRING" in trig_type:
-                        max_hold = cfg.max_hold_spring
-                    elif "LPS" in trig_type:
-                        max_hold = cfg.max_hold_lps
-                    else:
-                        max_hold = cfg.max_hold_sos
-
-                    # ─── FIXED: Entry at NEXT DAY Open (no look-ahead) ───
-                    entry_bar_idx = i + 1
-                    if entry_bar_idx >= len(df):
-                        continue
-                    entry_price = float(df.iloc[entry_bar_idx]["Open"])
-                    entry_price *= (1 + cfg.slippage_pct / 100)
-
-                    # ─── FIXED: Use trigger's SL/TP (matches live) ───
-                    sl = trig.get("stop", support_primary)
-                    tp = trig.get("target", resistance)
-
-                    # Validate R:R
-                    risk = entry_price - sl
-                    reward = tp - entry_price
-                    if risk <= 0 or reward / risk < 1.0:
-                        continue
-
-                    # Simulate trade forward
-                    trade = self._simulate_trade(
-                        df, entry_bar_idx, entry_price, sl, tp,
-                        max_hold, trig_type, phase, tier, decay_score
-                    )
-                    if trade:
-                        trades.append(trade)
-
+                if isinstance(triggers_result, dict):
+                    entry["triggered"] = triggers_result.get("triggered", [])
+                    pending_triggers_precompute = triggers_result.get("pending", [])
+                    entry["pending_out"] = pending_triggers_precompute
             except Exception:
+                pass
+
+            signals.append(entry)
+
+        return signals
+
+    def replay_with_thresholds(self, df: pd.DataFrame, signals: list[dict],
+                               start_idx: int, end_idx: int,
+                               cfg: BacktestConfig,
+                               confirmed_only: bool = False) -> list[Trade]:
+        """
+        Replay pre-computed signals with different threshold params.
+        This is FAST — just threshold logic + trade simulation.
+        
+        If confirmed_only=True, only generates trades when tier == "confirmed".
+        """
+        trades = []
+        tracking = False
+        decay_score = 0.0
+        promote_streak = 0
+        tier = "watch"
+        phase = "UNKNOWN"
+
+        for si, sig in enumerate(signals):
+            i = sig["idx"]
+            raw_score = sig["raw_score"]
+            phase = sig["phase"]
+
+            # Entry/exit tracking
+            if not tracking:
+                if raw_score >= cfg.entry_threshold:
+                    tracking = True
+                    decay_score = float(raw_score)
                 continue
 
+            # Decay (phase-based)
+            if phase in ("C", "D", "E"):
+                dr = DECAY_RATE_FAST
+            else:
+                dr = DECAY_RATE_SLOW
+            decay_score = max(float(raw_score), decay_score * dr)
+
+            # Exit
+            if decay_score < 3:
+                tracking = False
+                decay_score = 0.0
+                promote_streak = 0
+                tier = "watch"
+                continue
+
+            # Promotion
+            if decay_score >= cfg.confirm_threshold:
+                promote_streak += 1
+            else:
+                promote_streak = 0
+            if promote_streak >= cfg.promotion_streak:
+                tier = "confirmed"
+
+            # Tier filter: skip watch if confirmed_only
+            if confirmed_only and tier != "confirmed":
+                continue
+
+            # Process triggers
+            triggered_list = sig.get("triggered", [])
+            if not triggered_list:
+                continue
+
+            for trig in triggered_list:
+                if not isinstance(trig, dict):
+                    continue
+                trig_type = trig.get("type", "")
+
+                if "SPRING" in trig_type:
+                    max_hold = cfg.max_hold_spring
+                elif "LPS" in trig_type:
+                    max_hold = cfg.max_hold_lps
+                else:
+                    max_hold = cfg.max_hold_sos
+
+                # Entry at next-day Open
+                entry_bar_idx = i + 1
+                if entry_bar_idx >= len(df):
+                    continue
+                entry_price = float(df.iloc[entry_bar_idx]["Open"])
+                entry_price *= (1 + cfg.slippage_pct / 100)
+
+                sl = trig.get("stop", sig["support_primary"])
+                tp = trig.get("target", sig["resistance"])
+
+                risk = entry_price - sl
+                reward = tp - entry_price
+                if risk <= 0 or reward / risk < 1.0:
+                    continue
+
+                trade = self._simulate_trade(
+                    df, entry_bar_idx, entry_price, sl, tp,
+                    max_hold, trig_type, phase, tier, decay_score
+                )
+                if trade:
+                    trades.append(trade)
+
         return trades
+
+    def simulate_tracking(self, df: pd.DataFrame, spy_df: pd.DataFrame,
+                          start_idx: int, end_idx: int,
+                          cfg: BacktestConfig,
+                          confirmed_only: bool = False) -> list[Trade]:
+        """
+        Full simulation (precompute + replay). Used for single runs.
+        """
+        signals = self.precompute_signals(df, spy_df, start_idx, end_idx)
+        return self.replay_with_thresholds(
+            df, signals, start_idx, end_idx, cfg, confirmed_only=confirmed_only
+        )
 
     def _simulate_trade(self, df: pd.DataFrame, entry_idx: int,
                         entry: float, sl: float, tp: float,
@@ -311,10 +339,13 @@ class AccumulationBacktester:
         return trade
 
     def walk_forward(self, data: dict, symbols: list[str],
-                     cfg: BacktestConfig, exclude_holdout: bool = True) -> dict:
+                     cfg: BacktestConfig, exclude_holdout: bool = True,
+                     precomputed: dict = None,
+                     confirmed_only: bool = False) -> dict:
         """
         Run walk-forward backtest across rolling windows.
         
+        If precomputed is provided, skips expensive score computation.
         If exclude_holdout=True, reserves the last holdout_days for final validation.
         """
         spy_df = data.get("__SPY__")
@@ -367,13 +398,23 @@ class AccumulationBacktester:
                     continue
                 df.attrs["symbol"] = sym
 
-                # Build state during train, generate trades in full range
-                trades = self.simulate_tracking(
-                    df, spy_df,
-                    start_idx=w["train_start"],
-                    end_idx=w["test_end"],
-                    cfg=cfg,
-                )
+                # Use precomputed signals if available, otherwise compute
+                if precomputed and sym in precomputed:
+                    signals = precomputed[sym]
+                    # Filter signals to window range
+                    window_signals = [s for s in signals
+                                      if w["train_start"] <= s["idx"] < w["test_end"]]
+                    trades = self.replay_with_thresholds(
+                        df, window_signals, w["train_start"], w["test_end"], cfg,
+                        confirmed_only=confirmed_only,
+                    )
+                else:
+                    trades = self.simulate_tracking(
+                        df, spy_df,
+                        start_idx=w["train_start"],
+                        end_idx=w["test_end"],
+                        cfg=cfg,
+                    )
 
                 # Only count trades that ENTERED during test period
                 test_start_date = str(df.index[w["test_start"]].date())
@@ -401,7 +442,8 @@ class AccumulationBacktester:
         return {"trades": all_trades, "windows": window_results}
 
     def holdout_test(self, data: dict, symbols: list[str],
-                     cfg: BacktestConfig) -> dict:
+                     cfg: BacktestConfig,
+                     confirmed_only: bool = False) -> dict:
         """Run on final holdout period (never seen during walk-forward)."""
         spy_df = data.get("__SPY__")
         if spy_df is None:
@@ -431,6 +473,7 @@ class AccumulationBacktester:
                 start_idx=warmup_start,
                 end_idx=holdout_end,
                 cfg=cfg,
+                confirmed_only=confirmed_only,
             )
 
             holdout_start_date = str(df.index[holdout_start].date())
@@ -446,16 +489,38 @@ class AccumulationBacktester:
         Sweep ENTRY_THRESHOLD × CONFIRM_THRESHOLD.
         PROMOTION_STREAK fixed at 2.
         
-        Grid: entry ∈ [5,6,7,8,9], confirm ∈ [9,10,11,12,13]
-        Constraint: entry < confirm (always)
+        Optimization: pre-computes all signals ONCE, then replays with
+        different threshold params (10-20x faster than recomputing).
         """
         print("\n  Running parameter robustness sweep...")
-        print("  (ENTRY_THRESHOLD × CONFIRM_THRESHOLD, PROMOTION_STREAK=2 fixed)\n")
-        results = []
+        print("  (ENTRY_THRESHOLD × CONFIRM_THRESHOLD, PROMOTION_STREAK=2 fixed)")
+        print("  Pre-computing signals (one-time cost)...\n")
 
+        spy_df = data.get("__SPY__")
+        max_len = max(len(data[sym]) for sym in symbols if sym in data)
+        usable_bars = max_len - self.config.holdout_days
+
+        # Pre-compute signals for ALL symbols ONCE
+        precomputed = {}
+        for sym in symbols:
+            if sym not in data or sym == "__SPY__":
+                continue
+            df = data[sym]
+            if len(df) < usable_bars:
+                continue
+            df.attrs["symbol"] = sym
+            print(f"    Pre-computing {sym}...", end=" ", flush=True)
+            signals = self.precompute_signals(df, spy_df, 0, usable_bars)
+            precomputed[sym] = signals
+            n_triggers = sum(1 for s in signals if s.get("triggered"))
+            print(f"{len(signals)} bars, {n_triggers} trigger events")
+
+        print(f"\n  Pre-computation done: {len(precomputed)} symbols")
+        print(f"  Now sweeping thresholds...\n")
+
+        results = []
         entry_values = [5, 6, 7, 8, 9]
         confirm_values = [9, 10, 11, 12, 13]
-
         combos = [(e, c) for e in entry_values for c in confirm_values if e < c]
         total = len(combos)
 
@@ -464,7 +529,10 @@ class AccumulationBacktester:
             cfg.entry_threshold = entry_t
             cfg.confirm_threshold = confirm_t
 
-            result = self.walk_forward(data, symbols, cfg, exclude_holdout=True)
+            result = self.walk_forward(
+                data, symbols, cfg, exclude_holdout=True,
+                precomputed=precomputed, confirmed_only=True,
+            )
             trades = result["trades"]
 
             if len(trades) >= 10:
@@ -703,6 +771,8 @@ def main():
                         help="ENTRY_THRESHOLD (default: 7)")
     parser.add_argument("--confirm-threshold", type=int, default=11,
                         help="CONFIRM_THRESHOLD (default: 11)")
+    parser.add_argument("--confirmed-only", action="store_true",
+                        help="Only trade when tier=confirmed (skip watch tier)")
     args = parser.parse_args()
 
     symbols = args.symbols.split(",") if args.symbols else SYMBOLS[:30]
@@ -727,7 +797,7 @@ def main():
     data = backtester.download_data(symbols, total_days=args.days)
 
     if args.robustness:
-        # Parameter sweep (walk-forward region only)
+        # Parameter sweep (walk-forward region only, confirmed tier only)
         results = backtester.robustness_sweep(data, symbols)
         print_robustness(results)
 
@@ -741,17 +811,24 @@ def main():
             holdout_cfg.entry_threshold = best["entry_threshold"]
             holdout_cfg.confirm_threshold = best["confirm_threshold"]
 
-            holdout_result = backtester.holdout_test(data, symbols, holdout_cfg)
+            holdout_result = backtester.holdout_test(
+                data, symbols, holdout_cfg, confirmed_only=args.confirmed_only
+            )
             print_report(holdout_result, holdout_cfg, label="HOLDOUT VALIDATION")
     else:
         # Single run: walk-forward + holdout
-        result = backtester.walk_forward(data, symbols, config)
+        confirmed_only = args.confirmed_only
+        result = backtester.walk_forward(
+            data, symbols, config, confirmed_only=confirmed_only
+        )
         print_report(result, config, label="WALK-FORWARD")
 
         # Final holdout
         print(f"\n{'━'*65}")
         print(f"  Running final holdout validation...")
-        holdout_result = backtester.holdout_test(data, symbols, config)
+        holdout_result = backtester.holdout_test(
+            data, symbols, config, confirmed_only=confirmed_only
+        )
         print_report(holdout_result, config, label="HOLDOUT (UNSEEN DATA)")
 
 
