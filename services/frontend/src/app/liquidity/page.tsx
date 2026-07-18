@@ -77,8 +77,12 @@ function detectSweeps(ohlc: OHLCBar[], swingPoints: SwingPoint[]): SweepEvent[] 
 
   // Minimum penetration ratio to filter noise (wick must pierce at least 0.1% past level)
   const MIN_PENETRATION = 0.001;
+  // Maximum penetration ratio (too deep = not a sweep, it's a trend move)
+  const MAX_PENETRATION = 0.03;
   // Volume must be at least 1.2x the 20-day median (stop-loss triggering = volume spike)
   const MIN_VOL_RATIO = 1.2;
+  // Open must be within this % of the swing level (ensures price approaches from correct side)
+  const MAX_OPEN_DISTANCE = 0.02;
 
   // Compute 20-day volume median for each bar
   const volMedian = ohlc.map((_, i) => {
@@ -102,9 +106,15 @@ function detectSweeps(ohlc: OHLCBar[], swingPoints: SwingPoint[]): SweepEvent[] 
     const swingLows = relevantSwings.filter((sp) => sp.type === "low");
     for (const sl of swingLows) {
       if (bar.low < sl.price && bar.close > sl.price) {
+        // Open must be above or near the swing low (price approaches from above, dips below, reclaims)
+        // If open is far below swing low, price was already broken down — not a sweep
+        const openDistance = (sl.price - bar.open) / sl.price;
+        if (bar.open < sl.price && openDistance > MAX_OPEN_DISTANCE) continue;
+
         // Check minimum penetration depth
         const penetration = (sl.price - bar.low) / sl.price;
         if (penetration < MIN_PENETRATION) continue;
+        if (penetration > MAX_PENETRATION) continue;
 
         // Check volume confirmation
         const vRatio = bar.volume / volMedian[i];
@@ -140,9 +150,15 @@ function detectSweeps(ohlc: OHLCBar[], swingPoints: SwingPoint[]): SweepEvent[] 
     const swingHighs = relevantSwings.filter((sp) => sp.type === "high");
     for (const sh of swingHighs) {
       if (bar.high > sh.price && bar.close < sh.price) {
+        // Open must be below or near the swing high (price approaches from below, spikes above, rejects)
+        // If open is far above swing high, price was already broken out — not a sweep
+        const openDistance = (bar.open - sh.price) / sh.price;
+        if (bar.open > sh.price && openDistance > MAX_OPEN_DISTANCE) continue;
+
         // Check minimum penetration depth
         const penetration = (bar.high - sh.price) / sh.price;
         if (penetration < MIN_PENETRATION) continue;
+        if (penetration > MAX_PENETRATION) continue;
 
         // Check volume confirmation
         const vRatio = bar.volume / volMedian[i];
