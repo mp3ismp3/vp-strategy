@@ -39,6 +39,7 @@ export function Navbar() {
     { href: "/scanner", label: "Scanner" },
     { href: "/accumulation", label: "Accumulation" },
     { href: "/strategy", label: "Strategy" },
+    { href: "/liquidity", label: "Liquidity" },
     { href: "/fusion", label: "Fusion" },
     { href: "/pricing", label: "Pricing" },
   ];
