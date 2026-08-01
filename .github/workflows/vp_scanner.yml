@@ -35,6 +35,12 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python accumulation.py --notify
 
+      - name: Run MACD divergence scan
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python macd_scan.py --notify
+
       - name: Export frontend chart data
         run: python export_frontend_data.py
 
