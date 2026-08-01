@@ -28,7 +28,7 @@ SYMBOLS = [
     # ETFs
     "SPY", "QQQ",
     # Misc Tech / AI Adjacent
-    "UBER", "XYZ", "SHOP", "COIN",
+    "UBER", "XYZ", "SHOP", "COIN", "MSTR",
 ]
 
 SECTOR_ETFS = ["SMH", "XLK", "IGV", "SKYY", "BOTZ"]
@@ -47,7 +47,7 @@ SYMBOL_CATEGORIES = {
     "AI Cybersecurity": ["S", "CYBR", "OKTA"],
     "AI Enterprise / Automation": ["MNDY", "DOCN", "TWLO", "TTD"],
     "ETFs": ["SPY", "QQQ"],
-    "Misc Tech": ["UBER", "XYZ", "SHOP", "COIN"],
+    "Misc Tech": ["UBER", "XYZ", "SHOP", "COIN", "MSTR"],
 }
 
 SECTOR_MAP = {
@@ -65,7 +65,7 @@ SECTOR_MAP = {
     "VST": "XLK", "CEG": "XLK", "TLN": "XLK", "NRG": "XLK",
     "ETN": "XLK", "PWR": "XLK", "GEV": "XLK", "FSLR": "XLK",
     "SPY": "SPY", "QQQ": "QQQ",
-    "UBER": "XLK", "XYZ": "XLK", "SHOP": "IGV", "COIN": "XLK", "AMZN": "XLK",
+    "UBER": "XLK", "XYZ": "XLK", "SHOP": "IGV", "COIN": "XLK", "MSTR": "XLK", "AMZN": "XLK",
     # New AI stocks
     "SERV": "XLK", "IONQ": "XLK", "RGTI": "XLK", "QUBT": "XLK",
     "CSCO": "XLK", "CIEN": "XLK", "LITE": "XLK",

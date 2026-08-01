@@ -13,7 +13,7 @@ export const SYMBOL_CATEGORIES: Record<string, string[]> = {
   "AI Cybersecurity": ["S", "OKTA"],
   "AI Enterprise / Automation": ["MNDY", "DOCN", "TWLO", "TTD"],
   "ETFs": ["SPY", "QQQ"],
-  "Misc Tech": ["UBER", "XYZ", "SHOP", "COIN"],
+  "Misc Tech": ["UBER", "XYZ", "SHOP", "COIN", "MSTR"],
 };
 
 // Reverse lookup: ticker → category
