@@ -456,3 +456,215 @@ def determine_bias(df, ema_fast=20, ema_slow=50, swing_len=5, position_lookback=
         "structure": structure,
         "position": round(position, 3),
     }
+
+
+def calc_macd(df, fast=12, slow=26, signal=9):
+    """Calculate MACD indicator.
+
+    Args:
+        df: DataFrame with 'Close' column
+        fast: fast EMA period (default 12)
+        slow: slow EMA period (default 26)
+        signal: signal line EMA period (default 9)
+
+    Returns:
+        DataFrame with columns: macd, signal, histogram
+        Returns None if insufficient data.
+    """
+    import pandas as pd
+
+    if df is None or len(df) < slow + signal:
+        return None
+
+    close = df["Close"]
+    ema_fast = close.ewm(span=fast, adjust=False).mean()
+    ema_slow = close.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+
+    result = pd.DataFrame({
+        "macd": macd_line,
+        "signal": signal_line,
+        "histogram": histogram,
+    }, index=df.index)
+
+    return result
+
+
+def find_swing_highs(values, lookback=5):
+    """Find swing high points in a 1-D array.
+
+    A swing high is a point higher than all points within `lookback` on both sides.
+
+    Args:
+        values: numpy array of prices or indicator values.
+        lookback: number of bars on each side to compare.
+
+    Returns:
+        List of dicts: [{"index": int, "value": float}, ...]
+    """
+    import numpy as np
+
+    values = np.asarray(values, dtype=float)
+    points = []
+    for i in range(lookback, len(values) - lookback):
+        window = values[i - lookback: i + lookback + 1]
+        if values[i] == window.max() and np.sum(window == values[i]) == 1:
+            points.append({"index": i, "value": float(values[i])})
+    return points
+
+
+def find_swing_lows(values, lookback=5):
+    """Find swing low points in a 1-D array.
+
+    A swing low is a point lower than all points within `lookback` on both sides.
+
+    Args:
+        values: numpy array of prices or indicator values.
+        lookback: number of bars on each side to compare.
+
+    Returns:
+        List of dicts: [{"index": int, "value": float}, ...]
+    """
+    import numpy as np
+
+    values = np.asarray(values, dtype=float)
+    points = []
+    for i in range(lookback, len(values) - lookback):
+        window = values[i - lookback: i + lookback + 1]
+        if values[i] == window.min() and np.sum(window == values[i]) == 1:
+            points.append({"index": i, "value": float(values[i])})
+    return points
+
+
+def detect_macd_divergence(df, lookback=60, swing_lookback=5, max_bars_ago=10):
+    """Detect MACD divergence (bullish and bearish) on a DataFrame.
+
+    Bullish divergence: price makes lower low, MACD makes higher low.
+    Bearish divergence: price makes higher high, MACD makes lower high.
+
+    Args:
+        df: DataFrame with OHLCV columns (needs at least slow+signal+lookback bars).
+        lookback: how many recent bars to scan for swing points.
+        swing_lookback: swing point sensitivity (bars on each side).
+        max_bars_ago: only report divergences where the latest swing is within
+                      this many bars from the end.
+
+    Returns:
+        List of dicts:
+        [{"type": "bullish"|"bearish",
+          "bars_ago": int,
+          "price_prev": float, "price_curr": float,
+          "macd_prev": float, "macd_curr": float,
+          "index": int (absolute index in df)}, ...]
+        Returns empty list if insufficient data.
+    """
+    import numpy as np
+
+    macd_df = calc_macd(df)
+    if macd_df is None:
+        return []
+
+    n = len(df)
+    if n < lookback:
+        return []
+
+    start = n - lookback
+    price_lows = df["Low"].values.astype(float)
+    price_highs = df["High"].values.astype(float)
+    macd_values = macd_df["macd"].values.astype(float)
+
+    signals = []
+
+    # ─── Bullish Divergence: price lower low + MACD higher low ───
+    p_lows = find_swing_lows(price_lows[start:], swing_lookback)
+    m_lows = find_swing_lows(macd_values[start:], swing_lookback)
+
+    if len(p_lows) >= 2 and len(m_lows) >= 2:
+        p1 = p_lows[-2]
+        p2 = p_lows[-1]
+
+        # Find MACD low closest to each price low
+        m1 = _closest_swing(m_lows, p1["index"])
+        m2 = _closest_swing(m_lows, p2["index"])
+
+        if m1 and m2:
+            bars_ago = (lookback - 1) - p2["index"]
+            if (p2["value"] < p1["value"] and
+                    m2["value"] > m1["value"] and
+                    bars_ago <= max_bars_ago):
+                signals.append({
+                    "type": "bullish",
+                    "bars_ago": bars_ago,
+                    "price_prev": p1["value"],
+                    "price_curr": p2["value"],
+                    "macd_prev": m1["value"],
+                    "macd_curr": m2["value"],
+                    "index": start + p2["index"],
+                })
+
+    # ─── Bearish Divergence: price higher high + MACD lower high ───
+    p_highs = find_swing_highs(price_highs[start:], swing_lookback)
+    m_highs = find_swing_highs(macd_values[start:], swing_lookback)
+
+    if len(p_highs) >= 2 and len(m_highs) >= 2:
+        p1 = p_highs[-2]
+        p2 = p_highs[-1]
+
+        m1 = _closest_swing(m_highs, p1["index"])
+        m2 = _closest_swing(m_highs, p2["index"])
+
+        if m1 and m2:
+            bars_ago = (lookback - 1) - p2["index"]
+            if (p2["value"] > p1["value"] and
+                    m2["value"] < m1["value"] and
+                    bars_ago <= max_bars_ago):
+                signals.append({
+                    "type": "bearish",
+                    "bars_ago": bars_ago,
+                    "price_prev": p1["value"],
+                    "price_curr": p2["value"],
+                    "macd_prev": m1["value"],
+                    "macd_curr": m2["value"],
+                    "index": start + p2["index"],
+                })
+
+    return signals
+
+
+def _closest_swing(swings, target_index, tolerance=6):
+    """Find the swing point closest to target_index within tolerance."""
+    best = None
+    best_dist = tolerance
+    for s in swings:
+        dist = abs(s["index"] - target_index)
+        if dist < best_dist:
+            best_dist = dist
+            best = s
+    return best
+
+
+def resample_to_weekly(df):
+    """Resample a daily OHLCV DataFrame to weekly bars.
+
+    Args:
+        df: DataFrame with OHLCV columns and DatetimeIndex.
+
+    Returns:
+        Weekly DataFrame with same columns, or None if insufficient data.
+    """
+    import pandas as pd
+
+    if df is None or len(df) < 10:
+        return None
+
+    weekly = df.resample("W").agg({
+        "Open": "first",
+        "High": "max",
+        "Low": "min",
+        "Close": "last",
+        "Volume": "sum",
+    }).dropna()
+
+    return weekly if len(weekly) >= 5 else None

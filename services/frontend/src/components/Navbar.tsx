@@ -40,6 +40,7 @@ export function Navbar() {
     { href: "/accumulation", label: "Accumulation" },
     { href: "/strategy", label: "Strategy" },
     { href: "/liquidity", label: "Liquidity" },
+    { href: "/macd", label: "MACD" },
     { href: "/fusion", label: "Fusion" },
     { href: "/pricing", label: "Pricing" },
   ];
