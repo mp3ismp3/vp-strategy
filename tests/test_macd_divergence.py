@@ -9,6 +9,7 @@ from core.indicators import (
     find_swing_highs,
     find_swing_lows,
     detect_macd_divergence,
+    macd_turning_points,
     resample_to_weekly,
     _closest_swing,
 )
@@ -175,6 +176,83 @@ class TestSwingPoints:
             assert isinstance(p["value"], float)
 
 
+# ─── macd_turning_points Tests ────────────────────────────────────────────────
+
+
+class TestMACDTurningPoints:
+    def test_finds_lows_in_negative_segments(self):
+        """Finds minimum in each negative segment between zero crossings."""
+        # Two negative segments separated by a positive segment
+        values = [1, 0.5, -1, -3, -2, 0.5, 2, 1, -0.5, -4, -1, 0.5]
+        result = macd_turning_points(values, mode="low")
+        assert len(result) == 2
+        # First negative segment: [-1, -3, -2] → min at index 3
+        assert result[0]["index"] == 3
+        assert result[0]["value"] == -3.0
+        # Second negative segment: [-0.5, -4, -1] → min at index 9
+        assert result[1]["index"] == 9
+        assert result[1]["value"] == -4.0
+
+    def test_finds_highs_in_positive_segments(self):
+        """Finds maximum in each positive segment between zero crossings."""
+        values = [-1, -0.5, 1, 3, 2, -0.5, -2, -1, 0.5, 4, 1, -0.5]
+        result = macd_turning_points(values, mode="high")
+        assert len(result) == 2
+        # First positive segment: [1, 3, 2] → max at index 3
+        assert result[0]["index"] == 3
+        assert result[0]["value"] == 3.0
+        # Second positive segment: [0.5, 4, 1] → max at index 9
+        assert result[1]["index"] == 9
+        assert result[1]["value"] == 4.0
+
+    def test_empty_array(self):
+        """Returns empty for very short data."""
+        assert macd_turning_points([], mode="low") == []
+        assert macd_turning_points([1, 2], mode="low") == []
+
+    def test_all_positive_no_lows(self):
+        """No lows found if MACD never goes negative."""
+        values = [1, 2, 3, 2, 1, 0.5, 1, 2]
+        result = macd_turning_points(values, mode="low")
+        assert result == []
+
+    def test_all_negative_no_highs(self):
+        """No highs found if MACD never goes positive."""
+        values = [-1, -2, -3, -2, -1, -0.5, -1, -2]
+        result = macd_turning_points(values, mode="high")
+        assert result == []
+
+    def test_single_negative_segment(self):
+        """Single segment from start to end (no crossing)."""
+        values = [-1, -3, -5, -2, -1]
+        result = macd_turning_points(values, mode="low")
+        assert len(result) == 1
+        assert result[0]["index"] == 2
+        assert result[0]["value"] == -5.0
+
+    def test_no_lookback_dependency(self):
+        """Same result regardless of data shape — no tunable parameter."""
+        # Construct two scenarios that would give different results with swing detection
+        # but same result with zero-crossing
+        values = [-0.1, -0.5, -2, -1.8, -0.3, 0.5, 1, 0.2, -0.1, -3, -0.5, 0.1]
+        result = macd_turning_points(values, mode="low")
+        # Should always find the min of each negative segment, regardless of "lookback"
+        assert len(result) >= 2
+        lows = [p["value"] for p in result]
+        assert -2.0 in lows
+        assert -3.0 in lows
+
+    def test_returns_correct_format(self):
+        """Each result has index and value keys."""
+        values = [1, -1, -3, -1, 1, 3, 1, -1]
+        result = macd_turning_points(values, mode="low")
+        for p in result:
+            assert "index" in p
+            assert "value" in p
+            assert isinstance(p["index"], int)
+            assert isinstance(p["value"], float)
+
+
 # ─── _closest_swing Tests ─────────────────────────────────────────────────────
 
 
@@ -270,6 +348,23 @@ class TestDetectMACDDivergence:
         result = detect_macd_divergence(df, lookback=60, swing_lookback=5, max_bars_ago=3)
         # Not asserting empty (random might have one), but should be small
         assert len(result) <= 2
+
+    def test_robust_to_swing_lookback_changes(self):
+        """MACD detection should be stable across different swing_lookback values.
+
+        Since MACD turning points now use zero-crossing (parameter-free),
+        varying swing_lookback only affects price swing detection, which is
+        more stable than the old approach where both sides depended on it.
+        """
+        df = _make_bullish_divergence_df(150)
+        results = {}
+        for sl in [3, 4, 5, 6, 7]:
+            r = detect_macd_divergence(df, lookback=60, swing_lookback=sl, max_bars_ago=15)
+            bullish = [x for x in r if x["type"] == "bullish"]
+            results[sl] = len(bullish)
+        # At least 3 out of 5 settings should detect the divergence
+        detected_count = sum(1 for v in results.values() if v >= 1)
+        assert detected_count >= 3, f"Only {detected_count}/5 settings detected divergence: {results}"
 
 
 # ─── resample_to_weekly Tests ─────────────────────────────────────────────────

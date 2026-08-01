@@ -90,7 +90,7 @@ def main():
             chart_data = {
                 "price": vp["price"] if vp["price"] == vp["price"] else float(df["Close"].dropna().iloc[-1]),
                 "daily": {
-                    "ohlc": _df_to_ohlc(df, 60),
+                    "ohlc": _df_to_ohlc(df, 252),
                     "poc": vp["daily"]["poc"],
                     "vah": vp["daily"]["vah"],
                     "val": vp["daily"]["val"],

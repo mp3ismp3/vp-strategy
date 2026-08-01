@@ -538,16 +538,154 @@ def find_swing_lows(values, lookback=5):
     return points
 
 
+def macd_turning_points(macd_values, mode="low"):
+    """Find MACD turning points using zero-crossing segmentation.
+
+    Instead of swing detection (which requires a tunable lookback parameter),
+    this uses MACD's natural structure: segments between zero-crossings contain
+    turning points. Within each segment, all significant extrema are detected
+    by finding points where the derivative changes sign.
+
+    This is parameter-free and robust because MACD is already smoothed by EMA.
+
+    Args:
+        macd_values: 1-D numpy array of MACD line values.
+        mode: "low" to find lows (in negative segments),
+              "high" to find highs (in positive segments).
+
+    Returns:
+        List of dicts: [{"index": int, "value": float}, ...]
+    """
+    import numpy as np
+
+    values = np.asarray(macd_values, dtype=float)
+    n = len(values)
+    if n < 3:
+        return []
+
+    points = []
+
+    # Find zero-crossing boundaries
+    crossings = [0]
+    for i in range(1, n):
+        if values[i] * values[i - 1] < 0:
+            crossings.append(i)
+    crossings.append(n)
+
+    for seg_idx in range(len(crossings) - 1):
+        seg_start = crossings[seg_idx]
+        seg_end = crossings[seg_idx + 1]
+        seg = values[seg_start:seg_end]
+
+        if len(seg) < 2:
+            continue
+
+        if mode == "low":
+            # Only consider segments where MACD is negative (below zero)
+            if seg.mean() >= 0:
+                continue
+            # Find all local minima within this segment
+            seg_points = _find_segment_extrema(seg, seg_start, mode="min")
+            if seg_points:
+                points.extend(seg_points)
+            else:
+                # Fallback: absolute min of segment
+                local_idx = int(np.argmin(seg))
+                points.append({
+                    "index": seg_start + local_idx,
+                    "value": float(seg[local_idx]),
+                })
+        else:  # mode == "high"
+            # Only consider segments where MACD is positive (above zero)
+            if seg.mean() <= 0:
+                continue
+            # Find all local maxima within this segment
+            seg_points = _find_segment_extrema(seg, seg_start, mode="max")
+            if seg_points:
+                points.extend(seg_points)
+            else:
+                # Fallback: absolute max of segment
+                local_idx = int(np.argmax(seg))
+                points.append({
+                    "index": seg_start + local_idx,
+                    "value": float(seg[local_idx]),
+                })
+
+    return points
+
+
+def _find_segment_extrema(seg, seg_start, mode="min"):
+    """Find local extrema within a MACD segment using derivative sign changes.
+
+    Since MACD is already smoothed, we just look for direction reversals.
+    A local min/max occurs where the MACD stops falling/rising and reverses.
+
+    Args:
+        seg: numpy array of values within one zero-crossing segment.
+        seg_start: absolute index offset for this segment.
+        mode: "min" or "max".
+
+    Returns:
+        List of dicts with index/value, or empty list.
+    """
+    import numpy as np
+
+    if len(seg) < 3:
+        return []
+
+    points = []
+    # Compute differences (sign of slope)
+    diff = np.diff(seg)
+
+    for i in range(1, len(diff)):
+        if mode == "min":
+            # Slope goes from negative to positive (or zero) → local minimum
+            if diff[i - 1] < 0 and diff[i] >= 0:
+                points.append({
+                    "index": seg_start + i,
+                    "value": float(seg[i]),
+                })
+        else:  # mode == "max"
+            # Slope goes from positive to negative (or zero) → local maximum
+            if diff[i - 1] > 0 and diff[i] <= 0:
+                points.append({
+                    "index": seg_start + i,
+                    "value": float(seg[i]),
+                })
+
+    # If multiple points found, filter out insignificant ones
+    # (keep only those that are at least 20% of segment range from each other)
+    if len(points) > 1:
+        seg_range = float(np.ptp(seg))
+        if seg_range > 0:
+            min_significance = seg_range * 0.15
+            filtered = [points[0]]
+            for p in points[1:]:
+                if abs(p["value"] - filtered[-1]["value"]) >= min_significance:
+                    filtered.append(p)
+                elif mode == "min" and p["value"] < filtered[-1]["value"]:
+                    filtered[-1] = p
+                elif mode == "max" and p["value"] > filtered[-1]["value"]:
+                    filtered[-1] = p
+            points = filtered
+
+    return points
+
+
 def detect_macd_divergence(df, lookback=60, swing_lookback=5, max_bars_ago=10):
     """Detect MACD divergence (bullish and bearish) on a DataFrame.
 
     Bullish divergence: price makes lower low, MACD makes higher low.
     Bearish divergence: price makes higher high, MACD makes lower high.
 
+    Price turning points use swing detection (lookback-based).
+    MACD turning points use zero-crossing segmentation (parameter-free),
+    which is more robust because MACD is already smoothed by EMA.
+
     Args:
         df: DataFrame with OHLCV columns (needs at least slow+signal+lookback bars).
         lookback: how many recent bars to scan for swing points.
-        swing_lookback: swing point sensitivity (bars on each side).
+        swing_lookback: swing point sensitivity for price (bars on each side).
         max_bars_ago: only report divergences where the latest swing is within
                       this many bars from the end.
 
@@ -577,9 +715,12 @@ def detect_macd_divergence(df, lookback=60, swing_lookback=5, max_bars_ago=10):
 
     signals = []
 
+    # MACD turning points via zero-crossing (parameter-free)
+    m_lows = macd_turning_points(macd_values[start:], mode="low")
+    m_highs = macd_turning_points(macd_values[start:], mode="high")
+
     # ─── Bullish Divergence: price lower low + MACD higher low ───
     p_lows = find_swing_lows(price_lows[start:], swing_lookback)
-    m_lows = find_swing_lows(macd_values[start:], swing_lookback)
 
     if len(p_lows) >= 2 and len(m_lows) >= 2:
         p1 = p_lows[-2]
@@ -606,7 +747,6 @@ def detect_macd_divergence(df, lookback=60, swing_lookback=5, max_bars_ago=10):
 
     # ─── Bearish Divergence: price higher high + MACD lower high ───
     p_highs = find_swing_highs(price_highs[start:], swing_lookback)
-    m_highs = find_swing_highs(macd_values[start:], swing_lookback)
 
     if len(p_highs) >= 2 and len(m_highs) >= 2:
         p1 = p_highs[-2]

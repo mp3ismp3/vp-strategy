@@ -124,6 +124,89 @@ function findSwingLows(values: number[], lookback: number): SwingPoint[] {
   return points;
 }
 
+function macdTurningPoints(macdValues: number[], mode: "low" | "high"): SwingPoint[] {
+  const n = macdValues.length;
+  if (n < 3) return [];
+
+  // Find zero-crossing boundaries
+  const crossings: number[] = [0];
+  for (let i = 1; i < n; i++) {
+    if (macdValues[i] * macdValues[i - 1] < 0) {
+      crossings.push(i);
+    }
+  }
+  crossings.push(n);
+
+  const points: SwingPoint[] = [];
+
+  for (let segIdx = 0; segIdx < crossings.length - 1; segIdx++) {
+    const segStart = crossings[segIdx];
+    const segEnd = crossings[segIdx + 1];
+    const seg = macdValues.slice(segStart, segEnd);
+
+    if (seg.length < 2) continue;
+
+    const segMean = seg.reduce((a, b) => a + b, 0) / seg.length;
+
+    if (mode === "low" && segMean >= 0) continue;
+    if (mode === "high" && segMean <= 0) continue;
+
+    // Find turning points via derivative sign changes
+    const segPoints: SwingPoint[] = [];
+    const diff: number[] = [];
+    for (let i = 1; i < seg.length; i++) {
+      diff.push(seg[i] - seg[i - 1]);
+    }
+
+    for (let i = 1; i < diff.length; i++) {
+      if (mode === "low" && diff[i - 1] < 0 && diff[i] >= 0) {
+        segPoints.push({ index: segStart + i, price: seg[i] });
+      } else if (mode === "high" && diff[i - 1] > 0 && diff[i] <= 0) {
+        segPoints.push({ index: segStart + i, price: seg[i] });
+      }
+    }
+
+    if (segPoints.length > 1) {
+      // Filter insignificant points (< 15% of segment range)
+      const segMin = Math.min(...seg);
+      const segMax = Math.max(...seg);
+      const segRange = segMax - segMin;
+      if (segRange > 0) {
+        const minSignificance = segRange * 0.15;
+        const filtered: SwingPoint[] = [segPoints[0]];
+        for (let i = 1; i < segPoints.length; i++) {
+          const last = filtered[filtered.length - 1];
+          if (Math.abs(segPoints[i].price - last.price) >= minSignificance) {
+            filtered.push(segPoints[i]);
+          } else if (mode === "low" && segPoints[i].price < last.price) {
+            filtered[filtered.length - 1] = segPoints[i];
+          } else if (mode === "high" && segPoints[i].price > last.price) {
+            filtered[filtered.length - 1] = segPoints[i];
+          }
+        }
+        points.push(...filtered);
+      } else {
+        points.push(...segPoints);
+      }
+    } else if (segPoints.length === 1) {
+      points.push(...segPoints);
+    } else {
+      // Fallback: absolute extremum of segment
+      if (mode === "low") {
+        const minVal = Math.min(...seg);
+        const minIdx = seg.indexOf(minVal);
+        points.push({ index: segStart + minIdx, price: minVal });
+      } else {
+        const maxVal = Math.max(...seg);
+        const maxIdx = seg.indexOf(maxVal);
+        points.push({ index: segStart + maxIdx, price: maxVal });
+      }
+    }
+  }
+
+  return points;
+}
+
 function detectDivergence(
   ohlc: OHLCBar[],
   macdData: MACDPoint[],
@@ -140,16 +223,18 @@ function detectDivergence(
   const priceHighs = ohlc.map((b) => b.high);
   const macdValues = macdData.map((m) => m.macd);
 
-  // Swing lows in price and MACD
+  // MACD turning points via zero-crossing (parameter-free)
+  const mLows = macdTurningPoints(macdValues.slice(startIdx), "low");
+  const mHighs = macdTurningPoints(macdValues.slice(startIdx), "high");
+
+  // Price swing lows (still uses lookback for raw price)
   const pLows = findSwingLows(priceLows.slice(startIdx), swingLookback);
-  const mLows = findSwingLows(macdValues.slice(startIdx), swingLookback);
 
   // Bullish divergence: price lower low, MACD higher low
   if (pLows.length >= 2 && mLows.length >= 2) {
     const pLow1 = pLows[pLows.length - 2];
     const pLow2 = pLows[pLows.length - 1];
 
-    // Find MACD low closest to each price low
     const mLow1 = findClosestSwing(mLows, pLow1.index);
     const mLow2 = findClosestSwing(mLows, pLow2.index);
 
@@ -171,9 +256,8 @@ function detectDivergence(
     }
   }
 
-  // Swing highs in price and MACD
+  // Price swing highs
   const pHighs = findSwingHighs(priceHighs.slice(startIdx), swingLookback);
-  const mHighs = findSwingHighs(macdValues.slice(startIdx), swingLookback);
 
   // Bearish divergence: price higher high, MACD lower high
   if (pHighs.length >= 2 && mHighs.length >= 2) {
@@ -384,7 +468,6 @@ export default function MACDPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
-  const [swingLookback, setSwingLookback] = useState(5);
 
   const allTickers = useMemo(
     () => Object.values(SYMBOL_CATEGORIES).flat().sort(),
@@ -436,9 +519,9 @@ export default function MACDPage() {
 
   const dailyDivergences = useMemo(() => {
     if (!dailyMACD) return [];
-    const divs = detectDivergence(ohlc, dailyMACD, 60, swingLookback);
+    const divs = detectDivergence(ohlc, dailyMACD, 60, 5);
     return divs.map((d) => ({ ...d, timeframe: "daily" as const }));
-  }, [ohlc, dailyMACD, swingLookback]);
+  }, [ohlc, dailyMACD]);
 
   const weeklyDivergences = useMemo(() => {
     if (!weeklyMACD) return [];
@@ -470,7 +553,7 @@ export default function MACDPage() {
         const dMacd = calcMACD(closes);
         if (!dMacd) continue;
         const dMacdWithTime = dMacd.map((m, i) => ({ ...m, time: dailyOhlc[i].time }));
-        const dDivs = detectDivergence(dailyOhlc, dMacdWithTime, 60, swingLookback);
+        const dDivs = detectDivergence(dailyOhlc, dMacdWithTime, 60, 5);
         const dailyDivs = dDivs.map((d) => ({ ...d, timeframe: "daily" as const }));
 
         const wOhlc = resampleToWeekly(dailyOhlc);
@@ -533,6 +616,11 @@ export default function MACDPage() {
     setScanning(false);
   };
 
+  // Auto-scan all tickers on page load
+  useEffect(() => {
+    handleScan();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Categorize scan results
   const dualResults = scanResults.filter((r) => r.isDual);
   const dailyOnlyResults = scanResults.filter((r) => !r.isDual && r.dailyDivs.length > 0);
@@ -567,26 +655,12 @@ export default function MACDPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Swing 靈敏度：</label>
-          <select
-            value={swingLookback}
-            onChange={(e) => setSwingLookback(Number(e.target.value))}
-            className="border rounded-md px-3 py-1.5 text-sm"
-          >
-            <option value={3}>高 (3天)</option>
-            <option value={5}>中 (5天)</option>
-            <option value={7}>低 (7天)</option>
-          </select>
-        </div>
-
-        <button
-          onClick={handleScan}
-          disabled={scanning}
-          className="ml-auto px-4 py-2 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
-        >
-          {scanning ? "掃描中..." : "🔍 掃描全部標的"}
-        </button>
+        {scanning && (
+          <div className="ml-auto flex items-center gap-2 text-sm text-gray-500">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900" />
+            掃描中...
+          </div>
+        )}
       </div>
 
       {/* Divergence stats for current ticker */}
