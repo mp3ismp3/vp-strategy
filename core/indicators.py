@@ -808,3 +808,158 @@ def resample_to_weekly(df):
     }).dropna()
 
     return weekly if len(weekly) >= 5 else None
+
+
+def detect_fvg(df, lookback=60, min_gap_atr_ratio=0.5):
+    """Detect Fair Value Gaps (FVG) on daily bars.
+
+    A bullish FVG occurs when candle[i-1].High < candle[i+1].Low
+    (gap between first candle's high and third candle's low → unfilled buying).
+
+    A bearish FVG occurs when candle[i-1].Low > candle[i+1].High
+    (gap between first candle's low and third candle's high → unfilled selling).
+
+    Only gaps wider than min_gap_atr_ratio * ATR(14) are reported to filter noise.
+    Also checks if the gap has been "filled" (price returned to close the gap).
+
+    Args:
+        df: DataFrame with OHLCV columns and DatetimeIndex.
+        lookback: number of recent bars to scan (default 60).
+        min_gap_atr_ratio: minimum gap size as fraction of ATR (default 0.5).
+
+    Returns:
+        List of dicts:
+        [{"type": "bullish"|"bearish",
+          "gap_high": float,   # upper edge of the gap
+          "gap_low": float,    # lower edge of the gap
+          "gap_size": float,   # gap_high - gap_low
+          "bar_index": int,    # index of the middle candle (the impulse candle)
+          "date": str,         # date of the middle candle (ISO format)
+          "filled": bool,      # True if subsequent price action filled the gap
+          "fill_pct": float,   # 0.0-1.0, how much of the gap has been filled
+         }, ...]
+        Returns empty list if insufficient data.
+    """
+    if df is None or len(df) < lookback or len(df) < 20:
+        return []
+
+    d = df.tail(lookback).copy()
+    d = d.reset_index(drop=False)  # keep date as column
+
+    highs = d["High"].values.astype(float)
+    lows = d["Low"].values.astype(float)
+    closes = d["Close"].values.astype(float)
+
+    n = len(d)
+    if n < 3:
+        return []
+
+    # Calculate ATR for gap significance filtering
+    atr = calc_atr(df, 14)
+    if atr is None or atr <= 0:
+        min_gap = 0  # no filtering if ATR unavailable
+    else:
+        min_gap = atr * min_gap_atr_ratio
+
+    fvgs = []
+
+    for i in range(1, n - 1):
+        # Bullish FVG: candle[i-1].High < candle[i+1].Low
+        # The gap is between candle[i-1].High (gap_low) and candle[i+1].Low (gap_high)
+        bull_gap_low = highs[i - 1]
+        bull_gap_high = lows[i + 1]
+
+        if bull_gap_high > bull_gap_low:
+            gap_size = bull_gap_high - bull_gap_low
+            if gap_size >= min_gap:
+                # Check if gap has been filled by subsequent price action
+                filled, fill_pct = _check_fvg_fill(
+                    lows[i + 1:], bull_gap_low, bull_gap_high, "bullish"
+                )
+
+                # Get date from the middle candle
+                date_val = d.iloc[i].get("Date", d.iloc[i].get("index", ""))
+                date_str = str(date_val)[:10] if date_val is not None else ""
+
+                fvgs.append({
+                    "type": "bullish",
+                    "gap_high": round(float(bull_gap_high), 2),
+                    "gap_low": round(float(bull_gap_low), 2),
+                    "gap_size": round(float(gap_size), 2),
+                    "bar_index": i,
+                    "date": date_str,
+                    "filled": filled,
+                    "fill_pct": round(float(fill_pct), 2),
+                })
+
+        # Bearish FVG: candle[i-1].Low > candle[i+1].High
+        # The gap is between candle[i+1].High (gap_low) and candle[i-1].Low (gap_high)
+        bear_gap_high = lows[i - 1]
+        bear_gap_low = highs[i + 1]
+
+        if bear_gap_high > bear_gap_low:
+            gap_size = bear_gap_high - bear_gap_low
+            if gap_size >= min_gap:
+                # Check if gap has been filled
+                filled, fill_pct = _check_fvg_fill(
+                    highs[i + 1:], bear_gap_low, bear_gap_high, "bearish"
+                )
+
+                date_val = d.iloc[i].get("Date", d.iloc[i].get("index", ""))
+                date_str = str(date_val)[:10] if date_val is not None else ""
+
+                fvgs.append({
+                    "type": "bearish",
+                    "gap_high": round(float(bear_gap_high), 2),
+                    "gap_low": round(float(bear_gap_low), 2),
+                    "gap_size": round(float(gap_size), 2),
+                    "bar_index": i,
+                    "date": date_str,
+                    "filled": filled,
+                    "fill_pct": round(float(fill_pct), 2),
+                })
+
+    return fvgs
+
+
+def _check_fvg_fill(subsequent_prices, gap_low, gap_high, fvg_type):
+    """Check how much of an FVG has been filled by subsequent price action.
+
+    For bullish FVG: price dips back down into the gap (lows penetrate gap_high→gap_low).
+    For bearish FVG: price rallies back up into the gap (highs penetrate gap_low→gap_high).
+
+    Args:
+        subsequent_prices: array of lows (bullish) or highs (bearish) after the FVG.
+        gap_low: lower boundary of the gap.
+        gap_high: upper boundary of the gap.
+        fvg_type: "bullish" or "bearish".
+
+    Returns:
+        (filled: bool, fill_pct: float 0.0-1.0)
+    """
+    if len(subsequent_prices) == 0:
+        return False, 0.0
+
+    gap_size = gap_high - gap_low
+    if gap_size <= 0:
+        return True, 1.0
+
+    if fvg_type == "bullish":
+        # For bullish FVG, check if any subsequent low went below gap_high
+        # Fill amount = how far below gap_high the low reached, relative to gap_size
+        min_low = float(np.min(subsequent_prices))
+        if min_low >= gap_high:
+            return False, 0.0
+        penetration = gap_high - max(min_low, gap_low)
+        fill_pct = min(penetration / gap_size, 1.0)
+        filled = bool(fill_pct >= 1.0)
+    else:
+        # For bearish FVG, check if any subsequent high went above gap_low
+        max_high = float(np.max(subsequent_prices))
+        if max_high <= gap_low:
+            return False, 0.0
+        penetration = min(max_high, gap_high) - gap_low
+        fill_pct = min(penetration / gap_size, 1.0)
+        filled = bool(fill_pct >= 1.0)
+
+    return filled, float(fill_pct)

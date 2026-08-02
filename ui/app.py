@@ -86,6 +86,7 @@ st.markdown(
         <a href="/" target="_self">HOME</a>
         <a href="/?page=scanner" target="_self">SCANNER</a>
         <a href="/?page=accumulation" target="_self">ACCUMULATION</a>
+        <a href="/?page=indicator" target="_self">INDICATOR</a>
         <a href="/?page=strategy" target="_self">STRATEGY</a>
         <a href="/?page=fusion" target="_self">FUSION</a>
     </div>
@@ -102,6 +103,9 @@ if page == "scanner":
 elif page == "accumulation":
     from ui.accumulation_page import render_accumulation
     render_accumulation()
+elif page == "indicator":
+    from ui.indicator_page import render_indicator
+    render_indicator()
 elif page == "strategy":
     from ui.strategy_page import render_strategy
     render_strategy()
@@ -122,6 +126,7 @@ else:
         <div class="bottom-nav">
             <a href="/?page=scanner" target="_self">SCANNER</a>
             <a href="/?page=accumulation" target="_self">ACCUMULATION</a>
+            <a href="/?page=indicator" target="_self">INDICATOR</a>
             <a href="/?page=strategy" target="_self">STRATEGY</a>
             <a href="/?page=fusion" target="_self">FUSION</a>
         </div>
