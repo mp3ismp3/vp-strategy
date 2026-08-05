@@ -439,9 +439,8 @@ export default function FVGPage() {
         </div>
       </div>
 
-      <SignalMosaic locked={!isAuthenticated}>
-        {/* Chart */}
-        <div className="bg-white rounded-xl border p-4 mb-6">
+      {/* Chart remains visible in the guest preview. */}
+      <div className="bg-white rounded-xl border p-4 mb-6">
         {loading ? (
           <div className="flex items-center justify-center h-[550px]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
@@ -458,10 +457,9 @@ export default function FVGPage() {
             showFilled={showFilled}
           />
         )}
-        </div>
-      </SignalMosaic>
+      </div>
 
-      {/* FVG detail table for current ticker */}
+      {/* Signal details */}
       <SignalMosaic locked={!isAuthenticated}>
         {visibleFvgs.length > 0 && (
           <div className="bg-white rounded-xl border p-6 mb-6">
@@ -510,17 +508,12 @@ export default function FVGPage() {
           </div>
           </div>
         )}
-      </SignalMosaic>
-
-      {/* Scan Results */}
-      {scanning && (
-        <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900" />
-          掃描全部標的中...
-        </div>
-      )}
-
-      <SignalMosaic locked={!isAuthenticated}>
+        {scanning && (
+          <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900" />
+            掃描全部標的中...
+          </div>
+        )}
         {!scanning && scanResults.length > 0 && (
           <div className="bg-white rounded-xl border p-6">
           <h2 className="text-xl font-bold mb-4">
