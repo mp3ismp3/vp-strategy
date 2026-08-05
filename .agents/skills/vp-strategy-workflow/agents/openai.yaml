@@ -1,0 +1,4 @@
+interface:
+  display_name: "VP Strategy Development Workflow"
+  short_description: "Plan, test, review, and ship VP Strategy changes"
+  default_prompt: "Use $vp-strategy-workflow to implement this change from design through verified delivery."

@@ -1,8 +1,18 @@
 # AGENTS.md — AI Agent 開發規範
 
+## Codex 開發 Workflow
+
+進行任何程式碼、測試、設定、部署或 CI 變更時，使用 repo skill `$vp-strategy-workflow`（`.agents/skills/vp-strategy-workflow/`）。依 skill 完成需求定義、最小設計、test-first 實作、受影響測試、完整 diff review 與驗證交付。專案 `.codex/hooks.json` 會在 Codex session 啟動與 compaction 後提醒載入此 workflow。
+
+每次開始修改前，先閱讀 [`docs/CODEX_ARCHITECTURE.md`](docs/CODEX_ARCHITECTURE.md)；若程式碼與文件不一致，以程式碼為準，並在同一次變更中同步更新架構文件。
+
+每次修正功能（含 bug fix）或新增功能時，必須在同一次變更中同步更新根目錄 [`README.md`](README.md)，至少記錄受影響功能的行為、使用方式或限制；交付前確認 README 與實作一致。純重構、測試內部調整或只改文件時不適用。
+
+`scripts/pre-commit` 會阻擋 production code 與 `README.md` 未同時 staged 的 commit；架構敏感變更另要求 staged `docs/CODEX_ARCHITECTURE.md`。Hook 只驗證文件有進入同一個 commit，內容一致性由完整 diff review 與 commit 前 sub-agent review 判定。
+
 ## 專案概述
 
-Market Auction Theory 交易分析平台。Python 3.11，無 ORM、無 DB，純文件式架構。
+Market Auction Theory 交易分析平台。Python 3.11。Python 分析與 tracker state 採文件式 JSON 儲存；Web 產品層另使用既有 Supabase 提供發布、認證與訂閱資料。
 
 核心有兩個獨立的分析系統：
 1. **VP Position Viewer**（`scan_all.py`）— 日線/周線/月線 Volume Profile，顯示價格相對公允價值位置
@@ -13,7 +23,7 @@ Market Auction Theory 交易分析平台。Python 3.11，無 ORM、無 DB，純�
 ```
 ┌─────────────────── VP Position Viewer ───────────────────────┐
 │                                                               │
-│  YahooProvider.batch_daily(62 symbols, 1y)                    │
+│  YahooProvider.batch_daily(config.SYMBOLS, 1y)                │
 │       ↓                                                       │
 │  fetch_market_context() → {vix, spy_state}                    │
 │       ↓                                                       │
@@ -58,7 +68,7 @@ Market Auction Theory 交易分析平台。Python 3.11，無 ORM、無 DB，純�
 ## 架構限制
 
 ### 禁止事項
-- 不加 database（SQLite、Postgres 都不要）— 系統設計為文件式 JSON 存儲
+- 不把 Python 分析結果或 tracker state 遷移到 database（SQLite、Postgres 等）— 這一層維持 JSON；Web 層可使用既有 Supabase，但不得讓策略計算直接依賴它
 - 不加 async/await — 整個 codebase 是同步的，yfinance 不支援 async
 - 不加 class inheritance chain 超過 2 層 — `BaseStrategy → VPSignals` 就是上限
 - 不改 `scan_results.json` 的 schema — UI 層依賴這個格式
@@ -134,7 +144,7 @@ normalized_trust: {"VP": 0.48, "VWAP": 0.38, "TrendFollowing": 0.14}  # sums to 
 
 | 目錄 | 職責 | 修改注意 |
 |------|------|---------|
-| `core/` | 資料層 + 指標計算 + VP 多 TF | 純函數，無 side effect，改了要跑 `pytest tests/test_indicators.py` |
+| `core/` | 資料 provider + 純指標計算 + VP 多 TF | `data_provider.py` 有網路/cache IO；指標函數保持低副作用，改了跑對應 core tests |
 | `regime/` | 市場狀態判斷 | 只能依賴 `core/indicators.py` + `config.py`，backtest 用 |
 | `strategies/` | 信號產生 | 每個策略獨立，不能互相 import，backtest 用 |
 | `strategies/accumulation/` | Wyckoff 累積追蹤 | 有 state persistence，改 tracker 要跑全部 `test_accumulation_*.py` |
@@ -145,11 +155,7 @@ normalized_trust: {"VP": 0.48, "VWAP": 0.38, "TrendFollowing": 0.14}  # sums to 
 
 ## 資料流方向（嚴格單向）
 
-```
-core/data_provider → core/indicators → regime/engine → strategies/* → scoring/* → JSON/Telegram
-```
-
-不可逆向依賴。違反這個會造成 circular import。
+主要分析方向是 `core → regime/strategies → entry points → JSON/通知`。精確允許關係以 `docs/CODEX_ARCHITECTURE.md` 的依賴矩陣為準；其中 legacy `scoring/confidence.py` 目前允許依賴 `strategies/inst_trend.py`，但 strategies 不得反向 import scoring。
 
 ## 測試規範
 
@@ -218,6 +224,7 @@ core/data_provider → core/indicators → regime/engine → strategies/* → sc
    - [ ] config 預設值是否被改動（需 backtest 驗證）
    - [ ] 測試是否通過（跑受影響的 test files）
    - [ ] 是否引入新依賴（需確認必要性）
+   - [ ] 功能修正或新增是否已同步更新 `README.md`
    - [ ] commit 是否只做一件事（不混合 feature + refactor + fix）
    - [ ] 訊息格式是否正確（type: 描述）
 4. Reviewer 回報 PASS / FAIL + 原因
@@ -228,8 +235,8 @@ core/data_provider → core/indicators → regime/engine → strategies/* → sc
 
 - `yf.download` 很慢（每 symbol ~1-2s），用 `YahooProvider.batch_daily()` batch 下載
 - DataFrame 計算用 vectorized numpy，不要 for loop iterrows
-- `scan_all.py` 掃 52 檔約 2-3 分鐘，不要加太多重計算
-- `accumulation.py` 掃描同樣 52 檔，每檔獨立下載（~2 分鐘）
+- `scan_all.py` 掃描 `config.SYMBOLS` 約 2-3 分鐘，不要加太多重計算
+- `accumulation.py` 掃描同一份 `config.SYMBOLS`，每檔獨立下載（約 2 分鐘）
 - GitHub Actions 免費額度有限，workflow 不要跑超過 10 分鐘
 - `calc_vp` 和 `find_swing_points` 是最常被呼叫的，改動要注意效能
 

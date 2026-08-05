@@ -8,7 +8,8 @@ YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
+STAGED_STATUS=$(git diff --cached --name-status --diff-filter=ACMRD)
 ERRORS=0
 WARNINGS=0
 
@@ -22,7 +23,39 @@ if echo "$STAGED" | grep -q "^data/accum_state.json$"; then
     ERRORS=$((ERRORS + 1))
 fi
 
-# ─── 2. 檢查 import 方向違規 ───
+# ─── 2. 文件必須與功能實作同一個 commit 更新 ───
+# Git hook 只能確認文件有 staged，內容是否正確仍由完整 diff review 負責。
+PRODUCTION_PATTERN='(^[^/]+\.py$|^(core|regime|strategies|scoring|notifications|ui)/.*\.py$|^services/telegram-bot/.*\.py$|^services/frontend/src/.*\.(ts|tsx|js|jsx)$)'
+if echo "$STAGED" | grep -Eq "$PRODUCTION_PATTERN"; then
+    if ! echo "$STAGED" | grep -qx "README.md"; then
+        echo -e "${RED}✗ 功能程式碼有變更，但 README.md 未 staged${NC}"
+        echo -e "${RED}  請同步更新功能行為、使用方式或限制，並將 README.md 加入本次 commit${NC}"
+        ERRORS=$((ERRORS + 1))
+    fi
+fi
+
+# 架構契約、state schema、workflow/部署拓撲，或 production module 的新增/刪除/更名。
+ARCHITECTURE_SENSITIVE_PATTERN='(config\.py$|core/(signal|base_strategy)\.py$|strategies/accumulation/tracker\.py$|^\.github/workflows/|^deploy/|^services/frontend/src/app/api/data/)'
+MODULE_STRUCTURE_PATTERN='(^[^/]+\.py$|^(core|regime|strategies|scoring|notifications|ui)/.*\.py$|^services/telegram-bot/.*\.py$|^services/frontend/src/.*\.(ts|tsx|js|jsx)$)'
+ARCHITECTURE_CHANGED=0
+if echo "$STAGED" | grep -Eq "$ARCHITECTURE_SENSITIVE_PATTERN"; then
+    ARCHITECTURE_CHANGED=1
+elif echo "$STAGED_STATUS" | grep -Eq '^[ADR][0-9]*[[:space:]]'; then
+    STRUCTURAL_PATHS=$(echo "$STAGED_STATUS" | grep -E '^[ADR][0-9]*[[:space:]]' | cut -f2-)
+    if echo "$STRUCTURAL_PATHS" | grep -Eq "$MODULE_STRUCTURE_PATTERN"; then
+        ARCHITECTURE_CHANGED=1
+    fi
+fi
+
+if [ "$ARCHITECTURE_CHANGED" -eq 1 ]; then
+    if ! echo "$STAGED" | grep -qx "docs/CODEX_ARCHITECTURE.md"; then
+        echo -e "${RED}✗ 架構敏感變更未同步 staged docs/CODEX_ARCHITECTURE.md${NC}"
+        echo -e "${RED}  請更新資料流、契約、模組責任或部署拓撲後再 commit${NC}"
+        ERRORS=$((ERRORS + 1))
+    fi
+fi
+
+# ─── 3. 檢查 import 方向違規 ───
 # regime/ 不能 import strategies/ 或 scoring/
 for f in $(echo "$STAGED" | grep "^regime/"); do
     if [ -f "$f" ]; then
@@ -62,7 +95,7 @@ for f in $(echo "$STAGED" | grep "^strategies/[^/]*_signals.py$"); do
     fi
 done
 
-# ─── 3. 新的 signal_type 必須在 TRACK_MAP 中 ───
+# ─── 4. 新的 signal_type 必須在 TRACK_MAP 中 ───
 if echo "$STAGED" | grep -q "strategies/.*_signals.py"; then
     for f in $(echo "$STAGED" | grep "strategies/.*_signals.py"); do
         if [ -f "$f" ]; then
@@ -80,7 +113,7 @@ if echo "$STAGED" | grep -q "strategies/.*_signals.py"; then
     done
 fi
 
-# ─── 4. config 預設值變更警告 ───
+# ─── 5. config 預設值變更警告 ───
 if echo "$STAGED" | grep -q "^config.py$"; then
     CHANGED_LINES=$(git diff --cached config.py | grep "^[+-]" | grep -v "^[+-][+-][+-]" | grep -v "^[+-]#")
     if echo "$CHANGED_LINES" | grep -qi "DEFAULT_CFG\|SCORING_WEIGHTS\|REGIME_THRESHOLDS\|REGIME_STRATEGY_TRUST"; then
@@ -89,7 +122,7 @@ if echo "$STAGED" | grep -q "^config.py$"; then
     fi
 fi
 
-# ─── 5. accum_state.json schema 向後相容 ───
+# ─── 6. accum_state.json schema 向後相容 ───
 if echo "$STAGED" | grep -q "strategies/accumulation/tracker.py"; then
     # Check if new fields are added without defaults
     NEW_FIELDS=$(git diff --cached strategies/accumulation/tracker.py | grep "^+" | grep -oP 's\["[^"]+"\]' | sort -u)
@@ -99,13 +132,13 @@ if echo "$STAGED" | grep -q "strategies/accumulation/tracker.py"; then
     fi
 fi
 
-# ─── 6. Telegram 訊息長度 ───
+# ─── 7. Telegram 訊息長度 ───
 if echo "$STAGED" | grep -q "notifications/\|accumulation/notifications"; then
     echo -e "${YELLOW}⚠ 通知格式修改 — 確認訊息 ≤ 4096 字元，用 --dry-run 測試${NC}"
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# ─── 7. 跑受影響的測試 ───
+# ─── 8. 跑受影響的測試 ───
 RUN_TESTS=""
 
 if echo "$STAGED" | grep -q "^core/indicators.py$"; then
@@ -147,7 +180,7 @@ if [ -n "$RUN_TESTS" ]; then
     fi
 fi
 
-# ─── 8. Python syntax check ───
+# ─── 9. Python syntax check ───
 for f in $(echo "$STAGED" | grep "\.py$"); do
     if [ -f "$f" ]; then
         if ! python3 -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then

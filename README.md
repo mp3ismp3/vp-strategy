@@ -203,6 +203,20 @@ python intraday.py --dry-run        # 盤中 1H 確認
 pytest tests/                       # 137 個測試
 ```
 
+### Commit 前文件一致性檢查
+
+安裝 repository hooks：
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+`scripts/pre-commit` 會在 commit 前檢查 staged files：
+
+- 功能程式碼有修改時，必須同步 staged 根目錄 `README.md`。
+- 核心契約、state schema、workflow、部署拓撲或 production module 結構有變更時，必須同步 staged `docs/CODEX_ARCHITECTURE.md`。
+- Hook 負責確認文件包含在同一個 commit；文件內容是否與實作一致，仍須在完整 diff review 與 commit 前的獨立 sub-agent review 中確認。
+
 ---
 
 ## 檔案結構

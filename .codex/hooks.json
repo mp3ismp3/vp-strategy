@@ -1,0 +1,18 @@
+{
+  "description": "Load the VP Strategy development workflow at Codex session start and after compaction.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/session_start.py\"",
+            "statusMessage": "Loading VP Strategy workflow",
+            "additionalContextLimit": 600
+          }
+        ]
+      }
+    ]
+  }
+}
