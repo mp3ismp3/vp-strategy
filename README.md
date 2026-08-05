@@ -211,11 +211,20 @@ pytest tests/                       # 137 個測試
 bash scripts/install-hooks.sh
 ```
 
-`scripts/pre-commit` 會在 commit 前檢查 staged files：
+安裝後會啟用兩個 hooks：
 
+- `scripts/pre-commit` 在 commit 前檢查 staged files。
 - 功能程式碼有修改時，必須同步 staged 根目錄 `README.md`。
 - 核心契約、state schema、workflow、部署拓撲或 production module 結構有變更時，必須同步 staged `docs/CODEX_ARCHITECTURE.md`。
 - Hook 負責確認文件包含在同一個 commit；文件內容是否與實作一致，仍須在完整 diff review 與 commit 前的獨立 sub-agent review 中確認。
+- `scripts/pre-push` 禁止人工或 AI agent 直接 push `main`，並驗證工作 branch 必須使用 `feat/*`、`fix/*`、`refactor/*` 或 `chore/*`，再透過 Pull Request 合併。Tag 與刪除非 main branch 不受命名檢查影響；GitHub Actions 自動持久化 `data/accum_state.json` 是唯一的 main 直推例外。
+
+標準交付流程：
+
+```text
+main → 建立工作 branch → 修改/測試 → sub-agent review → commit
+     → push 工作 branch → 建立 PR（base: main）→ CI/review → merge
+```
 
 ---
 

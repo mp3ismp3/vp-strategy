@@ -10,6 +10,8 @@
 
 `scripts/pre-commit` 會阻擋 production code 與 `README.md` 未同時 staged 的 commit；架構敏感變更另要求 staged `docs/CODEX_ARCHITECTURE.md`。Hook 只驗證文件有進入同一個 commit，內容一致性由完整 diff review 與 commit 前 sub-agent review 判定。
 
+所有人工或 AI agent 的 repository 變更一律透過 Pull Request 合併：從最新 `main` 建立 `feat/*`、`fix/*`、`refactor/*` 或 `chore/*` branch，完成 commit 後只 push 該 branch，再建立 PR。禁止直接 push `main`；即使使用者只說「push」，也必須解讀為 push 工作 branch 並準備或建立 PR，不得把 commit 直接送到 `main`。唯一例外是既有 GitHub Actions 對 `data/accum_state.json` 的自動持久化 commit。`scripts/pre-push` 會在本地阻擋目標為 `refs/heads/main` 的 push。
+
 ## 專案概述
 
 Market Auction Theory 交易分析平台。Python 3.11。Python 分析與 tracker state 採文件式 JSON 儲存；Web 產品層另使用既有 Supabase 提供發布、認證與訂閱資料。
@@ -203,10 +205,11 @@ normalized_trust: {"VP": 0.48, "VWAP": 0.38, "TrendFollowing": 0.14}  # sums to 
 
 ## Git 規範
 
-- Branch naming: `feat/xxx`、`fix/xxx`、`refactor/xxx`
+- Branch naming: `feat/xxx`、`fix/xxx`、`refactor/xxx`、`chore/xxx`
 - Commit message 格式: `type: 簡短描述`（feat/fix/refactor/chore/test）
 - `data/accum_state.json` 由 CI 自動 commit，手動不要改
 - `data/scan_results.json` 不進 git
+- 禁止人工或 AI agent 直接 push `main`；所有開發變更必須 push 工作 branch 並透過 Pull Request 合併（既有 CI bot state persistence 除外）
 
 ## AI Agent Commit Protocol（強制）
 
