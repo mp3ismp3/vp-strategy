@@ -55,14 +55,16 @@ Treat `AGENTS.md` and any closer nested `AGENTS.md` as authoritative. Keep Scann
 7. **Hand off with evidence**
    - Lead with the outcome. List changed files, checks run and results, and any skipped gate with its reason.
    - Mention residual risks and operational follow-up. Never say “done” based only on code inspection when executable verification was available.
+   - Deliver human or agent-authored repository changes through a pull request: push only the working branch, create the PR, and report its target and URL. Never push development changes directly to `main`; the existing CI bot state-persistence commit is the only exception.
 
 ## Git and delivery gates
 
-- Use `feat/`, `fix/`, or `refactor/` branches for development work when creating a branch is in scope.
+- Before editing repository files, branch from the latest local `main` using `feat/`, `fix/`, `refactor/`, or `chore/`.
 - Keep one concern per commit and use `type: 簡短描述`.
 - Never stage `data/accum_state.json` from manual development.
 - Before any commit, run the repository pre-commit checks and complete the independent review protocol from `AGENTS.md`.
-- Before push or PR, verify the branch target, summarize commits, and confirm the worktree contains no unintended files.
+- Never push human or agent-authored commits directly to `main`, even when the user says only “push”; interpret that as push the working branch and create or prepare a pull request. Do not alter the existing CI bot exception for automatic state persistence.
+- Before push and PR, verify the working branch, `origin/main` target, commit range, and clean worktree. Push the working branch, then open a PR targeting `main`.
 
 ## Working examples
 

@@ -251,6 +251,8 @@ Cron 對應美股時段，不可順手調整。Daily workflow 的順序有資料
 
 Repository 的 `scripts/pre-commit` 會實際強制文件同行：production code 變更必須 staged `README.md`；核心契約、state schema、workflow、部署拓撲或 production module 結構變更必須 staged 本文件。Hook 無法判斷文字語意是否正確，因此 reviewer 仍須比較文件與完整實作 diff。
 
+人工與 AI agent 的 Git 交付只能走 Pull Request：從 `main` 建立 `feat/*`、`fix/*`、`refactor/*` 或 `chore/*` 工作 branch，review 與 commit 後 push 該 branch，再建立以 `main` 為 base 的 PR。不得直接 push `main`；`scripts/pre-push` 會阻擋目標 ref 為 `refs/heads/main` 的本地 push，並拒絕不符合命名規則的新增或更新 branch。Tag 與刪除非 main branch 不受命名檢查影響。唯一例外是 `vp_scanner.yml` 由 GitHub Actions bot 自動持久化 `data/accum_state.json`。GitHub branch protection 仍是遠端最終防線，local hook 不取代 repository ruleset。
+
 ## 11. 文件維護規則
 
 以下情況必須同步更新本文件：

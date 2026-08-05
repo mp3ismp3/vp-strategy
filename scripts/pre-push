@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Pre-push hook — 所有 main 變更必須透過 Pull Request
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+BLOCKED=0
+
+# stdin: <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/main" ]; then
+        echo -e "${RED}✗ 禁止直接 push main${NC}"
+        echo -e "${RED}  請建立 feat/*、fix/*、refactor/* 或 chore/* branch，push 後建立 Pull Request${NC}"
+        BLOCKED=1
+        continue
+    fi
+
+    # Allow tags and deletion of non-main remote branches. New/updated development
+    # branches must follow the repository naming convention.
+    if [[ "$remote_ref" = refs/heads/* ]] &&
+       [[ ! "$local_sha" =~ ^0+$ ]]; then
+        case "$remote_ref" in
+            refs/heads/feat/*|refs/heads/fix/*|refs/heads/refactor/*|refs/heads/chore/*)
+                ;;
+            *)
+                echo -e "${RED}✗ 不允許的工作 branch：${remote_ref#refs/heads/}${NC}"
+                echo -e "${RED}  Branch 必須使用 feat/*、fix/*、refactor/* 或 chore/*${NC}"
+                BLOCKED=1
+                ;;
+        esac
+    fi
+done
+
+if [ "$BLOCKED" -ne 0 ]; then
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Pre-push branch policy passed${NC}"
+exit 0
