@@ -674,32 +674,8 @@ export default function MACDPage() {
         )}
       </div>
 
-      {/* Divergence stats for current ticker */}
-      <SignalMosaic locked={!isAuthenticated}>
-        {(dailyDivergences.length > 0 || weeklyDivergences.length > 0) && (
-          <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-3">
-          {dailyDivergences.map((d, i) => (
-            <Badge key={`d-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-              {d.type === "bullish" ? "🟢" : "🔴"} 日線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
-            </Badge>
-          ))}
-          {weeklyDivergences.map((d, i) => (
-            <Badge key={`w-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-              {d.type === "bullish" ? "🟢" : "🔴"} 周線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
-            </Badge>
-          ))}
-          {dailyDivergences.some((d) => weeklyDivergences.some((w) => w.type === d.type)) && (
-            <Badge className="bg-orange-100 text-orange-800 font-bold">
-              🔥 日線+周線雙重背離
-            </Badge>
-          )}
-          </div>
-        )}
-      </SignalMosaic>
-
-      <SignalMosaic locked={!isAuthenticated}>
-        {/* Charts */}
-        <div className="space-y-6 mb-8">
+      {/* Charts remain visible in the guest preview. */}
+      <div className="space-y-6 mb-8">
         {/* Daily MACD Chart */}
         <div className="bg-white rounded-xl border p-4">
           {loading ? (
@@ -749,11 +725,29 @@ export default function MACDPage() {
             </div>
           )}
         </div>
-        </div>
-      </SignalMosaic>
+      </div>
 
-      {/* Scan Results */}
+      {/* Signal details */}
       <SignalMosaic locked={!isAuthenticated}>
+        {(dailyDivergences.length > 0 || weeklyDivergences.length > 0) && (
+          <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-3">
+            {dailyDivergences.map((d, i) => (
+              <Badge key={`d-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                {d.type === "bullish" ? "🟢" : "🔴"} 日線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
+              </Badge>
+            ))}
+            {weeklyDivergences.map((d, i) => (
+              <Badge key={`w-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                {d.type === "bullish" ? "🟢" : "🔴"} 周線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
+              </Badge>
+            ))}
+            {dailyDivergences.some((d) => weeklyDivergences.some((w) => w.type === d.type)) && (
+              <Badge className="bg-orange-100 text-orange-800 font-bold">
+                🔥 日線+周線雙重背離
+              </Badge>
+            )}
+          </div>
+        )}
         {scanResults.length > 0 && (
           <div className="space-y-6">
           {/* 🔥 Dual Divergence */}

@@ -623,9 +623,8 @@ export default function LiquidityPage() {
         </div>
       </div>
 
-      <SignalMosaic locked={!isAuthenticated}>
-        {/* Chart */}
-        <div className="bg-white rounded-xl border p-4 mb-6">
+      {/* Chart remains visible in the guest preview. */}
+      <div className="bg-white rounded-xl border p-4 mb-6">
         {loading ? (
           <div className="flex items-center justify-center h-[600px]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
@@ -642,9 +641,11 @@ export default function LiquidityPage() {
             sweeps={visibleSweeps}
           />
         )}
-        </div>
+      </div>
 
-      {/* Liquidity Levels Table */}
+      {/* Signal details */}
+      <SignalMosaic locked={!isAuthenticated}>
+        {/* Liquidity Levels Table */}
         {visibleLevels.length > 0 && (
         <div className="bg-white rounded-xl border p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">📋 流動性水平一覽</h2>

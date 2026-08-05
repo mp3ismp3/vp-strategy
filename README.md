@@ -187,7 +187,7 @@ streamlit run ui/app.py
 
 Next.js Web 預覽權限：
 
-- 未登入的 Indicator 僅能選擇 Mega Cap Tech，MACD/FVG/Liquidity 信號以馬賽克隱藏。
+- 未登入的 Indicator 僅能選擇 Mega Cap Tech；每個頁面的圖表仍完整顯示，圖表下方的信號明細集中在一個馬賽克區塊。
 - 登入後解鎖 Indicator 全部標的與完整信號。
 - 未登入的 Accumulation 顯示 Decay Score 前 10 名；登入後顯示完整排行榜。
 - Strategy Lab 的進場信號未登入時以馬賽克隱藏，登入後解鎖。
