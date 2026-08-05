@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
+import { SignalMosaic } from "@/components/SignalMosaic";
 
 interface AccumSymbol {
   symbol: string;
@@ -15,6 +17,7 @@ interface AccumSymbol {
 }
 
 export default function StrategyPage() {
+  const { data: session } = useSession();
   const [symbols, setSymbols] = useState<AccumSymbol[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,7 +138,8 @@ export default function StrategyPage() {
       </div>
 
       {/* Entry Signals */}
-      <div className="bg-white rounded-xl border p-6 mb-8">
+      <SignalMosaic locked={!session} message="登入後解鎖策略進場信號">
+        <div className="bg-white rounded-xl border p-6 mb-8">
         <h2 className="text-xl font-bold mb-4">⚡ 進場信號</h2>
 
         {loading ? (
@@ -196,7 +200,8 @@ export default function StrategyPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </SignalMosaic>
 
       {/* Entry Checklist */}
       <div className="bg-white rounded-xl border p-6 mb-8">

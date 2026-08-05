@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import MACDPage from "@/app/macd/page";
 import FVGPage from "@/app/fvg/page";
 import LiquidityPage from "@/app/liquidity/page";
@@ -30,6 +32,16 @@ const tabs: { key: IndicatorTab; icon: string; label: string; description: strin
 
 export default function IndicatorPage() {
   const [activeTab, setActiveTab] = useState<IndicatorTab>("macd");
+  const { data: session, status } = useSession();
+  const isAuthenticated = Boolean(session);
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -61,6 +73,15 @@ export default function IndicatorPage() {
           </div>
         </div>
       </div>
+
+      {!isAuthenticated && (
+        <div className="border-b bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
+          未登入僅可瀏覽 Mega Cap Tech，信號細節已隱藏。
+          <Link href="/login" className="ml-2 font-semibold underline">
+            登入解鎖全部標的
+          </Link>
+        </div>
+      )}
 
       {/* Tab Content */}
       <div>

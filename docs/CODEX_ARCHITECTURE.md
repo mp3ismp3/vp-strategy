@@ -186,6 +186,8 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。
 - `src/lib/rate-limit.ts`、`middleware.ts`：Upstash rate limit 與 request protection。
 
+Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech，MACD/FVG/Liquidity 信號用 `SignalMosaic` 遮罩；未登入的 Accumulation 只顯示依 decay score 排序的前 10 名；Strategy Lab 只遮罩進場信號。登入 session 解鎖上述完整 client view。`/accumulation` 因此不是 middleware auth-protected route，`/fusion` 與 `/account` 仍要求登入。這些是產品顯示 gate，不取代 Supabase RLS 或 server-side authorization。
+
 修改 frontend 前另讀 `services/frontend/AGENTS.md`，使用 `npm`/`package-lock.json`，至少依變更執行 lint、test、build 中適用的 checks。
 
 ### Supabase 與 Telegram bot

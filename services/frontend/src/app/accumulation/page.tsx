@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Paywall } from "@/components/Paywall";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { AccumulationState } from "@/types/signal";
 import { AccumChart } from "@/components/charts/AccumChart";
 import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
+import {
+  GUEST_ACCUMULATION_LIMIT,
+  limitAccumulationItems,
+} from "@/lib/preview-access";
 
 function AccumulationContent() {
+  const { data: session, status } = useSession();
   const [states, setStates] = useState<AccumulationState[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -44,7 +50,7 @@ function AccumulationContent() {
     });
   }, []);
 
-  if (loading) {
+  if (loading || status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
@@ -61,17 +67,27 @@ function AccumulationContent() {
     UNKNOWN: "bg-gray-100 text-gray-800",
   };
 
-  const sorted = [...states].sort((a, b) => b.decay_score - a.decay_score);
-  const selectedState = states.find((s) => s.ticker === selectedTicker);
+  const isAuthenticated = Boolean(session);
+  const visibleStates = limitAccumulationItems(states, isAuthenticated);
+  const selectedState = visibleStates.find((s) => s.ticker === selectedTicker);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Accumulation Tracker</h1>
         <p className="text-gray-600 mt-1">
-          Wyckoff 機構吸籌追蹤 — {states.length} 檔追蹤中
+          Wyckoff 機構吸籌追蹤 — 顯示 {visibleStates.length} / {states.length} 檔
         </p>
       </div>
+
+      {!isAuthenticated && states.length > GUEST_ACCUMULATION_LIMIT && (
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          未登入可查看 Decay Score 前 {GUEST_ACCUMULATION_LIMIT} 名。
+          <Link href="/login" className="ml-2 font-semibold underline">
+            登入解鎖完整排行榜
+          </Link>
+        </div>
+      )}
 
       {/* Strategy Guide (floating button + modal) */}
       <StrategyGuide type="accumulation" />
@@ -128,7 +144,7 @@ function AccumulationContent() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((s) => (
+              {visibleStates.map((s) => (
                 <tr
                   key={s.ticker}
                   onClick={() => setSelectedTicker(s.ticker)}
@@ -199,9 +215,5 @@ function AccumulationContent() {
 }
 
 export default function AccumulationPage() {
-  return (
-    <Paywall requiredPlan="pro">
-      <AccumulationContent />
-    </Paywall>
-  );
+  return <AccumulationContent />;
 }

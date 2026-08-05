@@ -88,7 +88,15 @@ describe("getTierForRoute", () => {
 
 // ─── createRateLimitResponse ────────────────────────────────
 
-import { createRateLimitResponse } from "@/middleware";
+import { config, createRateLimitResponse } from "@/middleware";
+
+describe("page access matcher", () => {
+  it("keeps accumulation public for the guest top-ten preview", () => {
+    expect(config.matcher).not.toContain("/accumulation");
+    expect(config.matcher).toContain("/fusion");
+    expect(config.matcher).toContain("/account");
+  });
+});
 
 describe("createRateLimitResponse", () => {
   it("calculates retryAfter from reset time", () => {
