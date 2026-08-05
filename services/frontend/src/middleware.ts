@@ -10,7 +10,7 @@ import {
 } from "./lib/rate-limit";
 
 // ─── Auth-protected routes (same as before) ─────────────────
-const AUTH_PROTECTED = ["/accumulation", "/fusion", "/account"];
+const AUTH_PROTECTED = ["/fusion", "/account"];
 
 function isAuthProtected(pathname: string): boolean {
   return AUTH_PROTECTED.some(
@@ -184,7 +184,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/api/:path*",
-    "/accumulation",
     "/fusion",
     "/account",
   ],

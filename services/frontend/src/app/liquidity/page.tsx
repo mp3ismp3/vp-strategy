@@ -2,8 +2,13 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
-import { SYMBOL_CATEGORIES } from "@/lib/categories";
+import { SignalMosaic } from "@/components/SignalMosaic";
+import {
+  getIndicatorCategories,
+  isIndicatorTickerAllowed,
+} from "@/lib/preview-access";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -463,6 +468,8 @@ const SOURCE_COLORS: Record<string, { line: string; bg: string; label: string }>
 type SourceFilter = "EQH" | "EQL" | "PDH" | "PDL" | "PWH" | "PWL" | "Swing";
 
 export default function LiquidityPage() {
+  const { data: session } = useSession();
+  const isAuthenticated = Boolean(session);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
   const [loading, setLoading] = useState(true);
@@ -470,6 +477,13 @@ export default function LiquidityPage() {
     new Set(["EQH", "EQL", "PDH", "PDL", "PWH", "PWL", "Swing"])
   );
   const [showSwept, setShowSwept] = useState(true);
+  const indicatorCategories = useMemo(
+    () => getIndicatorCategories(isAuthenticated),
+    [isAuthenticated]
+  );
+  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
+    ? selectedTicker
+    : "NVDA";
 
   // Fetch OHLC from Supabase
   useEffect(() => {
@@ -482,7 +496,7 @@ export default function LiquidityPage() {
       supabase
         .from("chart_data")
         .select("data")
-        .eq("ticker", selectedTicker.toUpperCase())
+        .eq("ticker", effectiveTicker.toUpperCase())
         .single()
         .then(({ data: row }) => {
           if (row?.data?.daily?.ohlc) {
@@ -493,7 +507,7 @@ export default function LiquidityPage() {
           setLoading(false);
         });
     });
-  }, [selectedTicker]);
+  }, [effectiveTicker]);
 
   // Compute liquidity levels and sweeps
   const levels = useMemo(() => buildLiquidityLevels(ohlc), [ohlc]);
@@ -551,11 +565,11 @@ export default function LiquidityPage() {
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">標的：</label>
             <select
-              value={selectedTicker}
+              value={effectiveTicker}
               onChange={(e) => setSelectedTicker(e.target.value)}
               className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {Object.entries(SYMBOL_CATEGORIES).map(([category, tickers]) => (
+              {Object.entries(indicatorCategories).map(([category, tickers]) => (
                 <optgroup key={category} label={category}>
                   {tickers.map((t) => (
                     <option key={t} value={t}>{t}</option>
@@ -609,28 +623,29 @@ export default function LiquidityPage() {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="bg-white rounded-xl border p-4 mb-6">
+      <SignalMosaic locked={!isAuthenticated}>
+        {/* Chart */}
+        <div className="bg-white rounded-xl border p-4 mb-6">
         {loading ? (
           <div className="flex items-center justify-center h-[600px]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
           </div>
         ) : ohlc.length === 0 ? (
           <div className="flex items-center justify-center h-[600px] text-gray-500">
-            無 {selectedTicker} 圖表數據。請先執行 export_frontend_data.py
+            無 {effectiveTicker} 圖表數據。請先執行 export_frontend_data.py
           </div>
         ) : (
           <LiquidityChart
-            ticker={selectedTicker}
+            ticker={effectiveTicker}
             ohlc={ohlc}
             levels={visibleLevels}
             sweeps={visibleSweeps}
           />
         )}
-      </div>
+        </div>
 
       {/* Liquidity Levels Table */}
-      {visibleLevels.length > 0 && (
+        {visibleLevels.length > 0 && (
         <div className="bg-white rounded-xl border p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">📋 流動性水平一覽</h2>
           <div className="overflow-x-auto">
@@ -687,10 +702,10 @@ export default function LiquidityPage() {
             </table>
           </div>
         </div>
-      )}
+        )}
 
       {/* Sweep Events Table */}
-      {visibleSweeps.length > 0 && (
+        {visibleSweeps.length > 0 && (
         <div className="bg-white rounded-xl border p-6">
           <h2 className="text-xl font-bold mb-4">⚡ Sweep 事件</h2>
           <div className="overflow-x-auto">
@@ -739,7 +754,8 @@ export default function LiquidityPage() {
             </table>
           </div>
         </div>
-      )}
+        )}
+      </SignalMosaic>
     </div>
   );
 }

@@ -35,8 +35,8 @@ export default function HomePage() {
       {/* Features */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">兩大核心系統</h2>
-          <div className="grid md:grid-cols-2 gap-8">
+          <h2 className="text-3xl font-bold text-center mb-12">四大策略工具</h2>
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-8">
             {/* VP Scanner */}
             <div className="bg-white rounded-xl p-8 shadow-sm border">
               <div className="text-3xl mb-4">📊</div>
@@ -45,8 +45,8 @@ export default function HomePage() {
                 日線 / 周線 / 月線 Volume Profile，一眼看出價格相對公允價值的位置。
               </p>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li>✓ 免費看 Mega Cap Tech 7 檔</li>
-                <li>✓ Pro 解鎖全部 78 檔 AI 美股</li>
+                <li>✓ 免費方案可看 Mega Cap Tech 7 檔</li>
+                <li>✓ Pro 解鎖完整 Scanner 清單</li>
                 <li>✓ 多時間框架共識分析</li>
                 <li>✓ K 線圖 + VP Histogram</li>
               </ul>
@@ -63,7 +63,37 @@ export default function HomePage() {
                 <li>✓ 6 指標每日評分（0-18）</li>
                 <li>✓ Wyckoff Phase A-E 自動分類</li>
                 <li>✓ Spring / LPS / SOS 入場觸發</li>
-                <li>✓ Pro 方案解鎖</li>
+                <li>✓ 未登入可查看 Decay Score 前 10 名</li>
+                <li>✓ 登入解鎖完整排行榜</li>
+              </ul>
+            </div>
+
+            {/* Indicator */}
+            <div className="bg-white rounded-xl p-8 shadow-sm border">
+              <div className="text-3xl mb-4">📉</div>
+              <h3 className="text-xl font-bold mb-3">Indicator Suite</h3>
+              <p className="text-gray-600 mb-4">
+                MACD 背離、FVG 與 Liquidity Sweep，集中查看技術結構信號。
+              </p>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>✓ 未登入限 Mega Cap Tech</li>
+                <li>✓ 未登入信號以馬賽克預覽</li>
+                <li>✓ 登入解鎖完整標的與信號</li>
+              </ul>
+            </div>
+
+            {/* Strategy Lab */}
+            <div className="bg-white rounded-xl p-8 shadow-sm border">
+              <div className="text-3xl mb-4">⚡</div>
+              <h3 className="text-xl font-bold mb-3">Strategy Lab</h3>
+              <p className="text-gray-600 mb-4">
+                將 Wyckoff 結構、RSI 時機與回測績效整合成可執行的交易流程。
+              </p>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>✓ 回測績效與進場 Checklist</li>
+                <li>✓ Spring / LPS / SOS 策略信號</li>
+                <li>✓ 未登入可閱讀策略規則</li>
+                <li>✓ 登入解鎖即時進場信號</li>
               </ul>
             </div>
           </div>
@@ -79,7 +109,7 @@ export default function HomePage() {
               <div className="text-4xl mb-4">1️⃣</div>
               <h3 className="font-bold mb-2">每日自動掃描</h3>
               <p className="text-gray-600 text-sm">
-                美股收盤後，系統自動分析 62 檔標的的 VP 位置和累積狀態
+                美股收盤後，系統自動分析完整追蹤清單的 VP 位置和累積狀態
               </p>
             </div>
             <div>

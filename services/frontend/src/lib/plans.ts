@@ -31,7 +31,7 @@ export const PLANS: Record<Plan, PlanConfig> = {
     features: {
       scannerSymbols: 7,
       scannerDelayDays: 0,
-      accumulation: false,
+      accumulation: true,
       fusion: false,
       telegramSignals: false,
       historyDays: 0,
@@ -39,6 +39,7 @@ export const PLANS: Record<Plan, PlanConfig> = {
     highlights: [
       "VP Scanner — Mega Cap Tech 7 檔",
       "多時間框架 VP 圖表",
+      "登入解鎖 Accumulation 完整排行榜",
       "基本操作建議",
     ],
   },

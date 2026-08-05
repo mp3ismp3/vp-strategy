@@ -185,6 +185,13 @@ python accumulation.py --debug      # 顯示詳細指標分解
 streamlit run ui/app.py
 ```
 
+Next.js Web 預覽權限：
+
+- 未登入的 Indicator 僅能選擇 Mega Cap Tech，MACD/FVG/Liquidity 信號以馬賽克隱藏。
+- 登入後解鎖 Indicator 全部標的與完整信號。
+- 未登入的 Accumulation 顯示 Decay Score 前 10 名；登入後顯示完整排行榜。
+- Strategy Lab 的進場信號未登入時以馬賽克隱藏，登入後解鎖。
+
 兩個頁面：
 - **Scanner** — VP 多時間框架 K 線圖 + VP 直方圖 + 操作建議
 - **Accumulation** — 追蹤中標的的 K 線 + OBV + 支撐壓力
@@ -200,7 +207,10 @@ python intraday.py --dry-run        # 盤中 1H 確認
 ### 測試
 
 ```bash
-pytest tests/                       # 137 個測試
+pytest tests/                       # Python tests
+cd services/frontend && npm test    # Frontend Vitest
+cd services/frontend && npm run lint
+cd services/frontend && npm run build
 ```
 
 ### Commit 前文件一致性檢查

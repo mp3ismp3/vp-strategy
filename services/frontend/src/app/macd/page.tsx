@@ -2,8 +2,14 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
-import { SYMBOL_CATEGORIES } from "@/lib/categories";
+import { SignalMosaic } from "@/components/SignalMosaic";
+import {
+  filterIndicatorItems,
+  getIndicatorCategories,
+  isIndicatorTickerAllowed,
+} from "@/lib/preview-access";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -463,16 +469,21 @@ interface ScanResult {
 }
 
 export default function MACDPage() {
+  const { data: session } = useSession();
+  const isAuthenticated = Boolean(session);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
 
-  const allTickers = useMemo(
-    () => Object.values(SYMBOL_CATEGORIES).flat().sort(),
-    []
+  const indicatorCategories = useMemo(
+    () => getIndicatorCategories(isAuthenticated),
+    [isAuthenticated]
   );
+  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
+    ? selectedTicker
+    : "NVDA";
 
   // Fetch OHLC for selected ticker
   useEffect(() => {
@@ -485,7 +496,7 @@ export default function MACDPage() {
       supabase
         .from("chart_data")
         .select("data")
-        .eq("ticker", selectedTicker.toUpperCase())
+        .eq("ticker", effectiveTicker.toUpperCase())
         .single()
         .then(({ data: row }) => {
           if (row?.data?.daily?.ohlc) {
@@ -496,7 +507,7 @@ export default function MACDPage() {
           setLoading(false);
         });
     });
-  }, [selectedTicker]);
+  }, [effectiveTicker]);
 
   // Compute MACD and divergences for selected ticker
   const dailyMACD = useMemo(() => {
@@ -545,7 +556,7 @@ export default function MACDPage() {
     const results: ScanResult[] = [];
 
     if (rows) {
-      for (const row of rows) {
+      for (const row of filterIndicatorItems(rows, isAuthenticated)) {
         const dailyOhlc: OHLCBar[] = row.data?.daily?.ohlc || [];
         if (dailyOhlc.length < 60) continue;
 
@@ -619,7 +630,7 @@ export default function MACDPage() {
   // Auto-scan all tickers on page load
   useEffect(() => {
     handleScan();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Categorize scan results
   const dualResults = scanResults.filter((r) => r.isDual);
@@ -641,11 +652,11 @@ export default function MACDPage() {
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">標的：</label>
           <select
-            value={selectedTicker}
+            value={effectiveTicker}
             onChange={(e) => setSelectedTicker(e.target.value)}
             className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {Object.entries(SYMBOL_CATEGORIES).map(([category, tickers]) => (
+            {Object.entries(indicatorCategories).map(([category, tickers]) => (
               <optgroup key={category} label={category}>
                 {tickers.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -664,8 +675,9 @@ export default function MACDPage() {
       </div>
 
       {/* Divergence stats for current ticker */}
-      {(dailyDivergences.length > 0 || weeklyDivergences.length > 0) && (
-        <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-3">
+      <SignalMosaic locked={!isAuthenticated}>
+        {(dailyDivergences.length > 0 || weeklyDivergences.length > 0) && (
+          <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-3">
           {dailyDivergences.map((d, i) => (
             <Badge key={`d-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
               {d.type === "bullish" ? "🟢" : "🔴"} 日線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
@@ -681,11 +693,13 @@ export default function MACDPage() {
               🔥 日線+周線雙重背離
             </Badge>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </SignalMosaic>
 
-      {/* Charts */}
-      <div className="space-y-6 mb-8">
+      <SignalMosaic locked={!isAuthenticated}>
+        {/* Charts */}
+        <div className="space-y-6 mb-8">
         {/* Daily MACD Chart */}
         <div className="bg-white rounded-xl border p-4">
           {loading ? (
@@ -694,15 +708,15 @@ export default function MACDPage() {
             </div>
           ) : ohlc.length === 0 ? (
             <div className="flex items-center justify-center h-[450px] text-gray-500">
-              無 {selectedTicker} 圖表數據。請先執行 export_frontend_data.py
+              無 {effectiveTicker} 圖表數據。請先執行 export_frontend_data.py
             </div>
           ) : dailyMACD ? (
             <MACDChart
-              ticker={selectedTicker}
+              ticker={effectiveTicker}
               ohlc={ohlc}
               macdData={dailyMACD}
               divergences={dailyDivergences}
-              title={`${selectedTicker} 日線 MACD (Daily)`}
+              title={`${effectiveTicker} 日線 MACD (Daily)`}
             />
           ) : (
             <div className="flex items-center justify-center h-[450px] text-gray-500">
@@ -723,11 +737,11 @@ export default function MACDPage() {
             </div>
           ) : weeklyMACD ? (
             <MACDChart
-              ticker={selectedTicker}
+              ticker={effectiveTicker}
               ohlc={weeklyOHLC}
               macdData={weeklyMACD}
               divergences={weeklyDivergences}
-              title={`${selectedTicker} 周線 MACD (Weekly)`}
+              title={`${effectiveTicker} 周線 MACD (Weekly)`}
             />
           ) : (
             <div className="flex items-center justify-center h-[450px] text-gray-500">
@@ -735,11 +749,13 @@ export default function MACDPage() {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      </SignalMosaic>
 
       {/* Scan Results */}
-      {scanResults.length > 0 && (
-        <div className="space-y-6">
+      <SignalMosaic locked={!isAuthenticated}>
+        {scanResults.length > 0 && (
+          <div className="space-y-6">
           {/* 🔥 Dual Divergence */}
           {dualResults.length > 0 && (
             <div className="bg-white rounded-xl border p-6">
@@ -848,8 +864,9 @@ export default function MACDPage() {
           <div className="text-center text-sm text-gray-500">
             共掃描到 {scanResults.length} 檔有背離訊號 | 🔥 雙重: {dualResults.length} | 日線: {dailyOnlyResults.length} | 周線: {weeklyOnlyResults.length}
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </SignalMosaic>
     </div>
   );
 }

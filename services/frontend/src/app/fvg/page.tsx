@@ -2,8 +2,14 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
-import { SYMBOL_CATEGORIES } from "@/lib/categories";
+import { SignalMosaic } from "@/components/SignalMosaic";
+import {
+  filterIndicatorItems,
+  getIndicatorCategories,
+  isIndicatorTickerAllowed,
+} from "@/lib/preview-access";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -270,6 +276,8 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function FVGPage() {
+  const { data: session } = useSession();
+  const isAuthenticated = Boolean(session);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
   const [loading, setLoading] = useState(true);
@@ -277,6 +285,13 @@ export default function FVGPage() {
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [showFilled, setShowFilled] = useState(false);
   const [maxAge, setMaxAge] = useState(30);
+  const indicatorCategories = useMemo(
+    () => getIndicatorCategories(isAuthenticated),
+    [isAuthenticated]
+  );
+  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
+    ? selectedTicker
+    : "NVDA";
 
   // Fetch OHLC for selected ticker
   useEffect(() => {
@@ -289,7 +304,7 @@ export default function FVGPage() {
       supabase
         .from("chart_data")
         .select("data")
-        .eq("ticker", selectedTicker.toUpperCase())
+        .eq("ticker", effectiveTicker.toUpperCase())
         .single()
         .then(({ data: row }) => {
           if (row?.data?.daily?.ohlc) {
@@ -300,7 +315,7 @@ export default function FVGPage() {
           setLoading(false);
         });
     });
-  }, [selectedTicker]);
+  }, [effectiveTicker]);
 
   // Detect FVGs for selected ticker
   const fvgs = useMemo(() => {
@@ -332,7 +347,7 @@ export default function FVGPage() {
     const results: ScanResult[] = [];
 
     if (rows) {
-      for (const row of rows) {
+      for (const row of filterIndicatorItems(rows, isAuthenticated)) {
         const dailyOhlc: OHLCBar[] = row.data?.daily?.ohlc || [];
         if (dailyOhlc.length < 30) continue;
 
@@ -359,7 +374,7 @@ export default function FVGPage() {
   // Auto-scan on mount
   useEffect(() => {
     handleScan();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -376,11 +391,11 @@ export default function FVGPage() {
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-gray-700">標的：</label>
           <select
-            value={selectedTicker}
+            value={effectiveTicker}
             onChange={(e) => setSelectedTicker(e.target.value)}
             className="border rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {Object.entries(SYMBOL_CATEGORIES).map(([category, tickers]) => (
+            {Object.entries(indicatorCategories).map(([category, tickers]) => (
               <optgroup key={category} label={category}>
                 {tickers.map((t) => (
                   <option key={t} value={t}>{t}</option>
@@ -424,31 +439,34 @@ export default function FVGPage() {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="bg-white rounded-xl border p-4 mb-6">
+      <SignalMosaic locked={!isAuthenticated}>
+        {/* Chart */}
+        <div className="bg-white rounded-xl border p-4 mb-6">
         {loading ? (
           <div className="flex items-center justify-center h-[550px]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
           </div>
         ) : ohlc.length === 0 ? (
           <div className="flex items-center justify-center h-[550px] text-gray-500">
-            無 {selectedTicker} 圖表數據。請先執行 export_frontend_data.py
+            無 {effectiveTicker} 圖表數據。請先執行 export_frontend_data.py
           </div>
         ) : (
           <FVGChart
-            ticker={selectedTicker}
+            ticker={effectiveTicker}
             ohlc={ohlc}
             fvgs={fvgs}
             showFilled={showFilled}
           />
         )}
-      </div>
+        </div>
+      </SignalMosaic>
 
       {/* FVG detail table for current ticker */}
-      {visibleFvgs.length > 0 && (
-        <div className="bg-white rounded-xl border p-6 mb-6">
+      <SignalMosaic locked={!isAuthenticated}>
+        {visibleFvgs.length > 0 && (
+          <div className="bg-white rounded-xl border p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">
-            📋 {selectedTicker} FVG 列表
+            📋 {effectiveTicker} FVG 列表
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -490,8 +508,9 @@ export default function FVGPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </SignalMosaic>
 
       {/* Scan Results */}
       {scanning && (
@@ -501,8 +520,9 @@ export default function FVGPage() {
         </div>
       )}
 
-      {!scanning && scanResults.length > 0 && (
-        <div className="bg-white rounded-xl border p-6">
+      <SignalMosaic locked={!isAuthenticated}>
+        {!scanning && scanResults.length > 0 && (
+          <div className="bg-white rounded-xl border p-6">
           <h2 className="text-xl font-bold mb-4">
             🔍 全標的 FVG 掃描（共 {scanResults.length} 檔有有效缺口）
           </h2>
@@ -570,8 +590,9 @@ export default function FVGPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </SignalMosaic>
     </div>
   );
 }
