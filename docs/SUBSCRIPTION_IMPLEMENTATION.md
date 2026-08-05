@@ -141,7 +141,6 @@ vp-strategy/
 ├── strategies/
 ├── regime/
 ├── scoring/
-├── ui/                        # 舊 Streamlit UI（保留參考，未來移除）
 ├── scan_all.py
 ├── accumulation.py
 └── config.py
@@ -629,11 +628,10 @@ scan_all.py ──(write)──→ Supabase scan_results 表（CI 完成後上�
                     │
   新增（付費層）     │    現有（分析層）
  ─────────────────  │  ─────────────────
-  services/frontend │    ui/app.py（保留參考，未來移除）
-  services/auth     │    core/
-  services/sub      │    strategies/
-  services/tg-bot   │    scan_all.py
-                    │    accumulation.py
+  services/frontend │    core/
+  services/auth     │    strategies/
+  services/sub      │    scan_all.py
+  services/tg-bot   │    accumulation.py
                     │    data/*.json
                     │
   讀取 data/ JSON ←─┼──── 寫入 data/ JSON
@@ -658,13 +656,11 @@ scan_all.py ──(write)──→ Supabase scan_results 表（CI 完成後上�
 
 3. **年繳折扣** — 是否 Day 1 就提供？（建議先不要，等有穩定用戶再加）
 
-4. **現有 UI 的遷移** — 現在 `ui/` 目錄的 code 要直接搬到 `services/frontend/` 改造，還是保留舊的、新開一份？
+4. **域名** — 有想好用什麼域名嗎？需要我幫你設定 DNS + SSL？
 
-5. **域名** — 有想好用什麼域名嗎？需要我幫你設定 DNS + SSL？
+5. **Supabase 專案** — 已經建了還是需要我引導你建？
 
-6. **Supabase 專案** — 已經建了還是需要我引導你建？
-
-7. **Stripe 帳號** — 已註冊？需要引導設定 Products + Prices？
+6. **Stripe 帳號** — 已註冊？需要引導設定 Products + Prices？
 
 ---
 

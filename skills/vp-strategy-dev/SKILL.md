@@ -105,7 +105,6 @@ No reverse dependencies. Violating this causes circular imports.
 | `regime/` | core/indicators, config | strategies/, scoring/ |
 | `strategies/*` | core/, regime/, config | other strategies, scoring/ |
 | `scoring/` | core/signal, config | strategies/, regime/ |
-| `ui/` | data/*.json (read-only) | anything that computes |
 | `notifications/` | stdlib, requests | strategies/, scoring/ |
 
 **Strategies are isolated** — `vp_signals` cannot import `vwap_signals` or `trend_signals`.

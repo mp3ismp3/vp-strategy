@@ -25,7 +25,6 @@ vp-strategy/
 │   └── accumulation/             # score、phase、trigger、tracker、通知格式
 ├── scoring/                      # legacy/intraday confidence scoring
 ├── notifications/                # Telegram、Teams transport/format adapter
-├── ui/                           # Streamlit UI；主要讀 JSON，部分頁面即時抓圖表資料
 ├── services/
 │   ├── frontend/                 # Next.js Web app、API routes、auth/paywall/rate limit
 │   └── telegram-bot/             # Telegram webhook bot 與訂閱者通知 router
@@ -68,7 +67,7 @@ vp-strategy/
 | `strategies/accumulation/` | 同子系統 config/helpers、數值套件 | 與 VP/VWAP/Trend strategies 保持獨立，不依賴 scoring |
 | `scoring/confidence.py` | config、core、`strategies.inst_trend` | `strategies.inst_trend` 是目前 legacy 例外；不要形成反向依賴 |
 | 根目錄 entry points | 上述分析層、notifications | 負責 orchestration 與輸出，不應被分析層反向 import |
-| `ui/`、frontend、bot、upload jobs | JSON/Supabase/API contracts | downstream consumer，不得成為策略計算依賴 |
+| frontend、bot、upload jobs | JSON/Supabase/API contracts | downstream consumer，不得成為策略計算依賴 |
 
 若新增依賴不符合矩陣，先調整設計；不要把現有 `scoring → strategies.inst_trend` 誤判成待順手修正的 bug。
 
@@ -112,7 +111,6 @@ auction enrichments
         ↓
 data/scan_results.json
         ├─ Telegram + Teams summary
-        ├─ Streamlit readers
         ├─ export_frontend_data.py
         ├─ fusion_report.py
         └─ upload_to_supabase.py → Supabase → Next.js API/UI
@@ -151,7 +149,7 @@ entry_triggers.check_triggers()
         ↓
 data/accum_state.json
         ├─ accumulation notifications
-        ├─ Streamlit/Fusion readers
+        ├─ Fusion readers
         ├─ Supabase upload
         └─ CI auto-commit
 ```
@@ -167,15 +165,11 @@ data/accum_state.json
 
 State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊 JSON 缺欄位時有 default，並驗證 load/save round trip。
 
-## 6. Fusion、UI 與產品服務
+## 6. Fusion 與產品服務
 
 ### Fusion
 
 `fusion_report.py` 讀取 `scan_results.json` 與 `accum_state.json`，合併 macro VP direction、Wyckoff phase/triggers、red flags 與交易 levels。它是 downstream consumer，不應回寫 Scanner 或 Tracker 的計算狀態。
-
-### Streamlit `ui/`
-
-`ui/app.py` 組裝 Scanner、Accumulation、Fusion、Strategy、Indicator 頁面。UI 層原則上負責呈現；不要把核心分析邏輯或 state mutation 移入頁面。既有部分頁面會抓 yfinance 以畫即時圖表，修改時仍要避免讓 UI 成為資料真相來源。
 
 ### Next.js `services/frontend/`
 
@@ -201,8 +195,8 @@ Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech；MACD/FVG
 
 | 資料/服務 | Producer | Consumer | 注意事項 |
 |---|---|---|---|
-| `data/scan_results.json` | `scan_all.py` | Fusion、UI、export、upload | schema 穩定；不進 git |
-| `data/accum_state.json` | `AccumulationTracker` | accumulation、Fusion、UI、upload | CI auto-commit；欄位向後相容 |
+| `data/scan_results.json` | `scan_all.py` | Fusion、export、upload | schema 穩定；不進 git |
+| `data/accum_state.json` | `AccumulationTracker` | accumulation、Fusion、upload | CI auto-commit；欄位向後相容 |
 | `data/frontend_charts.json` | `export_frontend_data.py` | `upload_to_supabase.py` | 衍生資料，可重建 |
 | `data/cache/` | `YahooProvider` | scanner/export jobs | runtime cache，可重建 |
 | Yahoo Finance | data providers/entry points | Python analysis | 測試一律 mock |
@@ -232,7 +226,6 @@ Cron 對應美股時段，不可順手調整。Daily workflow 的順序有資料
 | `strategies/accumulation/`, `accumulation.py` | 全部 accumulation、phase、entry trigger tests |
 | `scoring/`、權重、門檻、預設值 | scoring/strategy tests + backtest |
 | `notifications/` | notification tests + dry-run，禁止真實發送 |
-| `ui/` | import/smoke 與相關 Python tests |
 | `services/frontend/` | `npm run lint`、`npm test`、`npm run build` 中適用者 |
 | `.github/workflows/` | YAML parse/review + workflow 內實際 command |
 | 純文件 | link/path、Markdown 結構與完整 diff review |

@@ -182,7 +182,9 @@ python accumulation.py --debug      # 顯示詳細指標分解
 ### Web UI
 
 ```bash
-streamlit run ui/app.py
+cd services/frontend
+npm ci
+npm run dev
 ```
 
 Next.js Web 預覽權限：
@@ -192,9 +194,7 @@ Next.js Web 預覽權限：
 - 未登入的 Accumulation 顯示 Decay Score 前 10 名；登入後顯示完整排行榜。
 - Strategy Lab 的進場信號未登入時以馬賽克隱藏，登入後解鎖。
 
-兩個頁面：
-- **Scanner** — VP 多時間框架 K 線圖 + VP 直方圖 + 操作建議
-- **Accumulation** — 追蹤中標的的 K 線 + OBV + 支撐壓力
+Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
 ### 回測/優化
 
@@ -260,10 +260,6 @@ accumulation.py                      # 累積追蹤主程式
 pre_market.py                        # 開盤前觀察清單
 intraday.py                          # 盤中確認
 backtest_multi.py                    # 多策略回測
-ui/
-├── app.py                           # Streamlit 主程式 + 導航
-├── scanner_page.py                  # VP 多 TF 圖表
-├── accumulation_page.py             # Accumulation 視覺化
 notifications/                       # Telegram / Teams 發送
 data/
 ├── scan_results.json                # VP 掃描結果

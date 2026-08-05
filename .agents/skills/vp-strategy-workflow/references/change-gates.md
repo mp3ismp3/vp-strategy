@@ -12,7 +12,6 @@ Use this matrix after identifying files in scope. Apply every matching row.
 | `strategies/accumulation/`, `accumulation.py` | all `tests/test_accumulation_*.py`, `test_phase_classifier.py`, `test_entry_triggers.py` | State round trip, new fields defaulted, no manual state edit |
 | `scoring/`, tuned config or strategy thresholds | `pytest tests/test_scoring.py`; relevant strategy tests; `python backtest_multi.py` | Compare metrics; disclose regressions; preserve defaults unless requested |
 | `notifications/` | relevant notification tests; dry-run entry point | No real send; Telegram output at most 4096 chars; no secrets in logs |
-| `ui/` | import/smoke check plus relevant Python tests | UI remains read-only; no analysis or state-writing logic |
 | `services/frontend/` | commands exposed by `package.json` | Read nested `AGENTS.md` and installed Next.js docs; preserve JSON API contracts |
 | `.github/workflows/` | YAML parse/review; relevant local command | Do not change cron times; keep runtime below ten minutes; least privileges |
 | `deploy/`, Stripe, Supabase, bot services | available config/build checks | No live deploy or external mutation without explicit request; never expose secrets |

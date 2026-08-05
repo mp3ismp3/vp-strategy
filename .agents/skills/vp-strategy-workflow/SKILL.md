@@ -1,6 +1,6 @@
 ---
 name: vp-strategy-workflow
-description: Run the end-to-end software development workflow for the vp-strategy repository. Use when Codex plans, implements, fixes, refactors, reviews, tests, or prepares delivery of changes to VP Scanner, Accumulation Tracker, strategies, scoring, notifications, Streamlit UI, Next.js frontend, deployment, or CI. Enforce repository architecture, test-first changes, affected-test selection, backtest gates, evidence-based review, and safe Git handoff. Do not use for market/trading advice or read-only questions unrelated to changing this codebase.
+description: Run the end-to-end software development workflow for the vp-strategy repository. Use when Codex plans, implements, fixes, refactors, reviews, tests, or prepares delivery of changes to VP Scanner, Accumulation Tracker, strategies, scoring, notifications, Next.js frontend, deployment, or CI. Enforce repository architecture, test-first changes, affected-test selection, backtest gates, evidence-based review, and safe Git handoff. Do not use for market/trading advice or read-only questions unrelated to changing this codebase.
 ---
 
 # VP Strategy Development Workflow
