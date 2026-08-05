@@ -1,28 +1,40 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { PLANS } from "@/lib/plans";
 import { Plan } from "@/types/user";
 
 export default function PricingPage() {
   const { data: session } = useSession();
-  const userPlan = (session?.user as any)?.plan || "free";
+  const router = useRouter();
+  const userPlan = (session?.user as { plan?: Plan } | undefined)?.plan || "free";
+  const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
 
   const handleCheckout = async (plan: Plan) => {
     if (!session) {
-      window.location.href = "/login?callbackUrl=/pricing";
+      router.push("/login?callbackUrl=/pricing");
       return;
     }
 
-    const res = await fetch("/api/stripe/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan }),
-    });
-
-    const { url } = await res.json();
-    if (url) {
-      window.location.href = url;
+    setCheckoutError("");
+    setCheckoutPlan(plan);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.url) {
+        setCheckoutError(result.error || "目前無法建立付款頁面，請稍後再試。");
+        return;
+      }
+      window.location.assign(result.url);
+    } finally {
+      setCheckoutPlan(null);
     }
   };
 
@@ -32,8 +44,11 @@ export default function PricingPage() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold">選擇你的方案</h1>
           <p className="text-gray-600 mt-4">
-            7 天免費試用 Pro，不滿意隨時取消
+            新用戶享一次 7 天免費試用，不滿意隨時取消
           </p>
+          {checkoutError && (
+            <p className="mt-4 text-sm font-medium text-red-600">{checkoutError}</p>
+          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
@@ -76,7 +91,7 @@ export default function PricingPage() {
 
                 <button
                   onClick={() => handleCheckout(planKey)}
-                  disabled={isCurrent || planKey === "free"}
+                  disabled={isCurrent || planKey === "free" || checkoutPlan !== null}
                   className={`mt-8 w-full py-3 rounded-md font-medium transition ${
                     isCurrent
                       ? "bg-gray-100 text-gray-500 cursor-not-allowed"
@@ -87,7 +102,9 @@ export default function PricingPage() {
                       : "border border-black text-black hover:bg-gray-50"
                   }`}
                 >
-                  {isCurrent
+                  {checkoutPlan === planKey
+                    ? "前往 Stripe..."
+                    : isCurrent
                     ? "目前方案"
                     : planKey === "free"
                     ? "目前方案"
@@ -101,7 +118,7 @@ export default function PricingPage() {
         </div>
 
         <div className="mt-12 text-center text-sm text-gray-500">
-          <p>所有付費方案均享 7 天免費試用期。試用期內取消不收費。</p>
+          <p>每位新用戶僅享一次 7 天免費試用；試用期內取消不收費。</p>
           <p className="mt-1">付款由 Stripe 安全處理，我們不會儲存你的卡號。</p>
         </div>
       </div>

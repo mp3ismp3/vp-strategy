@@ -196,6 +196,8 @@ Next.js Web 預覽權限：
 
 Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
+Stripe Checkout 預設關閉，只有伺服器環境變數 `STRIPE_CHECKOUT_ENABLED=true` 才開放。正式金流使用 server-only 的 `STRIPE_PRICE_PRO` / `STRIPE_PRICE_PREMIUM` 白名單；Test 與 Live Customer 依 `stripe_mode` 隔離，每位使用者只提供一次試用。相同方案的未完成 Checkout Session 會在 30 分鐘內重用；若已有其他方案的 Session，API 會回傳衝突而不會靜默切換方案。Customer 與 Session 建立皆有冪等保護。Webhook 以 `subscription_events` ledger 去重及原子 reclaim，資料同步失敗會回傳非 2xx 讓 Stripe 重試；取消通知只在 ledger 完成後 best-effort 發送，舊訂閱的延遲刪除事件也不會覆蓋較新的有效訂閱。管理員可用 `/api/admin/stripe-reconcile` 先 dry-run 比對 Stripe/Supabase，明確傳入 `apply: true` 才修正安全且無歧義的差異。既有 Supabase 專案在 Live 上線前必須先執行 `services/frontend/supabase_billing_hardening.sql`，完整步驟見 `docs/stripe-live-mode.md`。
+
 ### 回測/優化
 
 ```bash

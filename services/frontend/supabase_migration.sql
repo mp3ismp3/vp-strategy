@@ -15,9 +15,13 @@ CREATE TABLE IF NOT EXISTS public.users (
     plan TEXT DEFAULT 'free',
     stripe_customer_id TEXT UNIQUE,
     stripe_subscription_id TEXT,
+    stripe_mode TEXT CHECK (stripe_mode IN ('test', 'live')),
+    stripe_checkout_session_id TEXT,
+    stripe_checkout_expires_at TIMESTAMPTZ,
     subscription_status TEXT DEFAULT 'inactive',
     trial_start TIMESTAMPTZ,
     trial_end TIMESTAMPTZ,
+    trial_used_at TIMESTAMPTZ,
     current_period_end TIMESTAMPTZ,
 
     -- Telegram 綁定
@@ -37,9 +41,28 @@ CREATE TABLE IF NOT EXISTS public.subscription_events (
     user_id UUID REFERENCES public.users(id),
     event_type TEXT NOT NULL,
     stripe_event_id TEXT UNIQUE,
+    processing_status TEXT NOT NULL DEFAULT 'processed'
+        CHECK (processing_status IN ('processing', 'processed', 'failed')),
+    processing_started_at TIMESTAMPTZ,
+    processed_at TIMESTAMPTZ,
+    last_error TEXT,
     payload JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Existing deployments: add production billing safety fields without replacing data.
+ALTER TABLE public.users
+    ADD COLUMN IF NOT EXISTS stripe_mode TEXT CHECK (stripe_mode IN ('test', 'live')),
+    ADD COLUMN IF NOT EXISTS trial_used_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS stripe_checkout_session_id TEXT,
+    ADD COLUMN IF NOT EXISTS stripe_checkout_expires_at TIMESTAMPTZ;
+
+ALTER TABLE public.subscription_events
+    ADD COLUMN IF NOT EXISTS processing_status TEXT NOT NULL DEFAULT 'processed'
+        CHECK (processing_status IN ('processing', 'processed', 'failed')),
+    ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_error TEXT;
 
 -- ============================================
 -- 3. Telegram Bind Tokens 表
@@ -77,6 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 CREATE INDEX IF NOT EXISTS idx_users_stripe_customer ON public.users(stripe_customer_id);
 CREATE INDEX IF NOT EXISTS idx_users_telegram ON public.users(telegram_user_id);
 CREATE INDEX IF NOT EXISTS idx_subscription_events_user ON public.subscription_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_events_status ON public.subscription_events(processing_status);
 
 -- ============================================
 -- 7. Scan Data 表（VP 掃描結果，覆蓋更新）
