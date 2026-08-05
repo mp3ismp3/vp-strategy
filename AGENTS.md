@@ -151,7 +151,7 @@ normalized_trust: {"VP": 0.48, "VWAP": 0.38, "TrendFollowing": 0.14}  # sums to 
 | `strategies/` | 信號產生 | 每個策略獨立，不能互相 import，backtest 用 |
 | `strategies/accumulation/` | Wyckoff 累積追蹤 | 有 state persistence，改 tracker 要跑全部 `test_accumulation_*.py` |
 | `scoring/` | Legacy 評分 | backtest 用，改動要跑 backtest 驗證 |
-| `ui/` | Streamlit 展示 | read-only，不做計算，不寫文件 |
+| `services/frontend/` | Next.js Web UI | 展示與產品 gate；分析資料來自 JSON/Supabase API |
 | `notifications/` | Telegram 通知 | 只負責格式化 + 發送 |
 | `tests/` | pytest 測試 | 新功能必須有對應測試 |
 
