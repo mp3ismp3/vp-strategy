@@ -32,6 +32,7 @@ Stripe Webhook        (docker-compose)     accumulation.py
    ```
    NEXTAUTH_URL=https://your-domain.vercel.app
    NEXTAUTH_SECRET=<random-string>
+   ADMIN_EMAILS=<comma-separated-admin-emails>
    GOOGLE_CLIENT_ID=<your-google-client-id>
    GOOGLE_CLIENT_SECRET=<your-google-client-secret>
    NEXT_PUBLIC_SUPABASE_URL=https://zviexeyaosdcuwpevywn.supabase.co
@@ -39,8 +40,9 @@ Stripe Webhook        (docker-compose)     accumulation.py
    SUPABASE_SERVICE_KEY=<your-service-key>
    STRIPE_SECRET_KEY=<your-stripe-secret-key>
    STRIPE_WEBHOOK_SECRET=<from-stripe-dashboard>
-   NEXT_PUBLIC_STRIPE_PRICE_PRO=price_1TtNJtFQbxamka7fzy0JhVlW
-   NEXT_PUBLIC_STRIPE_PRICE_PREMIUM=price_1TtNLFFQbxamka7fLdrMPony
+   STRIPE_PRICE_PRO=<server-side-price-id>
+   STRIPE_PRICE_PREMIUM=<server-side-price-id>
+   STRIPE_CHECKOUT_ENABLED=false
    NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
    ```
 
@@ -55,7 +57,7 @@ Stripe Webhook        (docker-compose)     accumulation.py
    ```
    https://your-domain.vercel.app/api/stripe/webhook
    ```
-   Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
+   Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.trial_will_end`, `invoice.paid`, `invoice.payment_failed`, `invoice.payment_action_required`
 
 ---
 
@@ -131,7 +133,8 @@ GitHub Actions (每天 21:05 UTC)
 2. 重新建立 Products + Prices（live mode）
 3. 更新 Vercel 環境變數：
    - `STRIPE_SECRET_KEY` → `sk_live_...`
-   - `NEXT_PUBLIC_STRIPE_PRICE_PRO` → 新的 price ID
-   - `NEXT_PUBLIC_STRIPE_PRICE_PREMIUM` → 新的 price ID
+   - `STRIPE_PRICE_PRO` → 新的 server-only price ID
+   - `STRIPE_PRICE_PREMIUM` → 新的 server-only price ID
+   - `STRIPE_CHECKOUT_ENABLED` → 驗收前維持 `false`
 4. 重新設定 Webhook endpoint（live mode）
 5. 測試一筆真實交易

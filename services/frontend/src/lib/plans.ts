@@ -11,7 +11,6 @@ export const TRIAL_DAYS = 7;
 export interface PlanConfig {
   name: string;
   price: number;
-  stripePriceId: string | null;
   features: {
     scannerSymbols: number; // -1 = unlimited
     scannerDelayDays: number;
@@ -27,7 +26,6 @@ export const PLANS: Record<Plan, PlanConfig> = {
   free: {
     name: "Free",
     price: 0,
-    stripePriceId: null,
     features: {
       scannerSymbols: 7,
       scannerDelayDays: 0,
@@ -46,7 +44,6 @@ export const PLANS: Record<Plan, PlanConfig> = {
   pro: {
     name: "Pro",
     price: 10,
-    stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || "",
     features: {
       scannerSymbols: -1,
       scannerDelayDays: 0,
@@ -65,7 +62,6 @@ export const PLANS: Record<Plan, PlanConfig> = {
   premium: {
     name: "Premium",
     price: 19,
-    stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM || "",
     features: {
       scannerSymbols: -1,
       scannerDelayDays: 0,

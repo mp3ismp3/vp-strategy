@@ -176,7 +176,9 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/app/**/page.tsx`：scanner、accumulation、fusion、strategy、indicator、liquidity、FVG、MACD、account/pricing 等頁面。
 - `src/app/api/data/*`：從 Supabase 提供 scan、accumulation、fusion、chart data。
 - `src/app/api/auth/*`、`src/lib/auth.ts`：NextAuth/Supabase authentication。
-- `src/app/api/stripe/*`、`src/lib/stripe.ts`：checkout、portal、webhook。
+- `src/app/api/stripe/*`、`src/lib/stripe.ts`：checkout、portal、webhook。Checkout 由 `STRIPE_CHECKOUT_ENABLED` 控制，Price ID 僅從 server-side allowlist 取得；`stripe-config.ts` 隔離 Test/Live mode，並為 Customer/30 分鐘同方案 pending Checkout 提供冪等保護，方案不一致時回傳衝突；`stripe-webhook.ts` 以 event ledger 與 observed timestamp CAS 提供冪等 claim/retry，取消通知在 ledger 完成後才 best-effort 發送，延遲的舊訂閱刪除事件會保留較新的有效訂閱。
+- `src/app/api/admin/stripe-reconcile/route.ts`、`stripe-reconciliation.ts`：限 `ADMIN_EMAILS` 管理員使用的 Stripe/Supabase reconciliation。預設 dry-run；只有單一或零個非終止訂閱才可 apply，多重訂閱必須人工處理。
+- `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；完整 `supabase_migration.sql` 則供新環境初始化。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。
 - `src/lib/rate-limit.ts`、`middleware.ts`：Upstash rate limit 與 request protection。
 
@@ -202,7 +204,7 @@ Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech；MACD/FVG
 | Yahoo Finance | data providers/entry points | Python analysis | 測試一律 mock |
 | Telegram/Teams | notification adapters/jobs | 外部使用者 | 只用 dry-run 驗證；Telegram ≤4096 chars |
 | Supabase | upload job、Next.js API、bot | Web/bot | service key 只能在 server/CI |
-| Stripe | Next.js API routes | subscription state | webhook 驗簽；不得用測試觸發 live mutation |
+| Stripe | Next.js API routes | subscription state | webhook 驗簽；Test/Live customer 分離；event ledger 去重並在同步失敗時回 5xx；不得用測試觸發 live mutation |
 
 ## 8. CI 與部署流程
 
