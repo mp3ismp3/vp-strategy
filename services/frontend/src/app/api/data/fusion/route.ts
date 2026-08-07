@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import type { Trigger } from "@/lib/triggers";
 
 // Confidence matrix (replicated from fusion_report.py)
 const CONFIDENCE_MATRIX: Record<string, { stars: number; label: string; action: string }> = {
@@ -23,7 +24,36 @@ const CONFIDENCE_MATRIX: Record<string, { stars: number; label: string; action: 
   "UNKNOWN|above_va": { stars: 0, label: "無結構", action: "不符吸籌結構，忽略" },
 };
 
-function getMacroDirection(vp: any): string {
+interface VPFrame {
+  position?: string;
+  position_pct?: number;
+}
+
+interface VPInfo {
+  daily?: VPFrame;
+  monthly?: VPFrame;
+  price?: number;
+  weekly?: VPFrame;
+}
+
+interface AccumulationInfo {
+  decay_score?: number;
+  failing?: boolean;
+  phase?: string;
+  raw_score?: number;
+  resistance?: number;
+  support_primary?: number;
+  tier?: string;
+  triggers_fired?: Trigger[];
+}
+
+interface FusionSignal {
+  decay_score: number;
+  stars: number;
+  [key: string]: unknown;
+}
+
+function getMacroDirection(vp: VPInfo): string {
   const weekly = vp?.weekly?.position || "inside_va";
   const monthly = vp?.monthly?.position || "inside_va";
   const above = [weekly, monthly].filter((p) => p === "above_va").length;
@@ -56,15 +86,15 @@ export async function GET() {
       return NextResponse.json({ signals: [], error: "No data" }, { status: 404 });
     }
 
-    const vpData = scanRow.vp_data || {};
-    const accumState: Record<string, any> = {};
+    const vpData = (scanRow.vp_data || {}) as Record<string, VPInfo>;
+    const accumState: Record<string, AccumulationInfo> = {};
     for (const row of accumRows) {
       accumState[row.ticker] = row.state;
     }
 
-    const signals: any[] = [];
+    const signals: FusionSignal[] = [];
 
-    for (const [symbol, accumInfo] of Object.entries(accumState) as [string, any][]) {
+    for (const [symbol, accumInfo] of Object.entries(accumState)) {
       if (!accumInfo || typeof accumInfo !== "object") continue;
 
       const phase = accumInfo.phase || "UNKNOWN";
@@ -110,7 +140,8 @@ export async function GET() {
     signals.sort((a, b) => b.stars - a.stars || b.decay_score - a.decay_score);
 
     return NextResponse.json({ signals });
-  } catch (error: any) {
-    return NextResponse.json({ signals: [], error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ signals: [], error: message }, { status: 500 });
   }
 }

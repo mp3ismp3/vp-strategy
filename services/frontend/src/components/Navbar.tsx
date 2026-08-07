@@ -12,10 +12,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import type { Plan } from "@/types/user";
+
+interface NavbarUser {
+  email?: string | null;
+  image?: string | null;
+  name?: string | null;
+  plan?: Plan;
+}
 
 export function Navbar() {
   const { data: session } = useSession();
-  const user = session?.user as any;
+  const user = session?.user as NavbarUser | undefined;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [trialDays, setTrialDays] = useState<number | null>(null);
 

@@ -1,3 +1,5 @@
+import type { Trigger } from "@/lib/triggers";
+
 export interface ScanResult {
   ticker: string;
   price: number;
@@ -26,5 +28,5 @@ export interface AccumulationState {
   support_dynamic: number;
   resistance: number;
   failing: boolean;
-  triggers_fired: string[];
+  triggers_fired: Trigger[];
 }

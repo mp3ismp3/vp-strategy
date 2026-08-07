@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import type { Data, Layout, Shape } from "plotly.js";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -45,7 +46,7 @@ export function AccumChart({
         .select("data")
         .eq("ticker", ticker.toUpperCase())
         .single()
-        .then(({ data: row, error }) => {
+        .then(({ data: row }) => {
           if (row?.data?.daily?.ohlc) {
             setOhlc(row.data.daily.ohlc);
           }
@@ -101,7 +102,7 @@ export function AccumChart({
   const times = ohlc.map((b) => b.time);
 
   // Row 1: Candlestick + S/R
-  const candlestick: any = {
+  const candlestick: Data = {
     type: "candlestick",
     x: times,
     open: ohlc.map((b) => b.open),
@@ -116,7 +117,7 @@ export function AccumChart({
   };
 
   // Row 2: OBV
-  const obvTrace: any = {
+  const obvTrace: Data = {
     type: "scatter",
     x: times,
     y: obv,
@@ -127,7 +128,7 @@ export function AccumChart({
     yaxis: "y2",
   };
 
-  const obvMATrace: any = {
+  const obvMATrace: Data = {
     type: "scatter",
     x: times,
     y: obvMA,
@@ -139,7 +140,7 @@ export function AccumChart({
   };
 
   // Row 3: Volume
-  const volTrace: any = {
+  const volTrace: Data = {
     type: "bar",
     x: times,
     y: ohlc.map((b) => b.volume),
@@ -150,7 +151,7 @@ export function AccumChart({
     yaxis: "y3",
   };
 
-  const volMedianTrace: any = {
+  const volMedianTrace: Data = {
     type: "scatter",
     x: times,
     y: volMedian,
@@ -162,7 +163,7 @@ export function AccumChart({
   };
 
   // Support/Resistance shapes
-  const shapes: any[] = [];
+  const shapes: Partial<Shape>[] = [];
   if (support_primary) {
     shapes.push({
       type: "line", xref: "paper", yref: "y",
@@ -185,7 +186,7 @@ export function AccumChart({
     });
   }
 
-  const layout: any = {
+  const layout: Partial<Layout> = {
     height: 550,
     margin: { l: 50, r: 70, t: 40, b: 30 },
     showlegend: false,
@@ -198,20 +199,20 @@ export function AccumChart({
     xaxis: { domain: [0, 1], anchor: "y", showticklabels: false, rangeslider: { visible: false } },
     xaxis2: { domain: [0, 1], anchor: "y2", showticklabels: false },
     xaxis3: { domain: [0, 1], anchor: "y3" },
-    yaxis: { domain: [0.48, 1], title: "Price" },
-    yaxis2: { domain: [0.24, 0.45], title: "OBV" },
-    yaxis3: { domain: [0, 0.21], title: "Volume" },
+    yaxis: { domain: [0.48, 1], title: { text: "Price" } },
+    yaxis2: { domain: [0.24, 0.45], title: { text: "OBV" } },
+    yaxis3: { domain: [0, 0.21], title: { text: "Volume" } },
     shapes,
     annotations: [
       ...(support_primary ? [{
-        x: 1.02, xref: "paper", y: support_primary, yref: "y",
+        x: 1.02, xref: "paper" as const, y: support_primary, yref: "y" as const,
         text: `SP $${support_primary.toFixed(0)}`, showarrow: false,
-        font: { size: 9, color: "white" }, bgcolor: "red", borderpad: 2, xanchor: "left",
+        font: { size: 9, color: "white" }, bgcolor: "red", borderpad: 2, xanchor: "left" as const,
       }] : []),
       ...(resistance ? [{
-        x: 1.02, xref: "paper", y: resistance, yref: "y",
+        x: 1.02, xref: "paper" as const, y: resistance, yref: "y" as const,
         text: `R $${resistance.toFixed(0)}`, showarrow: false,
-        font: { size: 9, color: "white" }, bgcolor: "#4caf50", borderpad: 2, xanchor: "left",
+        font: { size: 9, color: "white" }, bgcolor: "#4caf50", borderpad: 2, xanchor: "left" as const,
       }] : []),
     ],
   };

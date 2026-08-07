@@ -1,4 +1,4 @@
-import { Plan } from "@/types/user";
+import { Plan, SubscriptionStatus } from "@/types/user";
 
 export const PLAN_HIERARCHY: Record<Plan, number> = {
   free: 0,
@@ -86,6 +86,23 @@ export function hasAccess(userPlan: Plan, requiredPlan: Plan): boolean {
 
 export function isSubscriptionActive(status: string | null): boolean {
   return status === "active" || status === "trialing";
+}
+
+export interface PlanSnapshot {
+  email: string;
+  plan: Plan;
+  status: SubscriptionStatus;
+}
+
+export function resolvePlanSnapshot(
+  snapshot: PlanSnapshot | null,
+  email: string | null | undefined
+): { plan: Plan; ready: boolean; status: SubscriptionStatus } {
+  if (!email) return { plan: "free", ready: true, status: "inactive" };
+  if (snapshot?.email !== email) {
+    return { plan: "free", ready: false, status: "inactive" };
+  }
+  return { plan: snapshot.plan, ready: true, status: snapshot.status };
 }
 
 interface PricingPlanAction {

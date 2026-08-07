@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Paywall } from "@/components/Paywall";
 import { Badge } from "@/components/ui/badge";
+import { formatTrigger, type Trigger } from "@/lib/triggers";
 
 interface FusionSignal {
   symbol: string;
@@ -18,7 +19,7 @@ interface FusionSignal {
   stars: number;
   label: string;
   action: string;
-  triggers_fired: string[];
+  triggers_fired: Trigger[];
   price: number;
   support: number;
   resistance: number;
@@ -115,7 +116,7 @@ function FusionContent() {
                   <span>Resistance: ${sig.resistance?.toFixed(2)}</span>
                   {sig.triggers_fired.length > 0 && (
                     <Badge className="bg-orange-100 text-orange-800">
-                      {sig.triggers_fired.map((t: any) => typeof t === "string" ? t : t.type).join(", ")}
+                      {sig.triggers_fired.map(formatTrigger).join(", ")}
                     </Badge>
                   )}
                 </div>

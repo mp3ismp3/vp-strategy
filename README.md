@@ -198,6 +198,8 @@ Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。文件式 data API 在 production 只讀 frontend `data/`，repo-root JSON 路徑僅作為本機開發 fallback，且 runtime file reads 不參與自動 tracing，避免 production bundle 誤納整個 repository。
 
+Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。
+
 Stripe Checkout 預設關閉，只有伺服器環境變數 `STRIPE_CHECKOUT_ENABLED=true` 才開放。正式金流使用 server-only 的 `STRIPE_PRICE_PRO` / `STRIPE_PRICE_PREMIUM` 白名單；Test 與 Live Customer 依 `stripe_mode` 隔離，每位使用者只提供一次試用。相同方案的未完成 Checkout Session 會在 30 分鐘內重用；若已有其他方案的 Session，API 會回傳衝突而不會靜默切換方案。Customer 與 Session 建立皆有冪等保護。
 
 Pro 與 Premium 不支援直接升降級：已有有效訂閱的 Checkout 請求會回傳 `409`，使用者必須先從帳號頁的 Stripe Customer Portal 排定取消，待目前週期結束後再訂閱另一方案。Portal session 必須綁定 server-only 的 `STRIPE_PORTAL_CONFIGURATION_ID`；該 Stripe configuration 只允許更新付款方式、查看發票、取消及在到期前恢復訂閱，不得開啟產品或價格切換。Webhook 以 `subscription_events` ledger 去重及原子 reclaim，資料同步失敗會回傳非 2xx 讓 Stripe 重試；取消通知只在 ledger 完成後 best-effort 發送，舊訂閱的延遲刪除事件也不會覆蓋較新的有效訂閱。管理員可用 `/api/admin/stripe-reconcile` 先 dry-run 比對 Stripe/Supabase，明確傳入 `apply: true` 才修正安全且無歧義的差異。既有 Supabase 專案在 Live 上線前必須先執行 `services/frontend/supabase_billing_hardening.sql`，完整步驟見 `docs/stripe-live-mode.md`。

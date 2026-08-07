@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import type { Annotations, Data, Layout, Shape } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
@@ -178,7 +179,7 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
   const visibleFvgs = fvgs.filter((f) => showFilled || !f.filled);
 
   // Candlestick
-  const candlestick: any = {
+  const candlestick: Data = {
     type: "candlestick",
     x: times,
     open: displayData.map((b) => b.open),
@@ -191,7 +192,7 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
   };
 
   // FVG rectangles as shapes
-  const shapes: any[] = visibleFvgs.map((fvg) => {
+  const shapes: Partial<Shape>[] = visibleFvgs.map((fvg) => {
     const startTime = fvg.date;
     const endTime = times[times.length - 1]; // extend to end
 
@@ -223,7 +224,7 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
   });
 
   // Annotations at FVG start
-  const annotations: any[] = visibleFvgs.map((fvg) => ({
+  const annotations: Partial<Annotations>[] = visibleFvgs.map((fvg) => ({
     x: fvg.date,
     y: fvg.type === "bullish" ? fvg.gapLow : fvg.gapHigh,
     xref: "x",
@@ -240,7 +241,7 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
     yshift: fvg.type === "bullish" ? -12 : 12,
   }));
 
-  const layout: any = {
+  const layout: Partial<Layout> = {
     height: 550,
     margin: { l: 60, r: 20, t: 40, b: 40 },
     showlegend: true,
@@ -255,7 +256,7 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
       nticks: 12,
     },
     yaxis: {
-      title: "Price ($)",
+      title: { text: "Price ($)" },
       showgrid: true,
       gridcolor: "rgba(0,0,0,0.04)",
     },
@@ -280,7 +281,7 @@ export default function FVGPage() {
   const isAuthenticated = Boolean(session);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [showFilled, setShowFilled] = useState(false);
@@ -292,10 +293,11 @@ export default function FVGPage() {
   const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
     ? selectedTicker
     : "NVDA";
+  const loading = loadedTicker !== effectiveTicker;
 
   // Fetch OHLC for selected ticker
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     import("@supabase/supabase-js").then(({ createClient }) => {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -307,14 +309,18 @@ export default function FVGPage() {
         .eq("ticker", effectiveTicker.toUpperCase())
         .single()
         .then(({ data: row }) => {
+          if (cancelled) return;
           if (row?.data?.daily?.ohlc) {
             setOhlc(row.data.daily.ohlc);
           } else {
             setOhlc([]);
           }
-          setLoading(false);
+          setLoadedTicker(effectiveTicker);
         });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [effectiveTicker]);
 
   // Detect FVGs for selected ticker
@@ -373,7 +379,8 @@ export default function FVGPage() {
 
   // Auto-scan on mount
   useEffect(() => {
-    handleScan();
+    const timeoutId = window.setTimeout(() => void handleScan(), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

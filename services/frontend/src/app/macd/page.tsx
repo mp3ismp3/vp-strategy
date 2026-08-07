@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import type { Annotations, Data, Layout } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
@@ -79,29 +80,6 @@ function calcMACD(
     signal: signalLine[i],
     histogram: histogram[i],
   }));
-}
-
-function detectSwingPointsFromArray(
-  values: number[],
-  lookback: number = 5
-): SwingPoint[] {
-  const highs: SwingPoint[] = [];
-  const lows: SwingPoint[] = [];
-
-  for (let i = lookback; i < values.length - lookback; i++) {
-    let isHigh = true;
-    let isLow = true;
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j === i) continue;
-      if (values[j] >= values[i]) isHigh = false;
-      if (values[j] <= values[i]) isLow = false;
-    }
-    if (isHigh) highs.push({ index: i, price: values[i] });
-    if (isLow) lows.push({ index: i, price: values[i] });
-  }
-
-  return [...highs.map((h) => ({ ...h, _type: "high" as const })),
-          ...lows.map((l) => ({ ...l, _type: "low" as const }))];
 }
 
 function findSwingHighs(values: number[], lookback: number): SwingPoint[] {
@@ -337,18 +315,17 @@ function resampleToWeekly(ohlc: OHLCBar[]): OHLCBar[] {
 // ─── Chart Component ─────────────────────────────────────────────────────────
 
 interface MACDChartProps {
-  ticker: string;
   ohlc: OHLCBar[];
   macdData: MACDPoint[];
   divergences: DivergenceSignal[];
   title: string;
 }
 
-function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProps) {
+function MACDChart({ ohlc, macdData, divergences, title }: MACDChartProps) {
   const times = ohlc.map((b) => b.time);
 
   // Candlestick
-  const candlestick: any = {
+  const candlestick: Data = {
     type: "candlestick",
     x: times,
     open: ohlc.map((b) => b.open),
@@ -364,7 +341,7 @@ function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProp
 
   // MACD Histogram
   const histColors = macdData.map((m) => (m.histogram >= 0 ? "#26a69a" : "#ef5350"));
-  const histTrace: any = {
+  const histTrace: Data = {
     type: "bar",
     x: times,
     y: macdData.map((m) => m.histogram),
@@ -376,7 +353,7 @@ function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProp
   };
 
   // MACD Line
-  const macdLine: any = {
+  const macdLine: Data = {
     type: "scatter",
     x: times,
     y: macdData.map((m) => m.macd),
@@ -387,7 +364,7 @@ function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProp
   };
 
   // Signal Line
-  const signalLine: any = {
+  const signalLine: Data = {
     type: "scatter",
     x: times,
     y: macdData.map((m) => m.signal),
@@ -398,7 +375,7 @@ function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProp
   };
 
   // Divergence annotations
-  const annotations: any[] = divergences.map((div) => ({
+  const annotations: Partial<Annotations>[] = divergences.map((div) => ({
     x: div.time,
     y: div.type === "bullish" ? div.priceSwingCurr : div.priceSwingCurr,
     xref: "x",
@@ -411,7 +388,7 @@ function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProp
     font: { size: 10, color: div.type === "bullish" ? "#4caf50" : "#f44336" },
   }));
 
-  const layout: any = {
+  const layout: Partial<Layout> = {
     height: 450,
     margin: { l: 60, r: 20, t: 40, b: 30 },
     showlegend: true,
@@ -435,13 +412,13 @@ function MACDChart({ ticker, ohlc, macdData, divergences, title }: MACDChartProp
     },
     yaxis: {
       domain: [0.38, 1],
-      title: "Price ($)",
+      title: { text: "Price ($)" },
       showgrid: true,
       gridcolor: "rgba(0,0,0,0.04)",
     },
     yaxis2: {
       domain: [0, 0.32],
-      title: "MACD",
+      title: { text: "MACD" },
       showgrid: true,
       gridcolor: "rgba(0,0,0,0.04)",
     },
@@ -473,7 +450,7 @@ export default function MACDPage() {
   const isAuthenticated = Boolean(session);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
 
@@ -484,10 +461,11 @@ export default function MACDPage() {
   const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
     ? selectedTicker
     : "NVDA";
+  const loading = loadedTicker !== effectiveTicker;
 
   // Fetch OHLC for selected ticker
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     import("@supabase/supabase-js").then(({ createClient }) => {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -499,14 +477,18 @@ export default function MACDPage() {
         .eq("ticker", effectiveTicker.toUpperCase())
         .single()
         .then(({ data: row }) => {
+          if (cancelled) return;
           if (row?.data?.daily?.ohlc) {
             setOhlc(row.data.daily.ohlc);
           } else {
             setOhlc([]);
           }
-          setLoading(false);
+          setLoadedTicker(effectiveTicker);
         });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [effectiveTicker]);
 
   // Compute MACD and divergences for selected ticker
@@ -629,7 +611,8 @@ export default function MACDPage() {
 
   // Auto-scan all tickers on page load
   useEffect(() => {
-    handleScan();
+    const timeoutId = window.setTimeout(() => void handleScan(), 0);
+    return () => window.clearTimeout(timeoutId);
   }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Categorize scan results
@@ -688,7 +671,6 @@ export default function MACDPage() {
             </div>
           ) : dailyMACD ? (
             <MACDChart
-              ticker={effectiveTicker}
               ohlc={ohlc}
               macdData={dailyMACD}
               divergences={dailyDivergences}
@@ -713,7 +695,6 @@ export default function MACDPage() {
             </div>
           ) : weeklyMACD ? (
             <MACDChart
-              ticker={effectiveTicker}
               ohlc={weeklyOHLC}
               macdData={weeklyMACD}
               divergences={weeklyDivergences}

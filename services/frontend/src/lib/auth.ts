@@ -88,9 +88,11 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.userId;
-        (session.user as any).plan = token.plan;
-        (session.user as any).subscriptionStatus = token.subscriptionStatus;
+        Object.assign(session.user, {
+          id: token.userId,
+          plan: token.plan,
+          subscriptionStatus: token.subscriptionStatus,
+        });
       }
       return session;
     },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
+import type { Annotations, Data, Layout, Shape } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
@@ -472,7 +473,7 @@ export default function LiquidityPage() {
   const isAuthenticated = Boolean(session);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
   const [enabledSources, setEnabledSources] = useState<Set<SourceFilter>>(
     new Set(["EQH", "EQL", "PDH", "PDL", "PWH", "PWL", "Swing"])
   );
@@ -484,10 +485,11 @@ export default function LiquidityPage() {
   const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
     ? selectedTicker
     : "NVDA";
+  const loading = loadedTicker !== effectiveTicker;
 
   // Fetch OHLC from Supabase
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     import("@supabase/supabase-js").then(({ createClient }) => {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -499,14 +501,18 @@ export default function LiquidityPage() {
         .eq("ticker", effectiveTicker.toUpperCase())
         .single()
         .then(({ data: row }) => {
+          if (cancelled) return;
           if (row?.data?.daily?.ohlc) {
             setOhlc(row.data.daily.ohlc);
           } else {
             setOhlc([]);
           }
-          setLoading(false);
+          setLoadedTicker(effectiveTicker);
         });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [effectiveTicker]);
 
   // Compute liquidity levels and sweeps
@@ -774,7 +780,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
   const times = ohlc.map((b) => b.time);
 
   // Candlestick
-  const candlestick: any = {
+  const candlestick: Data = {
     type: "candlestick",
     x: times,
     open: ohlc.map((b) => b.open),
@@ -792,7 +798,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
   const volColors = ohlc.map((bar, i) =>
     i === 0 ? "#26a69a" : bar.close >= ohlc[i - 1].close ? "#26a69a" : "#ef5350"
   );
-  const volTrace: any = {
+  const volTrace: Data = {
     type: "bar",
     x: times,
     y: ohlc.map((b) => b.volume),
@@ -805,7 +811,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
   };
 
   // Shapes: horizontal lines for liquidity levels
-  const shapes: any[] = levels.map((level) => {
+  const shapes: Partial<Shape>[] = levels.map((level) => {
     const endIdx = level.swept && level.sweepIndex !== undefined
       ? Math.min(level.sweepIndex, ohlc.length - 1)
       : ohlc.length - 1;
@@ -829,7 +835,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
   });
 
   // Annotations for level labels
-  const annotations: any[] = levels.map((level) => {
+  const annotations: Partial<Annotations>[] = levels.map((level) => {
     const color = SOURCE_COLORS[level.source]?.line || "#999";
     return {
       x: ohlc[level.startIndex].time,
@@ -848,11 +854,11 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
   const bullSweeps = sweeps.filter((s) => s.direction === "bullish");
   const bearSweeps = sweeps.filter((s) => s.direction === "bearish");
 
-  const bullSweepTrace: any = {
+  const bullSweepTrace: Data = {
     type: "scatter",
     x: bullSweeps.map((s) => s.time),
     y: bullSweeps.map((s) => s.wickExtreme),
-    mode: "markers+text",
+    mode: "text+markers",
     marker: { symbol: "star", size: 14, color: "#4caf50", line: { width: 1, color: "#1b5e20" } },
     text: bullSweeps.map((s) => `SWEEP ${s.level.source}`),
     textposition: "bottom center",
@@ -864,11 +870,11 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     yaxis: "y",
   };
 
-  const bearSweepTrace: any = {
+  const bearSweepTrace: Data = {
     type: "scatter",
     x: bearSweeps.map((s) => s.time),
     y: bearSweeps.map((s) => s.wickExtreme),
-    mode: "markers+text",
+    mode: "text+markers",
     marker: { symbol: "star", size: 14, color: "#f44336", line: { width: 1, color: "#b71c1c" } },
     text: bearSweeps.map((s) => `SWEEP ${s.level.source}`),
     textposition: "top center",
@@ -880,7 +886,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     yaxis: "y",
   };
 
-  const layout: any = {
+  const layout: Partial<Layout> = {
     height: 650,
     margin: { l: 60, r: 20, t: 40, b: 30 },
     showlegend: true,
@@ -904,13 +910,13 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     },
     yaxis: {
       domain: [0.25, 1],
-      title: "Price ($)",
+      title: { text: "Price ($)" },
       showgrid: true,
       gridcolor: "rgba(0,0,0,0.04)",
     },
     yaxis2: {
       domain: [0, 0.2],
-      title: "Volume",
+      title: { text: "Volume" },
       showgrid: true,
       gridcolor: "rgba(0,0,0,0.04)",
     },

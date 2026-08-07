@@ -16,6 +16,16 @@ interface AccumSymbol {
   pending_triggers: { type: string }[];
 }
 
+interface AccumStateValue {
+  decay_score?: number;
+  pending_triggers?: { type: string }[];
+  phase?: string;
+  resistance?: number;
+  support_dynamic?: number;
+  tier?: string;
+  triggers_fired?: { type: string; date: string }[];
+}
+
 export default function StrategyPage() {
   const { data: session } = useSession();
   const [symbols, setSymbols] = useState<AccumSymbol[]>([]);
@@ -38,9 +48,11 @@ export default function StrategyPage() {
             return;
           }
           const state = data.accum_data || data.vp_data || {};
-          const items: AccumSymbol[] = Object.entries(state)
-            .filter(([, v]: [string, any]) => typeof v === "object" && v.tier)
-            .map(([sym, v]: [string, any]) => ({
+          const items: AccumSymbol[] = Object.entries(
+            state as Record<string, AccumStateValue>
+          )
+            .filter(([, value]) => Boolean(value?.tier))
+            .map(([sym, v]) => ({
               symbol: sym,
               tier: v.tier || "watch",
               phase: v.phase || "?",

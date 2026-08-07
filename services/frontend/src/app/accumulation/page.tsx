@@ -11,6 +11,12 @@ import {
   GUEST_ACCUMULATION_LIMIT,
   limitAccumulationItems,
 } from "@/lib/preview-access";
+import { formatTrigger } from "@/lib/triggers";
+
+interface AccumulationRow {
+  state: Omit<AccumulationState, "ticker"> | null;
+  ticker: string;
+}
 
 function AccumulationContent() {
   const { data: session, status } = useSession();
@@ -32,7 +38,7 @@ function AccumulationContent() {
             setLoading(false);
             return;
           }
-          const transformed = data.map((row: any) => ({
+          const transformed = (data as AccumulationRow[]).map((row) => ({
             ticker: row.ticker,
             phase: row.state?.phase || "UNKNOWN",
             tier: row.state?.tier || "watch",
@@ -198,7 +204,7 @@ function AccumulationContent() {
                   <td className="py-3 px-4">
                     {s.triggers_fired.length > 0 ? (
                       <Badge className="bg-orange-100 text-orange-800">
-                        {s.triggers_fired.map((t: any) => typeof t === "string" ? t : t.type).join(", ")}
+                      {s.triggers_fired.map(formatTrigger).join(", ")}
                       </Badge>
                     ) : (
                       <span className="text-gray-400 text-sm">—</span>
