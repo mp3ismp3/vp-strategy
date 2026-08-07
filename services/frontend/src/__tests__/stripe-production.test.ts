@@ -7,6 +7,7 @@ import {
   getPlanForPriceId,
   getSubscriptionSnapshot,
   getStripeMode,
+  getStripePortalConfigurationId,
   getStripePriceIds,
   isStripeCheckoutEnabled,
   isPendingCheckoutReusable,
@@ -38,6 +39,17 @@ describe("Stripe production configuration", () => {
         STRIPE_PRICE_PREMIUM: "price_same",
       })
     ).toThrow("distinct");
+  });
+
+  it("requires a dedicated Customer Portal configuration", () => {
+    expect(
+      getStripePortalConfigurationId({
+        STRIPE_PORTAL_CONFIGURATION_ID: "bpc_no_plan_changes",
+      })
+    ).toBe("bpc_no_plan_changes");
+    expect(() => getStripePortalConfigurationId({})).toThrow(
+      "STRIPE_PORTAL_CONFIGURATION_ID"
+    );
   });
 
   it("maps only allowlisted prices to plans", () => {

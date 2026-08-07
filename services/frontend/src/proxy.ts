@@ -82,8 +82,8 @@ export function createRateLimitResponse(
   );
 }
 
-// ─── Main Middleware ────────────────────────────────────────
-export async function middleware(request: NextRequest) {
+// ─── Main Proxy ─────────────────────────────────────────────
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 提前解析 JWT token，避免重複呼叫（rate limit + auth 都需要）

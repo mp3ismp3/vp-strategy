@@ -1,4 +1,4 @@
-import { Plan } from "@/types/user";
+import { Plan, SubscriptionStatus } from "@/types/user";
 
 export const PLAN_HIERARCHY: Record<Plan, number> = {
   free: 0,
@@ -86,4 +86,55 @@ export function hasAccess(userPlan: Plan, requiredPlan: Plan): boolean {
 
 export function isSubscriptionActive(status: string | null): boolean {
   return status === "active" || status === "trialing";
+}
+
+export interface PlanSnapshot {
+  email: string;
+  plan: Plan;
+  status: SubscriptionStatus;
+}
+
+export function resolvePlanSnapshot(
+  snapshot: PlanSnapshot | null,
+  email: string | null | undefined
+): { plan: Plan; ready: boolean; status: SubscriptionStatus } {
+  if (!email) return { plan: "free", ready: true, status: "inactive" };
+  if (snapshot?.email !== email) {
+    return { plan: "free", ready: false, status: "inactive" };
+  }
+  return { plan: snapshot.plan, ready: true, status: snapshot.status };
+}
+
+interface PricingPlanAction {
+  disabled: boolean;
+  href?: string;
+  label: string;
+}
+
+export function getPricingPlanAction(
+  userPlan: Plan,
+  plan: Plan
+): PricingPlanAction {
+  if (userPlan === plan) {
+    return { disabled: true, label: "目前方案" };
+  }
+
+  if (userPlan !== "free") {
+    if (plan === "free") {
+      return {
+        disabled: false,
+        href: "/account",
+        label: "前往管理訂閱取消",
+      };
+    }
+    return { disabled: true, label: "不支援直接切換" };
+  }
+
+  if (plan === "pro") {
+    return { disabled: false, label: "開始免費試用" };
+  }
+  if (plan === "premium") {
+    return { disabled: false, label: "訂閱 Premium" };
+  }
+  return { disabled: true, label: "目前方案" };
 }

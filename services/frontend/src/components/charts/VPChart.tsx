@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import type { Data, Layout } from "plotly.js";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -97,7 +98,7 @@ export function VPChart({ ticker }: VPChartProps) {
   const histogram = tf.histogram;
 
   // Candlestick trace
-  const candlestickTrace: any = {
+  const candlestickTrace: Data = {
     type: "candlestick",
     x: ohlc.map((b) => b.time),
     open: ohlc.map((b) => b.open),
@@ -112,7 +113,7 @@ export function VPChart({ ticker }: VPChartProps) {
   };
 
   // VP histogram trace (horizontal bars on right subplot)
-  const histTrace: any = histogram
+  const histTrace: Data | null = histogram
     ? {
         type: "bar",
         x: histogram.volumes.map((v) => v / Math.max(...histogram.volumes)),
@@ -134,7 +135,7 @@ export function VPChart({ ticker }: VPChartProps) {
     : null;
 
   // Layout with subplots: 80% candlestick, 20% histogram
-  const layout: any = {
+  const layout: Partial<Layout> = {
     height: 450,
     margin: { l: 60, r: 80, t: 30, b: 40 },
     showlegend: false,
@@ -152,7 +153,7 @@ export function VPChart({ ticker }: VPChartProps) {
       showticklabels: false,
     },
     yaxis: {
-      title: "Price ($)",
+      title: { text: "Price ($)" },
       side: "left",
       showgrid: true,
       gridcolor: "rgba(0,0,0,0.05)",

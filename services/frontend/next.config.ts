@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Include data files in serverless function bundle
   outputFileTracingIncludes: {
-    "/api/data/*": ["./data/**/*"],
+    "/api/data/scan-results": ["./data/scan_results.json"],
+    "/api/data/chart-data": ["./data/frontend_charts.json"],
+    "/api/data/accum-state": ["./data/accum_state.json"],
   },
 };
 

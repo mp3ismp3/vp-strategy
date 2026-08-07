@@ -5,13 +5,28 @@ import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import type { Plan, SubscriptionStatus } from "@/types/user";
+
+interface AccountUser {
+  email?: string | null;
+  name?: string | null;
+  plan?: Plan;
+  subscriptionStatus?: SubscriptionStatus;
+}
+
+interface PlanInfo {
+  currentPeriodEnd: string | null;
+  plan: Plan;
+  subscriptionStatus: SubscriptionStatus;
+  trialEnd: string | null;
+}
 
 export default function AccountPage() {
   const { data: session, status } = useSession();
-  const user = session?.user as any;
+  const user = session?.user as AccountUser | undefined;
   const [bindingTelegram, setBindingTelegram] = useState(false);
   const [bindToken, setBindToken] = useState("");
-  const [planInfo, setPlanInfo] = useState<any>(null);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
 
   // Fetch real-time plan info
   useEffect(() => {

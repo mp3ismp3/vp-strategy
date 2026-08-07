@@ -2,17 +2,34 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
+interface AccumulationInfo {
+  decay_score?: number;
+  failing?: boolean;
+  phase?: string;
+  raw_score?: number;
+  resistance?: number;
+  support_dynamic?: number;
+  support_primary?: number;
+  tier?: string;
+  triggers_fired?: unknown[];
+}
+
 export async function GET() {
   try {
     let raw: string = "";
-    const paths = [
-      path.join(process.cwd(), "../../data/accum_state.json"),
-      path.join(process.cwd(), "data/accum_state.json"),
-    ];
+    const paths = [path.join(process.cwd(), "data", "accum_state.json")];
+    if (process.env.NODE_ENV === "development") {
+      paths.unshift(
+        path.join(
+          /* turbopackIgnore: true */ process.cwd(),
+          "../../data/accum_state.json"
+        )
+      );
+    }
 
     for (const p of paths) {
       try {
-        raw = await fs.readFile(p, "utf-8");
+        raw = await fs.readFile(/* turbopackIgnore: true */ p, "utf-8");
         break;
       } catch {}
     }
@@ -21,10 +38,10 @@ export async function GET() {
       return NextResponse.json({ states: [], error: "Data file not found" }, { status: 404 });
     }
 
-    const data = JSON.parse(raw);
+    const data = JSON.parse(raw) as Record<string, AccumulationInfo>;
 
     // 轉換 dict → array
-    const states = Object.entries(data).map(([ticker, info]: [string, any]) => ({
+    const states = Object.entries(data).map(([ticker, info]) => ({
       ticker,
       phase: info.phase || "UNKNOWN",
       tier: info.tier || "watch",
@@ -38,8 +55,9 @@ export async function GET() {
     }));
 
     return NextResponse.json({ states });
-  } catch (error: any) {
-    console.error("Error reading accum state:", error.message);
-    return NextResponse.json({ states: [], error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error reading accum state:", message);
+    return NextResponse.json({ states: [], error: message }, { status: 500 });
   }
 }

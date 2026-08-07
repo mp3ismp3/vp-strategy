@@ -3,7 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { getStripeMode } from "@/lib/stripe-config";
+import {
+  getStripeMode,
+  getStripePortalConfigurationId,
+} from "@/lib/stripe-config";
 
 export async function POST() {
   const session = await getServerSession(authOptions);
@@ -29,6 +32,7 @@ export async function POST() {
   }
 
   const portalSession = await stripe.billingPortal.sessions.create({
+    configuration: getStripePortalConfigurationId(),
     customer: user.stripe_customer_id,
     return_url: `${process.env.NEXT_PUBLIC_APP_URL}/account`,
   });

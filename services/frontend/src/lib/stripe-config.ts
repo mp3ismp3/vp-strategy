@@ -40,6 +40,12 @@ export function getStripePriceIds(env: Env = process.env): Record<PaidPlan, stri
   return { pro, premium };
 }
 
+export function getStripePortalConfigurationId(env: Env = process.env): string {
+  const configurationId = env.STRIPE_PORTAL_CONFIGURATION_ID;
+  if (!configurationId) throw new Error("Missing STRIPE_PORTAL_CONFIGURATION_ID");
+  return configurationId;
+}
+
 export function getPlanForPriceId(
   priceId: string,
   env: Env = process.env

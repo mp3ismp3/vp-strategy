@@ -2,12 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { Paywall } from "@/components/Paywall";
 import { ScanResult } from "@/types/signal";
 import { VPChart } from "@/components/charts/VPChart";
 import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
 import { SYMBOL_CATEGORIES, ALL_CATEGORIES } from "@/lib/categories";
+import type { Plan } from "@/types/user";
+
+type VPPosition = "above_va" | "inside_va" | "below_va";
+
+interface RawVPFrame {
+  poc?: number;
+  position?: VPPosition;
+  position_pct?: number;
+  vah?: number;
+  val?: number;
+}
+
+interface RawVPInfo {
+  daily?: RawVPFrame;
+  monthly?: RawVPFrame;
+  price?: number;
+  weekly?: RawVPFrame;
+}
 
 function ScannerContent() {
   const { data: session } = useSession();
@@ -16,18 +33,28 @@ function ScannerContent() {
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [userPlan, setUserPlan] = useState<string>("free");
+  const [planSnapshot, setPlanSnapshot] = useState<{
+    email: string;
+    plan: Plan;
+  } | null>(null);
 
   // Fetch real-time plan
   useEffect(() => {
-    if (session) {
+    let cancelled = false;
+    if (session?.user?.email) {
+      const email = session.user.email;
       fetch("/api/user/plan")
         .then((res) => res.json())
-        .then((data) => setUserPlan(data.plan || "free"))
+        .then((data) => {
+          if (!cancelled) {
+            setPlanSnapshot({ email, plan: data.plan || "free" });
+          }
+        })
         .catch(() => {});
-    } else {
-      setUserPlan("free");
     }
+    return () => {
+      cancelled = true;
+    };
   }, [session]);
 
   useEffect(() => {
@@ -48,13 +75,15 @@ function ScannerContent() {
             return;
           }
           const vpData = data.vp_data || {};
-          const transformed = Object.entries(vpData).map(([ticker, info]: [string, any]) => {
+          const transformed: ScanResult[] = Object.entries(
+            vpData as Record<string, RawVPInfo>
+          ).map(([ticker, info]) => {
             const daily = info.daily || {};
             const weekly = info.weekly || {};
             const monthly = info.monthly || {};
             const positions = [daily.position, weekly.position, monthly.position];
-            const aboveCount = positions.filter((p: string) => p === "above_va").length;
-            const belowCount = positions.filter((p: string) => p === "below_va").length;
+            const aboveCount = positions.filter((p) => p === "above_va").length;
+            const belowCount = positions.filter((p) => p === "below_va").length;
             let consensus = "neutral";
             if (aboveCount >= 2) consensus = "bullish";
             else if (belowCount >= 2) consensus = "bearish";
@@ -94,7 +123,11 @@ function ScannerContent() {
   const FREE_SYMBOLS = SYMBOL_CATEGORIES["Mega Cap Tech"] || [];
 
   // Filter by plan: free only sees Mega Cap Tech
-  const planFilteredResults = userPlan === "free"
+  const effectiveUserPlan =
+    session?.user?.email && planSnapshot?.email === session.user.email
+      ? planSnapshot.plan
+      : "free";
+  const planFilteredResults = effectiveUserPlan === "free"
     ? results.filter((r) => FREE_SYMBOLS.includes(r.ticker))
     : results;
 
@@ -130,7 +163,7 @@ function ScannerContent() {
       </div>
 
       {/* Category Filter */}
-      {userPlan === "free" && (
+      {effectiveUserPlan === "free" && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center">
           <span className="text-sm text-yellow-800">
             🔒 免費方案只顯示 Mega Cap Tech（7 檔）。升級 Pro 解鎖全部 78 檔。

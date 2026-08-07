@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import {
   getRecentEvents,
@@ -15,9 +15,9 @@ import { isValidIP } from "@/lib/ip-validation";
  * 查看最近被阻擋的請求 + 黑名單
  * 僅限管理員存取
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const token = await getToken({
-    req: request as any,
+    req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
 
@@ -50,9 +50,9 @@ export async function GET(request: Request) {
  * 管理黑名單：新增或移除 IP
  * Body: { action: "add" | "remove", ip: string }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const token = await getToken({
-    req: request as any,
+    req: request,
     secret: process.env.NEXTAUTH_SECRET,
   });
 

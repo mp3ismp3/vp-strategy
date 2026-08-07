@@ -88,7 +88,7 @@ describe("getTierForRoute", () => {
 
 // ─── createRateLimitResponse ────────────────────────────────
 
-import { config, createRateLimitResponse } from "@/middleware";
+import { config, createRateLimitResponse } from "@/proxy";
 
 describe("page access matcher", () => {
   it("keeps accumulation public for the guest top-ten preview", () => {
@@ -164,7 +164,7 @@ describe("createRateLimitResponse", () => {
 
 // ─── isWebhookWhitelisted ───────────────────────────────────
 
-import { isWebhookWhitelisted } from "@/middleware";
+import { isWebhookWhitelisted } from "@/proxy";
 
 describe("isWebhookWhitelisted", () => {
   it("matches exact webhook paths", () => {

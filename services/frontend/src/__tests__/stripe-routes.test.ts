@@ -53,10 +53,12 @@ function supabaseQuery(result: { data: unknown; error: unknown }) {
 describe("Stripe route safety", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.subscriptionList.mockResolvedValue({ data: [] });
     process.env.STRIPE_SECRET_KEY = "sk_test_placeholder";
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_placeholder";
     process.env.STRIPE_PRICE_PRO = "price_pro";
     process.env.STRIPE_PRICE_PREMIUM = "price_premium";
+    process.env.STRIPE_PORTAL_CONFIGURATION_ID = "bpc_no_plan_changes";
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
   });
 
@@ -206,6 +208,61 @@ describe("Stripe route safety", () => {
     expect(mocks.sessionCreate.mock.calls[0][1].idempotencyKey).toMatch(
       /^checkout:/
     );
+  });
+
+  it("rejects plan changes when the customer already has a subscription", async () => {
+    process.env.STRIPE_CHECKOUT_ENABLED = "true";
+    mocks.getServerSession.mockResolvedValue({ user: { email: "member@example.com" } });
+    const query = supabaseQuery({
+      data: {
+        id: "user_1",
+        stripe_customer_id: "cus_1",
+        stripe_mode: "test",
+        trial_used_at: "2026-08-01T00:00:00Z",
+        stripe_checkout_session_id: null,
+        stripe_checkout_expires_at: null,
+      },
+      error: null,
+    });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.customerRetrieve.mockResolvedValue({ id: "cus_1" });
+    mocks.subscriptionList.mockResolvedValue({
+      data: [{ id: "sub_1", status: "active" }],
+    });
+    const { POST } = await import("@/app/api/stripe/checkout/route");
+
+    const response = await POST(
+      new NextRequest("https://example.com/api/stripe/checkout", {
+        method: "POST",
+        body: JSON.stringify({ plan: "premium" }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.error).toContain("not supported");
+    expect(mocks.sessionCreate).not.toHaveBeenCalled();
+    expect(mocks.portalCreate).not.toHaveBeenCalled();
+  });
+
+  it("pins Customer Portal sessions to the no-plan-change configuration", async () => {
+    mocks.getServerSession.mockResolvedValue({ user: { email: "member@example.com" } });
+    const query = supabaseQuery({
+      data: { stripe_customer_id: "cus_1", stripe_mode: "test" },
+      error: null,
+    });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.portalCreate.mockResolvedValue({ url: "https://billing.stripe.test/session" });
+    const { POST } = await import("@/app/api/stripe/portal/route");
+
+    const response = await POST();
+
+    expect(response.status).toBe(200);
+    expect(mocks.portalCreate).toHaveBeenCalledWith({
+      configuration: "bpc_no_plan_changes",
+      customer: "cus_1",
+      return_url: "https://example.com/account",
+    });
   });
 
   it.each([
