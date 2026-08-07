@@ -42,6 +42,7 @@ Stripe Webhook        (docker-compose)     accumulation.py
    STRIPE_WEBHOOK_SECRET=<from-stripe-dashboard>
    STRIPE_PRICE_PRO=<server-side-price-id>
    STRIPE_PRICE_PREMIUM=<server-side-price-id>
+   STRIPE_PORTAL_CONFIGURATION_ID=<server-side-bpc-id-with-plan-switching-disabled>
    STRIPE_CHECKOUT_ENABLED=false
    NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
    ```
@@ -135,6 +136,7 @@ GitHub Actions (每天 21:05 UTC)
    - `STRIPE_SECRET_KEY` → `sk_live_...`
    - `STRIPE_PRICE_PRO` → 新的 server-only price ID
    - `STRIPE_PRICE_PREMIUM` → 新的 server-only price ID
+   - `STRIPE_PORTAL_CONFIGURATION_ID` → 禁用方案切換、只允許付款方式／發票／取消／恢復的 Portal configuration ID
    - `STRIPE_CHECKOUT_ENABLED` → 驗收前維持 `false`
 4. 重新設定 Webhook endpoint（live mode）
 5. 測試一筆真實交易

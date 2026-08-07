@@ -87,3 +87,37 @@ export function hasAccess(userPlan: Plan, requiredPlan: Plan): boolean {
 export function isSubscriptionActive(status: string | null): boolean {
   return status === "active" || status === "trialing";
 }
+
+interface PricingPlanAction {
+  disabled: boolean;
+  href?: string;
+  label: string;
+}
+
+export function getPricingPlanAction(
+  userPlan: Plan,
+  plan: Plan
+): PricingPlanAction {
+  if (userPlan === plan) {
+    return { disabled: true, label: "目前方案" };
+  }
+
+  if (userPlan !== "free") {
+    if (plan === "free") {
+      return {
+        disabled: false,
+        href: "/account",
+        label: "前往管理訂閱取消",
+      };
+    }
+    return { disabled: true, label: "不支援直接切換" };
+  }
+
+  if (plan === "pro") {
+    return { disabled: false, label: "開始免費試用" };
+  }
+  if (plan === "premium") {
+    return { disabled: false, label: "訂閱 Premium" };
+  }
+  return { disabled: true, label: "目前方案" };
+}

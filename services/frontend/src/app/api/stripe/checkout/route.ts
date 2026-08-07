@@ -100,6 +100,25 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+  const existingSubscription = subscriptions.data.find(
+    (item) => !["canceled", "incomplete_expired"].includes(item.status)
+  );
+
+  if (existingSubscription) {
+    return NextResponse.json(
+      {
+        error:
+          "Direct plan changes are not supported. Cancel the current subscription and subscribe to another plan after it ends.",
+      },
+      { status: 409 }
+    );
+  }
+
   if (
     user.stripe_mode === stripeMode &&
     user.stripe_customer_id === customerId &&
@@ -144,23 +163,6 @@ export async function POST(req: NextRequest) {
       .update({ stripe_checkout_session_id: null, stripe_checkout_expires_at: null })
       .eq("id", user.id);
     if (clearPendingError) throw clearPendingError;
-  }
-
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 10,
-  });
-  const existingSubscription = subscriptions.data.find(
-    (item) => !["canceled", "incomplete_expired"].includes(item.status)
-  );
-
-  if (existingSubscription) {
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL}/account`,
-    });
-    return NextResponse.json({ url: portalSession.url, existingSubscription: true });
   }
 
   const trialEligible = !user.trial_used_at;

@@ -7,7 +7,7 @@
 - [ ] 確認 Pro / Premium 的幣別、月費與稅務顯示。
 - [ ] 確認每位新用戶只有一次 7 天試用。
 - [ ] 公開服務條款、隱私權、取消與退款政策。
-- [ ] 決定取消於週期結束生效；Customer Portal 不提供未經產品驗證的方案切換。
+- [ ] 確認取消於週期結束生效；Pro/Premium 不支援直接切換，必須取消並到期後重新訂閱。
 
 ## 1. 程式與資料庫前置
 
@@ -26,7 +26,7 @@
    - `VP Strategy Premium`：USD 19 / month
 3. 記錄兩個 Live Price ID。
 4. 設定品牌、帳單顯示名稱、客服信箱、付款成功與失敗通知。
-5. 啟用 Live Customer Portal：允許更新付款方式、查看發票、取消訂閱；確認取消時點符合政策。
+5. 建立專用 Live Customer Portal configuration：只允許更新付款方式、查看發票、週期末取消及到期前恢復訂閱；關閉產品與價格切換，並記錄 `bpc_...` configuration ID。
 6. 設定 Smart Retries 與最終欠款狀態；`unpaid` / `canceled` 不應保留產品權限。
 
 ## 3. Live Webhook
@@ -59,6 +59,7 @@ STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_PRO=price_...
 STRIPE_PRICE_PREMIUM=price_...
+STRIPE_PORTAL_CONFIGURATION_ID=bpc_...
 STRIPE_CHECKOUT_ENABLED=false
 ADMIN_EMAILS=admin@example.com
 NEXT_PUBLIC_APP_URL=https://vp-strategy-nu.vercel.app
@@ -81,8 +82,8 @@ Development / Preview 保持 Test key、Test Price 與 Test webhook。不要再�
 2. 使用內部新帳號購買 Pro。
 3. 確認 Stripe Customer、Subscription、Invoice 與 Supabase user mapping。
 4. 確認 `stripe_mode=live`、方案、狀態、trial/current period 時間正確。
-5. 再點一次訂閱，必須導向 Customer Portal，不得建立第二筆 Subscription。
-6. 驗證 Portal 更新付款方式、週期末取消及恢復訂閱。
+5. 再對已有訂閱者呼叫 Checkout，必須回傳 `409`，不得建立 Portal Session 或第二筆 Subscription。
+6. 從帳號頁進入 Portal，驗證可更新付款方式、週期末取消及恢復訂閱，且無法切換 Pro/Premium。
 7. 用 Dashboard 重送 webhook，確認 ledger 去重。
 8. 再次執行 reconciliation dry-run；只有結果無多重訂閱、未知 Price 或 mode mismatch 時，才可用 body `{"apply":true}` 修正 Supabase 差異。
 9. 完成退款並記錄會計處理方式。

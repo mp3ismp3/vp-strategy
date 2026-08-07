@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { PLANS } from "@/lib/plans";
+import { getPricingPlanAction, PLANS } from "@/lib/plans";
 import { Plan } from "@/types/user";
 
 export default function PricingPage() {
@@ -46,6 +46,11 @@ export default function PricingPage() {
           <p className="text-gray-600 mt-4">
             新用戶享一次 7 天免費試用，不滿意隨時取消
           </p>
+          {userPlan !== "free" && (
+            <p className="text-sm text-amber-700 mt-3">
+              目前不支援方案直接切換；如需更換，請先取消並於到期後重新訂閱。
+            </p>
+          )}
           {checkoutError && (
             <p className="mt-4 text-sm font-medium text-red-600">{checkoutError}</p>
           )}
@@ -54,8 +59,8 @@ export default function PricingPage() {
         <div className="grid md:grid-cols-3 gap-8">
           {(["free", "pro", "premium"] as Plan[]).map((planKey) => {
             const plan = PLANS[planKey];
-            const isCurrent = userPlan === planKey;
             const isPopular = planKey === "pro";
+            const action = getPricingPlanAction(userPlan, planKey);
 
             return (
               <div
@@ -89,29 +94,28 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <button
-                  onClick={() => handleCheckout(planKey)}
-                  disabled={isCurrent || planKey === "free" || checkoutPlan !== null}
-                  className={`mt-8 w-full py-3 rounded-md font-medium transition ${
-                    isCurrent
-                      ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                      : planKey === "free"
-                      ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                      : isPopular
-                      ? "bg-black text-white hover:bg-gray-800"
-                      : "border border-black text-black hover:bg-gray-50"
-                  }`}
-                >
-                  {checkoutPlan === planKey
-                    ? "前往 Stripe..."
-                    : isCurrent
-                    ? "目前方案"
-                    : planKey === "free"
-                    ? "目前方案"
-                    : planKey === "pro"
-                    ? "開始免費試用"
-                    : "升級 Premium"}
-                </button>
+                {action.href ? (
+                  <a
+                    href={action.href}
+                    className="mt-8 w-full py-3 rounded-md border border-black text-center text-sm font-medium text-black hover:bg-gray-50"
+                  >
+                    {action.label}
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => handleCheckout(planKey)}
+                    disabled={action.disabled || checkoutPlan !== null}
+                    className={`mt-8 w-full py-3 rounded-md font-medium transition ${
+                      action.disabled
+                        ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                        : isPopular
+                        ? "bg-black text-white hover:bg-gray-800"
+                        : "border border-black text-black hover:bg-gray-50"
+                    }`}
+                  >
+                    {checkoutPlan === planKey ? "前往 Stripe..." : action.label}
+                  </button>
+                )}
               </div>
             );
           })}
