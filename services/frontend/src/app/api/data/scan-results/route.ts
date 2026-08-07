@@ -2,18 +2,46 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 
+interface VolumeProfileFrame {
+  poc?: number;
+  position?: string;
+  position_pct?: number;
+  vah?: number;
+  val?: number;
+}
+
+interface ScanInfo {
+  daily?: VolumeProfileFrame;
+  monthly?: VolumeProfileFrame;
+  price?: number;
+  weekly?: VolumeProfileFrame;
+}
+
+interface ScanResults {
+  market_ctx?: unknown;
+  scan_time?: unknown;
+  vp_data?: Record<string, ScanInfo>;
+}
+
 export async function GET() {
   try {
     // Try multiple paths: local dev → Vercel serverless
     let raw: string = "";
-    const paths = [
-      path.join(process.cwd(), "../../data/scan_results.json"),  // local dev
-      path.join(process.cwd(), "data/scan_results.json"),         // Vercel
-    ];
+    const paths = [path.join(process.cwd(), "data", "scan_results.json")];
+    if (process.env.NODE_ENV === "development") {
+      // Repo-root fallback is local-only and must not expand the production
+      // server trace beyond the frontend project.
+      paths.unshift(
+        path.join(
+          /* turbopackIgnore: true */ process.cwd(),
+          "../../data/scan_results.json"
+        )
+      );
+    }
 
     for (const p of paths) {
       try {
-        raw = await fs.readFile(p, "utf-8");
+        raw = await fs.readFile(/* turbopackIgnore: true */ p, "utf-8");
         break;
       } catch {}
     }
@@ -22,11 +50,11 @@ export async function GET() {
       return NextResponse.json({ results: [], error: "Data file not found" }, { status: 404 });
     }
 
-    const data = JSON.parse(raw);
+    const data = JSON.parse(raw) as ScanResults;
 
     // 轉換格式給前端用
     const vpData = data.vp_data || {};
-    const results = Object.entries(vpData).map(([ticker, info]: [string, any]) => {
+    const results = Object.entries(vpData).map(([ticker, info]) => {
       const daily = info.daily || {};
       const weekly = info.weekly || {};
       const monthly = info.monthly || {};
@@ -74,8 +102,9 @@ export async function GET() {
       scan_time: data.scan_time,
       market_ctx: data.market_ctx,
     });
-  } catch (error: any) {
-    console.error("Error reading scan results:", error.message);
-    return NextResponse.json({ results: [], error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error reading scan results:", message);
+    return NextResponse.json({ results: [], error: message }, { status: 500 });
   }
 }

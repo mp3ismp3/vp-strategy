@@ -180,9 +180,11 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/app/api/admin/stripe-reconcile/route.ts`、`stripe-reconciliation.ts`：限 `ADMIN_EMAILS` 管理員使用的 Stripe/Supabase reconciliation。預設 dry-run；只有單一或零個非終止訂閱才可 apply，多重訂閱必須人工處理。
 - `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；完整 `supabase_migration.sql` 則供新環境初始化。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。
-- `src/lib/rate-limit.ts`、`middleware.ts`：Upstash rate limit 與 request protection。
+- `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
 
-Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech；MACD/FVG/Liquidity 圖表保持可見，每頁只用一個 `SignalMosaic` 遮罩圖表下方的信號明細。未登入的 Accumulation 只顯示依 decay score 排序的前 10 名；Strategy Lab 只遮罩進場信號。登入 session 解鎖上述完整 client view。`/accumulation` 因此不是 middleware auth-protected route，`/fusion` 與 `/account` 仍要求登入。這些是產品顯示 gate，不取代 Supabase RLS 或 server-side authorization。
+`src/app/api/data/scan-results`、`chart-data`、`accum-state` 的 JSON 路徑在 production 固定於 frontend `data/`；repo-root 路徑僅供 local development fallback，runtime file reads 不得讓 production tracing 擴張至整個 repository。
+
+Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech；MACD/FVG/Liquidity 圖表保持可見，每頁只用一個 `SignalMosaic` 遮罩圖表下方的信號明細。未登入的 Accumulation 只顯示依 decay score 排序的前 10 名；Strategy Lab 只遮罩進場信號。登入 session 解鎖上述完整 client view。`/accumulation` 因此不是 proxy auth-protected route，`/fusion` 與 `/account` 仍要求登入。這些是產品顯示 gate，不取代 Supabase RLS 或 server-side authorization。
 
 修改 frontend 前另讀 `services/frontend/AGENTS.md`，使用 `npm`/`package-lock.json`，至少依變更執行 lint、test、build 中適用的 checks。
 
