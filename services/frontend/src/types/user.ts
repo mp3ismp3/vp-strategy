@@ -18,6 +18,7 @@ export interface User {
   avatar_url: string | null;
   auth_provider: "email" | "google";
   plan: Plan;
+  cancel_at_period_end: boolean;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   stripe_mode: "test" | "live" | null;

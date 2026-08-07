@@ -6,7 +6,7 @@ describe("Pricing plan actions", () => {
   it("lets a free user start either paid plan", () => {
     expect(getPricingPlanAction("free", "pro")).toEqual({
       disabled: false,
-      label: "開始免費試用",
+      label: "訂閱 Pro",
     });
     expect(getPricingPlanAction("free", "premium")).toEqual({
       disabled: false,

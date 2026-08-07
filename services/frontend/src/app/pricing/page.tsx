@@ -12,6 +12,7 @@ export default function PricingPage() {
   const userPlan = (session?.user as { plan?: Plan } | undefined)?.plan || "free";
   const [checkoutError, setCheckoutError] = useState("");
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
+  const ecpayEnabled = process.env.NEXT_PUBLIC_ECPAY_ENABLED === "true";
 
   const handleCheckout = async (plan: Plan) => {
     if (!session) {
@@ -22,17 +23,28 @@ export default function PricingPage() {
     setCheckoutError("");
     setCheckoutPlan(plan);
     try {
-      const res = await fetch("/api/stripe/checkout", {
+      const res = await fetch("/api/ecpay/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
       const result = await res.json();
-      if (!res.ok || !result.url) {
+      if (!res.ok || !result.action || !result.fields) {
         setCheckoutError(result.error || "目前無法建立付款頁面，請稍後再試。");
         return;
       }
-      window.location.assign(result.url);
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = result.action;
+      for (const [name, value] of Object.entries(result.fields as Record<string, string>)) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
     } finally {
       setCheckoutPlan(null);
     }
@@ -43,9 +55,12 @@ export default function PricingPage() {
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold">選擇你的方案</h1>
-          <p className="text-gray-600 mt-4">
-            新用戶享一次 7 天免費試用，不滿意隨時取消
-          </p>
+          <p className="text-gray-600 mt-4">信用卡定期定額，付款成功後立即開通</p>
+          {!ecpayEnabled && (
+            <p className="mt-3 rounded-md bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              台灣地區金流建置中，目前暫不支援新訂閱。
+            </p>
+          )}
           {userPlan !== "free" && (
             <p className="text-sm text-amber-700 mt-3">
               目前不支援方案直接切換；如需更換，請先取消並於到期後重新訂閱。
@@ -78,7 +93,7 @@ export default function PricingPage() {
                 <h3 className="text-xl font-bold">{plan.name}</h3>
                 <div className="mt-4 flex items-baseline">
                   <span className="text-4xl font-bold">
-                    ${plan.price}
+                    {plan.price === 0 ? "$0" : `NT$${plan.price}`}
                   </span>
                   {plan.price > 0 && (
                     <span className="text-gray-500 ml-1">/月</span>
@@ -104,16 +119,16 @@ export default function PricingPage() {
                 ) : (
                   <button
                     onClick={() => handleCheckout(planKey)}
-                    disabled={action.disabled || checkoutPlan !== null}
+                    disabled={action.disabled || !ecpayEnabled || checkoutPlan !== null}
                     className={`mt-8 w-full py-3 rounded-md font-medium transition ${
-                      action.disabled
+                      action.disabled || !ecpayEnabled
                         ? "bg-gray-100 text-gray-500 cursor-not-allowed"
                         : isPopular
                         ? "bg-black text-white hover:bg-gray-800"
                         : "border border-black text-black hover:bg-gray-50"
                     }`}
                   >
-                    {checkoutPlan === planKey ? "前往 Stripe..." : action.label}
+                    {checkoutPlan === planKey ? "前往綠界..." : !ecpayEnabled && planKey !== "free" ? "暫不支援訂閱" : action.label}
                   </button>
                 )}
               </div>
@@ -122,8 +137,8 @@ export default function PricingPage() {
         </div>
 
         <div className="mt-12 text-center text-sm text-gray-500">
-          <p>每位新用戶僅享一次 7 天免費試用；試用期內取消不收費。</p>
-          <p className="mt-1">付款由 Stripe 安全處理，我們不會儲存你的卡號。</p>
+          <p>Pro NT$320／月；Premium NT$620／月，不提供免費試用。</p>
+          <p className="mt-1">付款由綠界科技安全處理，我們不會儲存你的卡號。</p>
         </div>
       </div>
     </div>

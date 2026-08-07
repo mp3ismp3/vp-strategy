@@ -1,5 +1,9 @@
 # Stripe 正式金流上線 Runbook
 
+> Legacy only：台灣新訂閱已改用綠界，Production 必須保持 `STRIPE_CHECKOUT_ENABLED=false`。本文件只供既有 Stripe 訂閱、Portal、webhook 與 reconciliation 維運，不再執行新訂閱真卡驗收。
+
+既有環境另須執行 `services/frontend/supabase_billing_providers.sql`，將 Stripe legacy records backfill 到通用 billing tables；migration 不會刪除舊欄位。
+
 此文件只描述上線操作。不要把 Live secret 寫入 Git、聊天訊息或 Vercel Preview 環境。
 
 ## 0. 上線決策

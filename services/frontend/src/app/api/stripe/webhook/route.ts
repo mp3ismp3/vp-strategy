@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import {
   findReplacementSubscription,
+  getStripeMode,
   getSubscriptionSnapshot,
 } from "@/lib/stripe-config";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -43,6 +44,55 @@ async function syncSubscription(
       ? subscription.customer
       : subscription.customer.id;
   const snapshot = getSubscriptionSnapshot(subscription);
+  const { data: billingCustomer } = await supabase
+    .from("billing_customers")
+    .select("user_id")
+    .eq("provider", "stripe")
+    .eq("provider_customer_id", customerId)
+    .maybeSingle();
+  let userId = billingCustomer?.user_id as string | undefined;
+  if (!userId) {
+    const { data: legacyUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("stripe_customer_id", customerId)
+      .single();
+    userId = legacyUser?.id;
+  }
+  if (!userId) throw new Error(`No user mapped to Stripe customer ${customerId}`);
+  const { error: customerUpsertError } = await supabase
+    .from("billing_customers")
+    .upsert({
+      user_id: userId,
+      provider: "stripe",
+      provider_customer_id: customerId,
+      mode: getStripeMode(),
+      metadata: { source: "stripe_webhook" },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "provider,provider_customer_id" });
+  if (customerUpsertError) throw customerUpsertError;
+  const price = subscription.items.data[0]?.price;
+  const interval = price?.recurring?.interval;
+  const billingInterval = interval === "day" || interval === "year" ? interval : "month";
+  const { error: billingError } = await supabase
+    .from("billing_subscriptions")
+    .upsert({
+      user_id: userId,
+      provider: "stripe",
+      provider_customer_id: customerId,
+      provider_subscription_id: subscription.id,
+      provider_order_id: null,
+      plan: snapshot.plan,
+      amount: price?.unit_amount ?? 0,
+      currency: (price?.currency ?? "usd").toUpperCase(),
+      billing_interval: billingInterval,
+      status: snapshot.subscriptionStatus,
+      current_period_end: snapshot.currentPeriodEnd,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      metadata: { priceId: price?.id ?? null },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "provider,provider_subscription_id" });
+  if (billingError) throw billingError;
   const update = {
     stripe_subscription_id: snapshot.stripeSubscriptionId,
     plan: snapshot.plan,
@@ -51,6 +101,7 @@ async function syncSubscription(
     trial_end: snapshot.trialEnd,
     ...(snapshot.trialStart ? { trial_used_at: snapshot.trialStart } : {}),
     current_period_end: snapshot.currentPeriodEnd,
+    cancel_at_period_end: subscription.cancel_at_period_end,
     stripe_checkout_session_id: null,
     stripe_checkout_expires_at: null,
     updated_at: new Date().toISOString(),
@@ -58,7 +109,7 @@ async function syncSubscription(
   const { data: user, error } = await supabase
     .from("users")
     .update(update)
-    .eq("stripe_customer_id", customerId)
+    .eq("id", userId)
     .select("id, telegram_user_id")
     .single();
 
@@ -103,11 +154,17 @@ async function handleWebhookEvent(
         typeof subscription.customer === "string"
           ? subscription.customer
           : subscription.customer.id;
-      const { data: user, error: lookupError } = await supabase
-        .from("users")
-        .select("id, telegram_user_id")
-        .eq("stripe_customer_id", customerId)
-        .single();
+      const { data: mappedCustomer } = await supabase
+        .from("billing_customers")
+        .select("user_id")
+        .eq("provider", "stripe")
+        .eq("provider_customer_id", customerId)
+        .maybeSingle();
+      let userQuery = supabase.from("users").select("id, telegram_user_id");
+      userQuery = mappedCustomer?.user_id
+        ? userQuery.eq("id", mappedCustomer.user_id)
+        : userQuery.eq("stripe_customer_id", customerId);
+      const { data: user, error: lookupError } = await userQuery.single();
       if (lookupError || !user) throw lookupError ?? new Error("Subscription user not found");
 
       const subscriptions = await stripe.subscriptions.list({
@@ -136,6 +193,12 @@ async function handleWebhookEvent(
         })
         .eq("id", user.id);
       if (updateError) throw updateError;
+      const { error: billingUpdateError } = await supabase
+        .from("billing_subscriptions")
+        .update({ status: "canceled", current_period_end: null, updated_at: new Date().toISOString() })
+        .eq("provider", "stripe")
+        .eq("provider_subscription_id", subscription.id);
+      if (billingUpdateError) throw billingUpdateError;
 
       return user.telegram_user_id
         ? { telegramUserId: user.telegram_user_id }

@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { stripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { TRIAL_DAYS } from "@/lib/plans";
 import {
   buildCheckoutIdempotencyKey,
   buildCustomerIdempotencyKey,
@@ -100,6 +99,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const { error: billingCustomerError } = await supabase
+    .from("billing_customers")
+    .upsert({
+      user_id: user.id,
+      provider: "stripe",
+      provider_customer_id: customerId,
+      mode: stripeMode,
+      metadata: { source: "stripe_checkout" },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "provider,provider_customer_id" });
+  if (billingCustomerError) {
+    console.error("Generic billing customer persistence failed", billingCustomerError);
+    return NextResponse.json({ error: "Unable to save billing profile" }, { status: 500 });
+  }
+
   const subscriptions = await stripe.subscriptions.list({
     customer: customerId,
     status: "all",
@@ -165,8 +179,6 @@ export async function POST(req: NextRequest) {
     if (clearPendingError) throw clearPendingError;
   }
 
-  const trialEligible = !user.trial_used_at;
-
   // Create checkout session
   const expiresAt = Math.floor(Date.now() / 1000) + 30 * 60;
   const checkoutSession = await stripe.checkout.sessions.create({
@@ -180,7 +192,6 @@ export async function POST(req: NextRequest) {
       },
     ],
     subscription_data: {
-      ...(trialEligible ? { trial_period_days: TRIAL_DAYS } : {}),
       metadata: { plan, userId: user.id },
     },
     success_url: `${process.env.NEXT_PUBLIC_APP_URL}/account?session_id={CHECKOUT_SESSION_ID}`,
