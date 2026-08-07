@@ -177,6 +177,8 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/app/api/data/*`：從 Supabase 提供 scan、accumulation、fusion、chart data。
 - `src/app/api/auth/*`、`src/lib/auth.ts`：NextAuth/Supabase authentication。
 - `src/app/api/stripe/*`、`src/lib/stripe.ts`：checkout、portal、webhook。Checkout 由 `STRIPE_CHECKOUT_ENABLED` 控制，Price ID 僅從 server-side allowlist 取得；`stripe-config.ts` 隔離 Test/Live mode，並為 Customer/30 分鐘同方案 pending Checkout 提供冪等保護，方案不一致時回傳衝突。已有有效訂閱者不得透過 Checkout 直接切換 Pro/Premium；Portal session 固定使用 `STRIPE_PORTAL_CONFIGURATION_ID` 指定的無方案切換設定，只提供付款方式、發票、取消與恢復。`stripe-webhook.ts` 以 event ledger 與 observed timestamp CAS 提供冪等 claim/retry，取消通知在 ledger 完成後才 best-effort 發送，延遲的舊訂閱刪除事件會保留較新的有效訂閱。
+- `src/lib/billing.ts`、`billing_customers`、`billing_subscriptions`、`billing_events`：provider-neutral 金流契約。Stripe、綠界與未來 provider 使用相同 customer/subscription/event 欄位，供應商額外資料放 `metadata`；provider 為開放字串，不以 DB enum 阻擋新增金流。三張 billing tables 啟用 RLS 且不提供 anon/authenticated policy，只允許 server-side service role；`users` 維持快速 entitlement snapshot，`last_billing_event_at` 防止舊 callback 覆寫新權限，既有 `stripe_*` 舊欄位與 `subscription_events` 暫留供 rollback/backfill。
+- `src/app/api/ecpay/*`、`src/lib/ecpay.ts`：台灣新訂閱的綠界信用卡定期定額 adapter。Checkout 僅允許 Pro NT$320/Premium NT$620，無試用且 server/public flags 預設關閉。ReturnURL 與 PeriodReturnURL 必須驗 SHA256 CheckMacValue、拒絕金額不符與模擬付款開通，並寫入通用 billing tables；OrderResultURL 只導頁。取消透過 CreditCardPeriodAction Cancel 停止後續授權，權限保留至當期結束。
 - `src/app/api/admin/stripe-reconcile/route.ts`、`stripe-reconciliation.ts`：限 `ADMIN_EMAILS` 管理員使用的 Stripe/Supabase reconciliation。預設 dry-run；只有單一或零個非終止訂閱才可 apply，多重訂閱必須人工處理。
 - `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；完整 `supabase_migration.sql` 則供新環境初始化。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。Client 方案 snapshot 必須綁定 session email；帳號不匹配或尚未完成查詢時 fail-closed，不得沿用前一個帳號的付費狀態。
@@ -192,7 +194,7 @@ Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech；MACD/FVG
 
 - `upload_to_supabase.py`：把 scan、chart、accum JSON 清理後 upsert 至 Supabase。
 - `services/telegram-bot/bot.py`：Telegram webhook/bot commands 與帳號綁定。
-- `services/telegram-bot/notification_router.py`：讀 Supabase 訂閱者並分發 scanner/accumulation 摘要。
+- `services/telegram-bot/notification_router.py`：讀 Supabase 訂閱者並分發 scanner/accumulation 摘要；與 bot 共用 `entitlement.py`，取消到期即 fail-closed，不依賴使用者再次登入網站。
 - `setup_telegram_webhook.py`：部署時設定 webhook；屬外部狀態變更，不可當一般測試執行。
 
 ## 7. Runtime 資料與外部邊界

@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
 from supabase import create_client
+from entitlement import has_active_entitlement
 
 load_dotenv()
 
@@ -90,10 +91,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     supabase.table("telegram_bind_tokens").delete().eq("token", bind_token).execute()
 
     # 檢查用戶方案
-    user_result = supabase.table("users").select("plan, subscription_status").eq("email", email).execute()
+    user_result = supabase.table("users").select(
+        "plan, subscription_status, current_period_end, cancel_at_period_end"
+    ).eq("email", email).execute()
     user = user_result.data[0] if user_result.data else None
 
-    if user and user["plan"] != "free" and user["subscription_status"] in ("active", "trialing"):
+    if user and has_active_entitlement(user):
         await update.message.reply_text(
             f"✅ 綁定成功！（{email}）\n\n"
             f"你的方案：{user['plan'].upper()}\n"
@@ -116,7 +119,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     supabase = get_supabase()
 
     result = supabase.table("users").select(
-        "email, plan, subscription_status, current_period_end"
+        "email, plan, subscription_status, current_period_end, cancel_at_period_end"
     ).eq("telegram_user_id", telegram_user_id).execute()
 
     if not result.data:
@@ -126,7 +129,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user = result.data[0]
-    status_emoji = "✅" if user["subscription_status"] in ("active", "trialing") else "❌"
+    status_emoji = "✅" if has_active_entitlement(user) else "❌"
 
     await update.message.reply_text(
         f"📊 <b>VP Strategy 訂閱狀態</b>\n\n"

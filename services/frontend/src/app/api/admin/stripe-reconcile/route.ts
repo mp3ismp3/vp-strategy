@@ -86,6 +86,32 @@ export async function POST(request: Request) {
           })
           .eq("id", user.id);
         if (updateError) throw updateError;
+        const expectedSubscription = subscriptions.data.find(
+          (item) => item.id === result.expected?.stripe_subscription_id
+        );
+        if (expectedSubscription) {
+          const price = expectedSubscription.items.data[0]?.price;
+          const interval = price?.recurring?.interval;
+          const { error: billingError } = await supabase
+            .from("billing_subscriptions")
+            .upsert({
+              user_id: user.id,
+              provider: "stripe",
+              provider_customer_id: user.stripe_customer_id,
+              provider_subscription_id: expectedSubscription.id,
+              provider_order_id: null,
+              plan: result.expected.plan,
+              amount: price?.unit_amount ?? 0,
+              currency: (price?.currency ?? "usd").toUpperCase(),
+              billing_interval: interval === "day" || interval === "year" ? interval : "month",
+              status: expectedSubscription.status,
+              current_period_end: result.expected.current_period_end,
+              cancel_at_period_end: expectedSubscription.cancel_at_period_end,
+              metadata: { priceId: price?.id ?? null, source: "stripe_reconciliation" },
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "provider,provider_subscription_id" });
+          if (billingError) throw billingError;
+        }
         applied = true;
       }
 

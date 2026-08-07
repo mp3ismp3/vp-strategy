@@ -15,6 +15,8 @@ interface AccountUser {
 }
 
 interface PlanInfo {
+  billingProvider: "ecpay" | "stripe" | null;
+  cancelAtPeriodEnd: boolean;
   currentPeriodEnd: string | null;
   plan: Plan;
   subscriptionStatus: SubscriptionStatus;
@@ -58,6 +60,17 @@ export default function AccountPage() {
   };
 
   const handleManageSubscription = async () => {
+    if (planInfo?.billingProvider === "ecpay") {
+      if (!window.confirm("確定取消綠界定期定額？目前方案權限會保留到本期結束。")) return;
+      const res = await fetch("/api/ecpay/cancel", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setPlanInfo((current) => current ? { ...current, cancelAtPeriodEnd: true } : current);
+        window.alert("已停止後續扣款，方案權限保留到本期結束。");
+      }
+      else window.alert(data.error || "目前無法取消訂閱");
+      return;
+    }
     const res = await fetch("/api/stripe/portal", { method: "POST" });
     const data = await res.json();
     if (data.url) {
@@ -121,6 +134,12 @@ export default function AccountPage() {
             </div>
           )}
 
+          {planInfo?.cancelAtPeriodEnd && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              已停止後續扣款，方案權限保留至本期結束。
+            </div>
+          )}
+
           {/* Trial days remaining */}
           {trialDaysLeft && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -149,12 +168,14 @@ export default function AccountPage() {
           </div>
           <Separator />
           <div className="flex gap-3">
-            <button
+            {(planInfo?.plan ?? user?.plan) !== "free" && !planInfo?.cancelAtPeriodEnd && (
+              <button
               onClick={handleManageSubscription}
               className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-gray-50"
             >
-              管理訂閱
-            </button>
+              {planInfo?.billingProvider === "ecpay" ? "取消定期定額" : "管理既有訂閱"}
+              </button>
+            )}
             <a
               href="/pricing"
               className="px-4 py-2 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800"

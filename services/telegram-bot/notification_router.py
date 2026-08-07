@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import Bot
 from supabase import create_client
+from entitlement import has_active_entitlement
 
 load_dotenv()
 
@@ -42,7 +43,7 @@ def get_subscribers(min_plan: str = "pro") -> list[dict]:
     min_level = plan_hierarchy.get(min_plan, 1)
 
     result = supabase.table("users").select(
-        "telegram_user_id, plan, subscription_status"
+        "telegram_user_id, plan, subscription_status, current_period_end, cancel_at_period_end"
     ).not_.is_("telegram_user_id", "null").in_(
         "subscription_status", ["active", "trialing"]
     ).execute()
@@ -50,7 +51,7 @@ def get_subscribers(min_plan: str = "pro") -> list[dict]:
     subscribers = []
     for user in result.data:
         user_level = plan_hierarchy.get(user["plan"], 0)
-        if user_level >= min_level:
+        if user_level >= min_level and has_active_entitlement(user):
             subscribers.append(user)
 
     return subscribers

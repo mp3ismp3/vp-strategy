@@ -6,8 +6,6 @@ export const PLAN_HIERARCHY: Record<Plan, number> = {
   premium: 2,
 };
 
-export const TRIAL_DAYS = 7;
-
 export interface PlanConfig {
   name: string;
   price: number;
@@ -43,7 +41,7 @@ export const PLANS: Record<Plan, PlanConfig> = {
   },
   pro: {
     name: "Pro",
-    price: 10,
+    price: 320,
     features: {
       scannerSymbols: -1,
       scannerDelayDays: 0,
@@ -61,7 +59,7 @@ export const PLANS: Record<Plan, PlanConfig> = {
   },
   premium: {
     name: "Premium",
-    price: 19,
+    price: 620,
     features: {
       scannerSymbols: -1,
       scannerDelayDays: 0,
@@ -131,7 +129,7 @@ export function getPricingPlanAction(
   }
 
   if (plan === "pro") {
-    return { disabled: false, label: "開始免費試用" };
+    return { disabled: false, label: "訂閱 Pro" };
   }
   if (plan === "premium") {
     return { disabled: false, label: "訂閱 Premium" };

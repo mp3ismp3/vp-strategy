@@ -71,13 +71,20 @@ export const authOptions: NextAuthOptions = {
       const supabase = getSupabaseAdmin();
       const { data } = await supabase
         .from("users")
-        .select("plan, subscription_status")
+        .select("id, plan, subscription_status, current_period_end, cancel_at_period_end")
         .eq("email", token.email!)
         .single();
 
       if (data) {
-        token.plan = data.plan;
-        token.subscriptionStatus = data.subscription_status;
+        const cancellationExpired = Boolean(
+          data.cancel_at_period_end && data.current_period_end && new Date(data.current_period_end).getTime() <= Date.now()
+        );
+        token.plan = cancellationExpired ? "free" : data.plan;
+        token.subscriptionStatus = cancellationExpired ? "canceled" : data.subscription_status;
+        if (cancellationExpired) {
+          await supabase.from("users").update({ plan: "free", subscription_status: "canceled", cancel_at_period_end: false }).eq("email", token.email!);
+          await supabase.from("billing_subscriptions").update({ status: "canceled", cancel_at_period_end: false, updated_at: new Date().toISOString() }).eq("user_id", data.id).eq("status", "canceling");
+        }
       } else {
         token.plan = "free";
         token.subscriptionStatus = "inactive";

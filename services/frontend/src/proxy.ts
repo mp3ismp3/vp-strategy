@@ -30,6 +30,9 @@ function isRateLimited(pathname: string): boolean {
 // 這些服務的回呼無法重試太多次，被 429 擋到會丟失事件。
 const WEBHOOK_WHITELIST = [
   "/api/stripe/webhook",
+  "/api/ecpay/return",
+  "/api/ecpay/period-return",
+  "/api/ecpay/result",
   "/api/telegram/webhook",
 ];
 

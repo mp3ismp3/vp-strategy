@@ -43,10 +43,12 @@ vi.mock("@/lib/stripe-webhook", () => ({
 
 function supabaseQuery(result: { data: unknown; error: unknown }) {
   const query: Record<string, ReturnType<typeof vi.fn>> = {};
-  for (const method of ["select", "eq", "not", "update", "insert"]) {
+  for (const method of ["select", "eq", "not", "update", "insert", "in", "order", "limit"]) {
     query[method] = vi.fn(() => query);
   }
   query.single = vi.fn().mockResolvedValue(result);
+  query.maybeSingle = vi.fn().mockResolvedValue(result);
+  query.upsert = vi.fn().mockResolvedValue({ data: null, error: null });
   return query;
 }
 
@@ -303,10 +305,14 @@ describe("Stripe route safety", () => {
       data: { id: "user_1", telegram_user_id: 123 },
       error: null,
     });
+    const customerQuery = supabaseQuery({ data: null, error: null });
     const updateQuery = supabaseQuery({ data: null, error: null });
-    updateQuery.eq = vi.fn().mockResolvedValue({ error: null });
     mocks.getSupabaseAdmin.mockReturnValue({
-      from: vi.fn(() => (selectQuery.select.mock.calls.length ? updateQuery : selectQuery)),
+      from: vi.fn((table: string) => {
+        if (table === "billing_customers") return customerQuery;
+        if (table === "users" && selectQuery.select.mock.calls.length === 0) return selectQuery;
+        return updateQuery;
+      }),
     });
     mocks.subscriptionList.mockResolvedValue({ data: [] });
     mocks.markWebhookProcessed.mockResolvedValue(undefined);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { hasActiveEntitlement } from "@/lib/billing";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 
@@ -81,11 +82,16 @@ export async function POST(req: NextRequest) {
     // Check user plan
     const { data: user } = await supabase
       .from("users")
-      .select("plan, subscription_status")
+      .select("plan, subscription_status, current_period_end, cancel_at_period_end")
       .eq("email", email)
       .single();
 
-    if (user && user.plan !== "free" && ["active", "trialing"].includes(user.subscription_status)) {
+    if (user && hasActiveEntitlement({
+      plan: user.plan,
+      subscriptionStatus: user.subscription_status,
+      currentPeriodEnd: user.current_period_end,
+      cancelAtPeriodEnd: user.cancel_at_period_end,
+    })) {
       await sendTelegramMessage(
         telegramUserId,
         `✅ 綁定成功！（${email}）\n\n` +
@@ -110,7 +116,7 @@ export async function POST(req: NextRequest) {
 
     const { data: user } = await supabase
       .from("users")
-      .select("email, plan, subscription_status, current_period_end")
+      .select("email, plan, subscription_status, current_period_end, cancel_at_period_end")
       .eq("telegram_user_id", telegramUserId)
       .single();
 
@@ -120,7 +126,12 @@ export async function POST(req: NextRequest) {
         "❌ 尚未綁定帳號。\n請到網站「帳號設定」進行綁定。"
       );
     } else {
-      const statusEmoji = ["active", "trialing"].includes(user.subscription_status) ? "✅" : "❌";
+      const statusEmoji = hasActiveEntitlement({
+        plan: user.plan,
+        subscriptionStatus: user.subscription_status,
+        currentPeriodEnd: user.current_period_end,
+        cancelAtPeriodEnd: user.cancel_at_period_end,
+      }) ? "✅" : "❌";
       await sendTelegramMessage(
         telegramUserId,
         `📊 <b>VP Strategy 訂閱狀態</b>\n\n` +

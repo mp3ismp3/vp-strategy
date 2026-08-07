@@ -96,6 +96,8 @@ const routeTierEntries: [string, RateLimitTier][] = [
   ["/api/auth", "auth"],
   ["/api/stripe/checkout", "strict"],
   ["/api/stripe/portal", "strict"],
+  ["/api/ecpay/checkout", "strict"],
+  ["/api/ecpay/cancel", "strict"],
   ["/api/telegram/bind", "strict"],
   ["/api/user/plan", "strict"],
   ["/api/data", "data"],
