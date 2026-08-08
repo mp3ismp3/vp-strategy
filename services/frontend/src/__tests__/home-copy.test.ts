@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -29,5 +29,23 @@ describe("trial-free product UI", () => {
     expect(navbar).not.toMatch(/trialDays|試用 \{/);
     expect([login, account, navbar, pricing].join("\n")).not.toContain("試用");
     expect(pricing).toContain("Free 免費使用；Pro NT$320／月；Premium NT$620／月。");
+  });
+});
+
+describe("product branding", () => {
+  it("uses the P Trade icon across the public brand surfaces", () => {
+    const home = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+    const login = readFileSync(resolve(process.cwd(), "src/app/login/page.tsx"), "utf8");
+    const layout = readFileSync(resolve(process.cwd(), "src/app/layout.tsx"), "utf8");
+    const navbar = readFileSync(resolve(process.cwd(), "src/components/Navbar.tsx"), "utf8");
+
+    expect([home, login, navbar].join("\n")).not.toContain("💰");
+    for (const source of [home, login, layout, navbar]) {
+      expect(source).toContain("/ptrade.svg");
+    }
+    expect([home, login].join("\n")).not.toMatch(/\bpriority\b/);
+    expect([home, login].join("\n").match(/\bpreload\b/g)).toHaveLength(2);
+    expect(existsSync(resolve(process.cwd(), "src/app/favicon.ico"))).toBe(false);
+    expect(existsSync(resolve(process.cwd(), "public/ptrade.svg"))).toBe(true);
   });
 });

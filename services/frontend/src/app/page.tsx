@@ -1,11 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
       <section className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
-        <div className="text-6xl mb-6">💰</div>
+        <Image
+          src="/ptrade.svg"
+          alt="P Trade"
+          width={96}
+          height={96}
+          preload
+          className="mb-6 rounded-2xl"
+        />
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight max-w-3xl">
           Market Auction Theory
           <br />

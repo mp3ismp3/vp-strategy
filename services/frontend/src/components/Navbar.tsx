@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -41,7 +42,13 @@ export function Navbar() {
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">💰</span>
+            <Image
+              src="/ptrade.svg"
+              alt="P Trade"
+              width={32}
+              height={32}
+              className="rounded-md"
+            />
             <span className="font-bold text-lg">VP Strategy</span>
           </Link>
 

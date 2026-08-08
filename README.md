@@ -198,7 +198,7 @@ Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。文件式 data API 在 production 只讀 frontend `data/`，repo-root JSON 路徑僅作為本機開發 fallback，且 runtime file reads 不參與自動 tracing，避免 production bundle 誤納整個 repository。
 
-Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。
+Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。品牌 icon 使用 `services/frontend/public/ptrade.svg`，首頁、登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
 
 Stripe Checkout 已退出新訂閱 UI 且 production 必須保持 `STRIPE_CHECKOUT_ENABLED=false`；既有 Stripe Customer Portal 與 webhook 仍保留，避免既有訂閱失去取消或狀態同步能力。原有 server-only Price allowlist、Test/Live 隔離、Session 冪等與禁止直接切換方案的安全邊界維持不變。
 

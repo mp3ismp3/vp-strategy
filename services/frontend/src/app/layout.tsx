@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   title: "VP Strategy — Market Auction Theory 交易分析平台",
   description:
     "Volume Profile 多時間框架分析 + Wyckoff 機構吸籌追蹤。即時信號通知，幫你找到最佳入場時機。",
+  icons: {
+    icon: [{ url: "/ptrade.svg", type: "image/svg+xml" }],
+    shortcut: "/ptrade.svg",
+    apple: "/ptrade.svg",
+  },
 };
 
 export default function RootLayout({

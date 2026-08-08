@@ -183,6 +183,7 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；完整 `supabase_migration.sql` 則供新環境初始化。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。Client 方案 snapshot 必須綁定 session email；帳號不匹配或尚未完成查詢時 fail-closed，不得沿用前一個帳號的付費狀態。
 - `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
+- `public/ptrade.svg`：前端共用品牌 icon，由首頁、登入頁、Navbar 與 root metadata 的瀏覽器 icon 引用。
 
 `src/app/api/data/scan-results`、`chart-data`、`accum-state` 的 JSON 路徑在 production 固定於 frontend `data/`；repo-root 路徑僅供 local development fallback，runtime file reads 不得讓 production tracing 擴張至整個 repository。
 
