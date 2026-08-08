@@ -124,7 +124,7 @@ function LoginForm() {
         <p className="text-center text-sm text-gray-600">
           還沒有帳號？{" "}
           <a href="/pricing" className="font-medium text-black hover:underline">
-            開始免費試用
+            查看方案
           </a>
         </p>
       </div>
