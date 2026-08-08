@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -25,23 +26,6 @@ export function Navbar() {
   const { data: session } = useSession();
   const user = session?.user as NavbarUser | undefined;
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [trialDays, setTrialDays] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (session) {
-      fetch("/api/user/plan")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.trialEnd && data.subscriptionStatus === "trialing") {
-            const days = Math.ceil(
-              (new Date(data.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-            );
-            setTrialDays(days > 0 ? days : null);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [session]);
 
   const navLinks = [
     { href: "/scanner", label: "Scanner" },
@@ -58,7 +42,13 @@ export function Navbar() {
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl">💰</span>
+            <Image
+              src="/ptrade.svg"
+              alt="P Trade"
+              width={32}
+              height={32}
+              className="rounded-md"
+            />
             <span className="font-bold text-lg">VP Strategy</span>
           </Link>
 
@@ -81,11 +71,6 @@ export function Navbar() {
             {session ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex items-center gap-2">
-                  {trialDays && (
-                    <Badge className="bg-blue-100 text-blue-800 text-xs">
-                      試用 {trialDays}天
-                    </Badge>
-                  )}
                   <Badge variant="outline" className="capitalize hidden sm:inline-flex">
                     {user?.plan || "free"}
                   </Badge>

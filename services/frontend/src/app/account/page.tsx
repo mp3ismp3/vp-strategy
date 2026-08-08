@@ -20,7 +20,6 @@ interface PlanInfo {
   currentPeriodEnd: string | null;
   plan: Plan;
   subscriptionStatus: SubscriptionStatus;
-  trialEnd: string | null;
 }
 
 export default function AccountPage() {
@@ -40,16 +39,9 @@ export default function AccountPage() {
     }
   }, [session]);
 
-  const getTrialDaysLeft = () => {
-    if (!planInfo?.trialEnd) return null;
-    const end = new Date(planInfo.trialEnd);
-    const now = new Date();
-    const days = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return days > 0 ? days : null;
-  };
-
-  const trialDaysLeft = getTrialDaysLeft();
-  const isPastDue = planInfo?.subscriptionStatus === "past_due";
+  const subscriptionStatus = planInfo?.subscriptionStatus ?? user?.subscriptionStatus ?? "inactive";
+  const displayedSubscriptionStatus = subscriptionStatus === "trialing" ? "active" : subscriptionStatus;
+  const isPastDue = subscriptionStatus === "past_due";
 
   const handleBindTelegram = async () => {
     setBindingTelegram(true);
@@ -140,15 +132,6 @@ export default function AccountPage() {
             </div>
           )}
 
-          {/* Trial days remaining */}
-          {trialDaysLeft && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800">
-                🎉 免費試用中 — 剩餘 <span className="font-bold">{trialDaysLeft} 天</span>
-              </p>
-            </div>
-          )}
-
           <div className="flex justify-between items-center">
             <span className="text-gray-600">目前方案</span>
             <Badge className="capitalize text-sm">{planInfo?.plan || user?.plan || "free"}</Badge>
@@ -156,14 +139,9 @@ export default function AccountPage() {
           <div className="flex justify-between items-center">
             <span className="text-gray-600">狀態</span>
             <Badge
-              variant={
-                user?.subscriptionStatus === "active" ||
-                user?.subscriptionStatus === "trialing"
-                  ? "default"
-                  : "destructive"
-              }
+              variant={displayedSubscriptionStatus === "active" ? "default" : "destructive"}
             >
-              {user?.subscriptionStatus || "inactive"}
+              {displayedSubscriptionStatus}
             </Badge>
           </div>
           <Separator />

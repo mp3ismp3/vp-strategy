@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -37,7 +38,14 @@ function LoginForm() {
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="text-4xl mb-4">💰</div>
+          <Image
+            src="/ptrade.svg"
+            alt="P Trade"
+            width={64}
+            height={64}
+            preload
+            className="mx-auto mb-4 rounded-xl"
+          />
           <h1 className="text-2xl font-bold">登入 VP Strategy</h1>
           <p className="text-gray-600 mt-2">登入以存取交易信號和分析工具</p>
         </div>
@@ -124,7 +132,7 @@ function LoginForm() {
         <p className="text-center text-sm text-gray-600">
           還沒有帳號？{" "}
           <a href="/pricing" className="font-medium text-black hover:underline">
-            開始免費試用
+            查看方案
           </a>
         </p>
       </div>

@@ -137,7 +137,7 @@ export default function PricingPage() {
         </div>
 
         <div className="mt-12 text-center text-sm text-gray-500">
-          <p>Pro NT$320／月；Premium NT$620／月，不提供免費試用。</p>
+          <p>Free 免費使用；Pro NT$320／月；Premium NT$620／月。</p>
           <p className="mt-1">付款由綠界科技安全處理，我們不會儲存你的卡號。</p>
         </div>
       </div>

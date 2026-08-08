@@ -1,11 +1,19 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
       <section className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
-        <div className="text-6xl mb-6">💰</div>
+        <Image
+          src="/ptrade.svg"
+          alt="P Trade"
+          width={96}
+          height={96}
+          preload
+          className="mb-6 rounded-2xl"
+        />
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight max-w-3xl">
           Market Auction Theory
           <br />
@@ -14,14 +22,14 @@ export default function HomePage() {
         <p className="mt-6 text-lg text-gray-600 max-w-2xl">
           Volume Profile 多時間框架分析 + Wyckoff 機構吸籌追蹤。
           <br />
-          即時 Telegram 信號通知，幫你找到最佳入場時機。
+          先瀏覽市場結構，登入即可解鎖完整預覽。
         </p>
         <div className="mt-8 flex gap-4">
           <Link
-            href="/pricing"
+            href="/scanner"
             className="bg-black text-white px-8 py-3 rounded-md font-medium hover:bg-gray-800 text-lg"
           >
-            開始 7 天免費試用
+            免費瀏覽 Scanner
           </Link>
           <Link
             href="/login"
@@ -116,7 +124,7 @@ export default function HomePage() {
               <div className="text-4xl mb-4">2️⃣</div>
               <h3 className="font-bold mb-2">即時信號推送</h3>
               <p className="text-gray-600 text-sm">
-                觸發條件成立時，Telegram 私訊通知你入場時機和建議倉位
+                Premium 方案提供 Telegram 即時信號私訊
               </p>
             </div>
             <div>
@@ -133,13 +141,13 @@ export default function HomePage() {
       {/* CTA */}
       <section className="py-20 bg-black text-white text-center">
         <div className="max-w-3xl mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-4">準備好了嗎？</h2>
-          <p className="text-gray-400 mb-8">7 天免費試用，不滿意隨時取消。</p>
+          <h2 className="text-3xl font-bold mb-4">先看看今天的市場結構</h2>
+          <p className="text-gray-400 mb-8">不用訂閱即可瀏覽；登入後解鎖完整預覽。</p>
           <Link
-            href="/pricing"
+            href="/scanner"
             className="bg-white text-black px-8 py-3 rounded-md font-medium hover:bg-gray-100 text-lg"
           >
-            查看方案
+            開啟 Scanner
           </Link>
         </div>
       </section>
