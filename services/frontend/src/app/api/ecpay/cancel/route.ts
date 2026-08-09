@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
-import { buildEcpayCancelFields, getEcpayConfig, verifyEcpayCallback } from "@/lib/ecpay";
+import { buildEcpayCancelFields, getEcpayConfig, parseEcpayResponse, verifyEcpayCallback } from "@/lib/ecpay";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function POST() {
@@ -30,7 +30,12 @@ export async function POST() {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(fields),
   });
-  const result = Object.fromEntries(new URLSearchParams(await response.text())) as Record<string, string>;
+  let result: Record<string, string>;
+  try {
+    result = parseEcpayResponse(await response.text());
+  } catch {
+    return NextResponse.json({ error: "Invalid response from ECPay" }, { status: 502 });
+  }
   if (!response.ok || result.RtnCode !== "1" || !verifyEcpayCallback(result, config)) {
     return NextResponse.json({ error: result.RtnMsg || "Unable to cancel ECPay subscription" }, { status: 502 });
   }

@@ -10,6 +10,7 @@ import {
   getEcpayPlanAmount,
   getNextEcpayPeriodEnd,
   isEcpayCheckoutEnabled,
+  parseEcpayResponse,
   verifyEcpayCallback,
 } from "@/lib/ecpay";
 import { applyEcpayCallback } from "@/lib/ecpay-callback";
@@ -79,6 +80,7 @@ describe("ECPay recurring billing", () => {
   it("rejects tampered callbacks and deduplicates each authorization", () => {
     const config = getEcpayConfig({ ...credentials, ECPAY_MODE: "test" });
     const callback = {
+      MerchantID: "3002607",
       MerchantTradeNo: "VP260807ABC123",
       TradeNo: "240807000000001",
       RtnCode: "1",
@@ -95,6 +97,17 @@ describe("ECPay recurring billing", () => {
 
     expect(verifyEcpayCallback(signed, config)).toBe(true);
     expect(verifyEcpayCallback({ ...signed, RtnCode: "0" }, config)).toBe(false);
+    const withoutMerchantId = {
+      MerchantTradeNo: callback.MerchantTradeNo,
+      TradeNo: callback.TradeNo,
+      RtnCode: callback.RtnCode,
+      TotalSuccessTimes: callback.TotalSuccessTimes,
+    };
+    const missingMerchantId = {
+      ...withoutMerchantId,
+      CheckMacValue: createCheckMacValue(withoutMerchantId, config.hashKey, config.hashIv),
+    };
+    expect(verifyEcpayCallback(missingMerchantId, config)).toBe(false);
     expect(buildEcpayEventId(signed)).toBe(
       "ecpay:VP260807ABC123:240807000000001:2:1:0:unknown"
     );
@@ -108,10 +121,34 @@ describe("ECPay recurring billing", () => {
     expect(() => getEcpayCallbackTime({})).toThrow("authorization time");
   });
 
+  it("accepts the lowercase process_date used by recurring callbacks", () => {
+    expect(getEcpayCallbackTime({ process_date: "2026/01/31 12:34:56" })).toBe(
+      "2026-01-31T04:34:56.000Z"
+    );
+    expect(buildEcpayEventId({
+      MerchantTradeNo: "VP260807ABC123",
+      TradeNo: "240807000000001",
+      RtnCode: "1",
+      TotalSuccessTimes: "2",
+      process_date: "2026/01/31 12:34:56",
+    })).toContain("2026/01/31 12:34:56");
+  });
+
   it("clamps month-end entitlement instead of rolling into March", () => {
     expect(getNextEcpayPeriodEnd("2026-01-31T04:34:56.000Z")).toBe(
       "2026-02-28T04:34:56.000Z"
     );
+  });
+
+  it("parses both current JSON and legacy form-encoded provider responses", () => {
+    expect(parseEcpayResponse('{"MerchantID":"3002607","RtnCode":1}')).toEqual({
+      MerchantID: "3002607",
+      RtnCode: "1",
+    });
+    expect(parseEcpayResponse("MerchantID=3002607&RtnCode=1")).toEqual({
+      MerchantID: "3002607",
+      RtnCode: "1",
+    });
   });
 
   function callbackDb(options: {

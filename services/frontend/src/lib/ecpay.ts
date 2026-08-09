@@ -77,11 +77,25 @@ export function verifyEcpayCallback(
   fields: EcpayFields,
   config: EcpayConfig
 ): boolean {
-  if (fields.MerchantID && fields.MerchantID !== config.merchantId) return false;
+  if (fields.MerchantID !== config.merchantId) return false;
   const received = fields.CheckMacValue?.toUpperCase();
   if (!received || !/^[A-F0-9]{64}$/.test(received)) return false;
   const expected = createCheckMacValue(fields, config.hashKey, config.hashIv);
   return timingSafeEqual(Buffer.from(received), Buffer.from(expected));
+}
+
+export function parseEcpayResponse(body: string): EcpayFields {
+  const trimmed = body.trim();
+  if (trimmed.startsWith("{")) {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Invalid ECPay JSON response");
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, value]) => [key, String(value)])
+    );
+  }
+  return Object.fromEntries(new URLSearchParams(trimmed));
 }
 
 export function createMerchantTradeNo(now = new Date()): string {
@@ -131,7 +145,7 @@ export function buildEcpayEventId(fields: EcpayFields): string {
     fields.TotalSuccessTimes ?? "1",
     fields.RtnCode ?? "unknown",
     fields.SimulatePaid ?? "0",
-    fields.ProcessDate ?? fields.PaymentDate ?? fields.TradeDate ?? "unknown",
+    fields.ProcessDate ?? fields.process_date ?? fields.PaymentDate ?? fields.TradeDate ?? "unknown",
   ].join(":");
 }
 
@@ -140,7 +154,7 @@ export function getEcpayCallbackAmount(fields: EcpayFields): string | undefined 
 }
 
 export function getEcpayCallbackTime(fields: EcpayFields): string {
-  const value = fields.ProcessDate ?? fields.PaymentDate ?? fields.TradeDate;
+  const value = fields.ProcessDate ?? fields.process_date ?? fields.PaymentDate ?? fields.TradeDate;
   const match = value?.match(/^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
   if (!match) throw new Error("Missing or invalid ECPay authorization time");
   const [, year, month, day, hour, minute, second] = match;

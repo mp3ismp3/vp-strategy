@@ -67,6 +67,9 @@ export async function POST(request: Request) {
     status: "pending",
     metadata: { frequency: 1, execTimes: 99 },
   });
+  if (insertError?.code === "23505") {
+    return NextResponse.json({ error: "已有訂閱或付款流程進行中，請勿重複送出" }, { status: 409 });
+  }
   if (insertError) return NextResponse.json({ error: "Unable to create billing order" }, { status: 500 });
   return NextResponse.json({
     action: config.checkoutUrl,

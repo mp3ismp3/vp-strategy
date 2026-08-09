@@ -164,6 +164,10 @@ CREATE INDEX IF NOT EXISTS idx_billing_customers_user ON public.billing_customer
 CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_user ON public.billing_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_status ON public.billing_subscriptions(provider, status);
 CREATE INDEX IF NOT EXISTS idx_billing_events_status ON public.billing_events(provider, processing_status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_subscriptions_one_open_ecpay_per_user
+    ON public.billing_subscriptions(user_id)
+    WHERE provider = 'ecpay'
+      AND status IN ('pending', 'active', 'past_due', 'canceling');
 
 -- ============================================
 -- 7. Scan Data 表（VP 掃描結果，覆蓋更新）
