@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { buildBillingSubscriptionRecord, hasActiveEntitlement } from "@/lib/billing";
 
 describe("provider-neutral billing model", () => {
+  it("enforces one open ECPay subscription per user at the database boundary", () => {
+    const migration = readFileSync("supabase_billing_providers.sql", "utf8");
+    expect(migration).toContain("idx_billing_subscriptions_one_open_ecpay_per_user");
+    expect(migration).toMatch(/UNIQUE INDEX[\s\S]*user_id[\s\S]*provider = 'ecpay'[\s\S]*pending[\s\S]*active[\s\S]*past_due[\s\S]*canceling/);
+  });
+
   it("fails closed after a canceled subscription reaches its period end", () => {
     expect(hasActiveEntitlement({
       plan: "pro",

@@ -204,7 +204,7 @@ Stripe Checkout 已退出新訂閱 UI 且 production 必須保持 `STRIPE_CHECKO
 
 台灣新訂閱改用綠界信用卡定期定額：Pro 為 NT$320／月、Premium 為 NT$620／月，不提供免費試用。首頁採免費預覽優先流程，主按鈕直接進入 Scanner，登入後解鎖完整 client view；Premium 才提供 Telegram 即時信號私訊。網站不顯示試用 CTA、倒數或徽章；既有 Stripe `trialing` 欄位僅保留作歷史資料與 webhook 相容。`ECPAY_CHECKOUT_ENABLED` 與 `NEXT_PUBLIC_ECPAY_ENABLED` 必須同時為 `true` 才會顯示並開放付款；預設皆為 `false`，UI 顯示「台灣地區金流建置中」。後端驗證首次及每期通知的 SHA256 `CheckMacValue`、拒絕模擬付款開通並以 provider event ID 去重。Stripe、綠界及未來 provider 共用 `billing_customers`、`billing_subscriptions`、`billing_events`；provider-specific identifiers 放在通用欄位或 metadata，`users` 只保留 entitlement snapshot 與既有 Stripe rollback 欄位。上線前執行 `services/frontend/supabase_billing_providers.sql`，步驟見 `docs/ecpay-recurring.md`。
 
-Pro 與 Premium 不支援直接升降級：已有有效訂閱的 Checkout 請求會回傳 `409`，使用者必須先取消並待目前週期結束後再訂閱另一方案。既有 Stripe 使用者透過固定 configuration 的 Customer Portal 管理；綠界使用者則由 CreditCardPeriodAction 停止後續授權，網站與 Telegram consumers 都會依取消週期截止時間 fail-closed。所有 provider webhook 以 `billing_events` ledger 去重及失敗重試，Stripe 延遲刪除與綠界亂序授權都不得覆蓋較新的有效訂閱。Stripe 管理員 reconciliation 預設 dry-run，只有明確 `apply: true` 才修正安全且無歧義的差異；綠界每期通知只送一次，目前仍需在正式開放前補定期對帳與漏單監控。
+Pro 與 Premium 不支援直接升降級：已有有效訂閱的 Checkout 請求會回傳 `409`，使用者必須先取消並待目前週期結束後再訂閱另一方案。綠界另以 partial unique index 原子限制每位使用者只能有一筆未結束的訂閱，並發或重複 Checkout 同樣回傳 `409`。既有 Stripe 使用者透過固定 configuration 的 Customer Portal 管理；綠界使用者則由 CreditCardPeriodAction 停止後續授權，取消 API 同時接受綠界現行 JSON 與 legacy form-encoded 回應，且兩者都必須通過 MerchantID 與 CheckMacValue 驗證；每期通知相容官方 `ProcessDate` 與 `process_date` 欄位，網站與 Telegram consumers 都會依取消週期截止時間 fail-closed。所有 provider webhook 以 `billing_events` ledger 去重及失敗重試，Stripe 延遲刪除與綠界亂序授權都不得覆蓋較新的有效訂閱。Stripe 管理員 reconciliation 預設 dry-run，只有明確 `apply: true` 才修正安全且無歧義的差異；綠界每期通知只送一次，目前仍需在正式開放前補定期對帳與漏單監控。
 
 ### 回測/優化
 

@@ -14,6 +14,8 @@
 
 若曾執行較早版本的同名 migration，必須安全重跑最新版；其中的 `DROP CONSTRAINT IF EXISTS billing_customers_user_id_provider_mode_key` 允許同一使用者在 Customer 被供應商刪除後建立替代 Customer，並補上 `last_provider_event_at` 與 `users.last_billing_event_at`，讓 subscription 及 entitlement snapshot 都只能被相同或較新的 callback 更新。重跑不會刪除 billing records。
 
+最新版 migration 另建立 `idx_billing_subscriptions_one_open_ecpay_per_user`，原子限制每位使用者只能有一筆 `pending`、`active`、`past_due` 或 `canceling` 的綠界訂閱。若 Production 已存在同一使用者的多筆未結束綠界訂閱，index 會拒絕建立；必須先人工核對綠界後台並終止重複訂單，不可自動刪除付款紀錄。
+
 ## Environment
 
 ```text
