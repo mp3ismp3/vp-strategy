@@ -203,11 +203,13 @@ Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker
 
 Stripe Checkout 已退出新訂閱 UI 且 production 必須保持 `STRIPE_CHECKOUT_ENABLED=false`；既有 Stripe Customer Portal 與 webhook 仍保留，避免既有訂閱失去取消或狀態同步能力。原有 server-only Price allowlist、Test/Live 隔離、Session 冪等與禁止直接切換方案的安全邊界維持不變。
 
-台灣新訂閱改用綠界信用卡定期定額：Pro 為 NT$320／月、Premium 為 NT$620／月，不提供免費試用。`ECPAY_CHECKOUT_ENABLED` 與 `NEXT_PUBLIC_ECPAY_ENABLED` 預設皆為 `false`。後端驗證首次及每期通知的 SHA256 `CheckMacValue`、拒絕模擬付款開通並以 provider event ID 去重。所有付費權益（包括未取消的 active 訂閱）都必須有尚未到期的 `current_period_end`，缺失或到期即 fail-closed。上線前執行 `services/frontend/supabase_billing_providers.sql`，撤除 analysis tables 的 anon/authenticated 讀取並建立原子取消 RPC；步驟見 `docs/ecpay-recurring.md`。
+台灣新訂閱改用綠界信用卡定期定額：Pro 為 NT$320／月、Premium 為 NT$620／月，不提供免費試用。`ECPAY_CHECKOUT_ENABLED` 與 `NEXT_PUBLIC_ECPAY_ENABLED` 預設皆為 `false`。後端驗證首次及每期通知的 SHA256 `CheckMacValue`、拒絕模擬付款開通並以 provider event ID 去重；callback 透過單一 transaction RPC 同步 event、subscription 與聚合 entitlement。所有付費權益都必須有尚未到期的 `current_period_end`，缺失或到期即 fail-closed。上線前執行最新版 `services/frontend/supabase_billing_providers.sql`，撤除 billing/analysis tables 的 anon/authenticated grants、建立取消 outbox/retry、跨 provider entitlement 聚合與 retention RPC；步驟見 `docs/ecpay-recurring.md`。
 
-Telegram webhook 必須設定 `TELEGRAM_WEBHOOK_SECRET`；route 會在解析 payload 前驗證 `X-Telegram-Bot-Api-Secret-Token`，而 `setup_telegram_webhook.py` 會把相同 secret 註冊至 Telegram。綁定碼以原子 delete-and-return claim，只能被有效 Premium 使用一次。
+Telegram webhook 必須設定 `TELEGRAM_WEBHOOK_SECRET`；route 會在解析 payload 前驗證 `X-Telegram-Bot-Api-Secret-Token`，而 `setup_telegram_webhook.py` 會把相同 secret 註冊至 Telegram。綁定碼透過 transaction RPC 同時完成 token claim、Premium 到期驗證與帳號綁定，失敗不會先消耗 token。
 
-Pro 與 Premium 不支援直接升降級：已有有效訂閱的 Checkout 請求會回傳 `409`，使用者必須先取消並待目前週期結束後再訂閱另一方案。綠界另以 partial unique index 原子限制每位使用者只能有一筆未結束的訂閱，並發或重複 Checkout 同樣回傳 `409`。取消通過綠界驗簽後，以單一 DB transaction 同步 subscription 與 user，callback 不得清除已確認取消。管理員可呼叫 `GET /api/admin/ecpay-reconcile` 檢視過期 active、漏 callback 與未解決 events；此稽核不等同綠界端真實交易查詢，因此正式 Checkout 仍須保持關閉，直到外部對帳/補帳流程完成。
+Pro 與 Premium 不支援直接升降級：Stripe 與 ECPay 共用 `billing_checkout_intents`，由 transaction RPC 鎖定 user row 並以 partial unique index 保證每位使用者同時只能有一個跨 provider Checkout；存在有效、pending、past-due 訂閱或其他付款頁時回傳 `409`，30 分鐘後才可釋放逾期 reservation。`users` 只保存由 `billing_subscriptions` 聚合出的最佳有效 entitlement，Stripe 延遲事件不得撤銷仍有效的 ECPay 權益，反之亦然。綠界取消會先建立 durable outbox，再呼叫 provider；本地同步失敗可由 `/api/admin/ecpay-cancel-retry` 以 CAS claim 重試並透過 provider query 復原。`GET /api/admin/ecpay-reconcile` 使用綠界 `QueryCreditCardPeriodInfo` 核對金額與執行狀態，failed/stuck events 也會透過 `BILLING_ALERT_WEBHOOK_URL` 告警。正式 Checkout 仍必須保持關閉，直到 migration、排程、告警、人工補帳與 sandbox/live E2E 全部驗收。
+
+所有 cookie-authenticated billing mutation 在 production 會精確比對 `NEXT_PUBLIC_APP_URL` Origin；production URL 必須是單一 HTTPS origin。Stripe、ECPay 與 Telegram webhook 使用流式 body size cap；billing event 僅保存 allowlist 摘要，管理員可透過 `/api/admin/billing-retention` 清除 30–365 天以前已處理事件（預設 90 天）。
 
 ### 回測/優化
 

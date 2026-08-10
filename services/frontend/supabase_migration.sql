@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.users (
     trial_used_at TIMESTAMPTZ,
     current_period_end TIMESTAMPTZ,
     last_billing_event_at TIMESTAMPTZ,
+    entitlement_provider TEXT,
+    entitlement_subscription_id UUID,
 
     -- Telegram 綁定
     telegram_user_id BIGINT UNIQUE,
@@ -59,7 +61,9 @@ ALTER TABLE public.users
     ADD COLUMN IF NOT EXISTS stripe_checkout_session_id TEXT,
     ADD COLUMN IF NOT EXISTS stripe_checkout_expires_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
-    ADD COLUMN IF NOT EXISTS last_billing_event_at TIMESTAMPTZ;
+    ADD COLUMN IF NOT EXISTS last_billing_event_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS entitlement_provider TEXT,
+    ADD COLUMN IF NOT EXISTS entitlement_subscription_id UUID;
 
 ALTER TABLE public.subscription_events
     ADD COLUMN IF NOT EXISTS processing_status TEXT NOT NULL DEFAULT 'processed'
@@ -118,6 +122,40 @@ CREATE TABLE IF NOT EXISTS public.billing_events (
     UNIQUE (provider, provider_event_id)
 );
 
+CREATE TABLE IF NOT EXISTS public.billing_cancel_outbox (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id),
+    subscription_id UUID NOT NULL REFERENCES public.billing_subscriptions(id),
+    provider TEXT NOT NULL,
+    provider_order_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'processing', 'provider_succeeded', 'completed', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    provider_result JSONB NOT NULL DEFAULT '{}'::JSONB,
+    last_error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS public.billing_checkout_intents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id),
+    provider TEXT NOT NULL,
+    plan TEXT NOT NULL CHECK (plan IN ('pro', 'premium')),
+    status TEXT NOT NULL DEFAULT 'reserved'
+        CHECK (status IN ('reserved', 'session_created', 'completed', 'expired')),
+    external_reference TEXT,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 minutes',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_checkout_one_open_per_user
+    ON public.billing_checkout_intents(user_id)
+    WHERE status IN ('reserved', 'session_created');
+
 -- ============================================
 -- 3. Telegram Bind Tokens 表
 -- ============================================
@@ -148,6 +186,8 @@ ALTER TABLE public.subscription_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.billing_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.billing_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.billing_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.billing_cancel_outbox ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.billing_checkout_intents ENABLE ROW LEVEL SECURITY;
 
 -- Analysis data is only exposed through server-side entitlement APIs.
 ALTER TABLE public.scan_results ENABLE ROW LEVEL SECURITY;
@@ -216,38 +256,10 @@ GRANT ALL ON public.telegram_bind_tokens TO service_role;
 GRANT ALL ON public.billing_customers TO service_role;
 GRANT ALL ON public.billing_subscriptions TO service_role;
 GRANT ALL ON public.billing_events TO service_role;
+GRANT ALL ON public.billing_cancel_outbox TO service_role;
+GRANT ALL ON public.billing_checkout_intents TO service_role;
 
-CREATE OR REPLACE FUNCTION public.mark_ecpay_subscription_canceling(
-    target_user_id UUID,
-    target_subscription_id UUID
-) RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    changed_rows INTEGER;
-BEGIN
-    UPDATE public.billing_subscriptions
-    SET status = 'canceling', cancel_at_period_end = TRUE, updated_at = NOW()
-    WHERE id = target_subscription_id
-      AND user_id = target_user_id
-      AND provider = 'ecpay'
-      AND status IN ('active', 'past_due');
-    GET DIAGNOSTICS changed_rows = ROW_COUNT;
-    IF changed_rows <> 1 THEN RETURN FALSE; END IF;
-    UPDATE public.users
-    SET subscription_status = 'active', cancel_at_period_end = TRUE, updated_at = NOW()
-    WHERE id = target_user_id;
-    GET DIAGNOSTICS changed_rows = ROW_COUNT;
-    IF changed_rows <> 1 THEN
-        RAISE EXCEPTION 'ECPay cancellation user snapshot was not updated';
-    END IF;
-    RETURN TRUE;
-END;
-$$;
-REVOKE ALL ON FUNCTION public.mark_ecpay_subscription_canceling(UUID, UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.mark_ecpay_subscription_canceling(UUID, UUID) TO service_role;
+DROP FUNCTION IF EXISTS public.mark_ecpay_subscription_canceling(UUID, UUID);
 GRANT ALL ON public.telegram_bind_tokens TO service_role;
 GRANT ALL ON public.scan_results TO service_role;
 
@@ -255,6 +267,28 @@ GRANT ALL ON public.scan_results TO service_role;
 REVOKE ALL ON public.users FROM anon, authenticated;
 REVOKE ALL ON public.telegram_bind_tokens FROM anon, authenticated;
 REVOKE ALL ON public.subscription_events FROM anon, authenticated;
+REVOKE ALL ON public.billing_customers FROM anon, authenticated;
+REVOKE ALL ON public.billing_subscriptions FROM anon, authenticated;
+REVOKE ALL ON public.billing_events FROM anon, authenticated;
+REVOKE ALL ON public.billing_cancel_outbox FROM anon, authenticated;
+REVOKE ALL ON public.billing_checkout_intents FROM anon, authenticated;
+
+DO $$
+DECLARE policy_record RECORD;
+BEGIN
+    FOR policy_record IN
+        SELECT schemaname, tablename, policyname FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename IN ('users', 'telegram_bind_tokens', 'subscription_events',
+                            'billing_customers', 'billing_subscriptions',
+                            'billing_events', 'billing_cancel_outbox',
+                            'billing_checkout_intents')
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+            policy_record.policyname, policy_record.schemaname, policy_record.tablename);
+    END LOOP;
+END;
+$$;
 REVOKE ALL ON public.scan_results FROM anon, authenticated;
 REVOKE ALL ON public.scan_data FROM anon, authenticated;
 REVOKE ALL ON public.chart_data FROM anon, authenticated;

@@ -13,10 +13,16 @@ import {
   markWebhookFailed,
   markWebhookProcessed,
 } from "@/lib/stripe-webhook";
+import { minimizeBillingEventPayload } from "@/lib/billing-event";
+import { PayloadTooLargeError, readRequestBodyWithLimit } from "@/lib/http-security";
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>;
 interface CancellationNotice {
   telegramUserId: number;
+}
+interface WebhookResult {
+  notice: CancellationNotice | null;
+  completedAtomically: boolean;
 }
 
 function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
@@ -37,7 +43,8 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
 
 async function syncSubscription(
   supabase: SupabaseAdmin,
-  subscription: Stripe.Subscription
+  subscription: Stripe.Subscription,
+  eventId: string
 ) {
   const customerId =
     typeof subscription.customer === "string"
@@ -74,78 +81,58 @@ async function syncSubscription(
   const price = subscription.items.data[0]?.price;
   const interval = price?.recurring?.interval;
   const billingInterval = interval === "day" || interval === "year" ? interval : "month";
-  const { error: billingError } = await supabase
-    .from("billing_subscriptions")
-    .upsert({
-      user_id: userId,
-      provider: "stripe",
-      provider_customer_id: customerId,
-      provider_subscription_id: subscription.id,
-      provider_order_id: null,
-      plan: snapshot.plan,
-      amount: price?.unit_amount ?? 0,
-      currency: (price?.currency ?? "usd").toUpperCase(),
-      billing_interval: billingInterval,
-      status: snapshot.subscriptionStatus,
-      current_period_end: snapshot.currentPeriodEnd,
-      cancel_at_period_end: subscription.cancel_at_period_end,
-      metadata: { priceId: price?.id ?? null },
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "provider,provider_subscription_id" });
+  const { error: billingError } = await supabase.rpc("sync_stripe_subscription", {
+    target_user_id: userId,
+    stripe_customer: customerId,
+    stripe_subscription: subscription.id,
+    stripe_plan: snapshot.plan,
+    stripe_amount: price?.unit_amount ?? 0,
+    stripe_currency: (price?.currency ?? "usd").toUpperCase(),
+    stripe_interval: billingInterval,
+    stripe_status: snapshot.subscriptionStatus,
+    stripe_period_end: snapshot.currentPeriodEnd,
+    stripe_cancel_at_period_end: subscription.cancel_at_period_end,
+    stripe_price_id: price?.id ?? null,
+    stripe_trial_start: snapshot.trialStart,
+    stripe_trial_end: snapshot.trialEnd,
+    stripe_mode_value: getStripeMode(),
+    stripe_event_id: eventId,
+  });
   if (billingError) throw billingError;
-  const update = {
-    stripe_subscription_id: snapshot.stripeSubscriptionId,
-    plan: snapshot.plan,
-    subscription_status: snapshot.subscriptionStatus,
-    trial_start: snapshot.trialStart,
-    trial_end: snapshot.trialEnd,
-    ...(snapshot.trialStart ? { trial_used_at: snapshot.trialStart } : {}),
-    current_period_end: snapshot.currentPeriodEnd,
-    cancel_at_period_end: subscription.cancel_at_period_end,
-    stripe_checkout_session_id: null,
-    stripe_checkout_expires_at: null,
-    updated_at: new Date().toISOString(),
-  };
-  const { data: user, error } = await supabase
-    .from("users")
-    .update(update)
-    .eq("id", userId)
-    .select("id, telegram_user_id")
-    .single();
-
-  if (error || !user) {
-    throw error ?? new Error(`No user mapped to Stripe customer ${customerId}`);
-  }
+  const { data: user, error } = await supabase.from("users")
+    .select("id, telegram_user_id").eq("id", userId).single();
+  if (error || !user) throw error ?? new Error(`No user mapped to Stripe customer ${customerId}`);
   return user;
 }
 
 async function retrieveAndSyncSubscription(
   supabase: SupabaseAdmin,
-  subscriptionId: string
+  subscriptionId: string,
+  eventId: string
 ) {
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-  return syncSubscription(supabase, subscription);
+  return syncSubscription(supabase, subscription, eventId);
 }
 
 async function handleWebhookEvent(
   supabase: SupabaseAdmin,
   event: Stripe.Event
-): Promise<CancellationNotice | null> {
+): Promise<WebhookResult> {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       if (typeof session.subscription !== "string") {
         throw new Error("Checkout session is missing a subscription ID");
       }
-      await retrieveAndSyncSubscription(supabase, session.subscription);
-      return null;
+      await retrieveAndSyncSubscription(supabase, session.subscription, event.id);
+      return { notice: null, completedAtomically: true };
     }
 
     case "customer.subscription.created":
     case "customer.subscription.updated": {
       const subscription = event.data.object as Stripe.Subscription;
-      await retrieveAndSyncSubscription(supabase, subscription.id);
-      return null;
+      await retrieveAndSyncSubscription(supabase, subscription.id, event.id);
+      return { notice: null, completedAtomically: true };
     }
 
     case "customer.subscription.deleted": {
@@ -177,46 +164,38 @@ async function handleWebhookEvent(
         subscription.id
       );
       if (replacement) {
-        await syncSubscription(supabase, replacement);
-        return null;
+        await syncSubscription(supabase, replacement, event.id);
+        return { notice: null, completedAtomically: true };
       }
 
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          plan: "free",
-          subscription_status: "canceled",
-          current_period_end: null,
-          stripe_checkout_session_id: null,
-          stripe_checkout_expires_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
-      if (updateError) throw updateError;
-      const { error: billingUpdateError } = await supabase
-        .from("billing_subscriptions")
-        .update({ status: "canceled", current_period_end: null, updated_at: new Date().toISOString() })
-        .eq("provider", "stripe")
-        .eq("provider_subscription_id", subscription.id);
+      const { error: billingUpdateError } = await supabase.rpc("cancel_stripe_subscription", {
+        target_user_id: user.id,
+        stripe_subscription: subscription.id,
+        stripe_event_id: event.id,
+      });
       if (billingUpdateError) throw billingUpdateError;
 
-      return user.telegram_user_id
-        ? { telegramUserId: user.telegram_user_id }
-        : null;
+      return {
+        notice: user.telegram_user_id ? { telegramUserId: user.telegram_user_id } : null,
+        completedAtomically: true,
+      };
     }
 
     case "invoice.paid":
     case "invoice.payment_failed":
     case "invoice.payment_action_required": {
       const subscriptionId = getInvoiceSubscriptionId(event.data.object as Stripe.Invoice);
-      if (subscriptionId) await retrieveAndSyncSubscription(supabase, subscriptionId);
-      return null;
+      if (subscriptionId) {
+        await retrieveAndSyncSubscription(supabase, subscriptionId, event.id);
+        return { notice: null, completedAtomically: true };
+      }
+      return { notice: null, completedAtomically: false };
     }
 
     case "customer.subscription.trial_will_end":
-      return null;
+      return { notice: null, completedAtomically: false };
   }
-  return null;
+  return { notice: null, completedAtomically: false };
 }
 
 async function sendCancellationNotice(notice: CancellationNotice | null) {
@@ -242,7 +221,15 @@ async function sendCancellationNotice(notice: CancellationNotice | null) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.text();
+  let body: string;
+  try {
+    body = await readRequestBodyWithLimit(req, 256 * 1024);
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+    throw error;
+  }
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
@@ -263,7 +250,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = getSupabaseAdmin();
   try {
-    const claim = await claimWebhookEvent(supabase, event.id, event.type, event);
+    const claim = await claimWebhookEvent(supabase, event.id, event.type, minimizeBillingEventPayload(event));
     if (claim === "processed") {
       return NextResponse.json({ received: true, duplicate: true });
     }
@@ -271,9 +258,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Webhook event is still processing" }, { status: 409 });
     }
 
-    const cancellationNotice = await handleWebhookEvent(supabase, event);
-    await markWebhookProcessed(supabase, event.id);
-    await sendCancellationNotice(cancellationNotice);
+    const result = await handleWebhookEvent(supabase, event);
+    if (!result.completedAtomically) await markWebhookProcessed(supabase, event.id);
+    await sendCancellationNotice(result.notice);
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
     console.error("Stripe webhook processing failed", error);

@@ -4,8 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import crypto from "crypto";
 import { getServerPlan } from "@/lib/server-entitlement";
+import { isTrustedMutationRequest } from "@/lib/http-security";
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
@@ -22,7 +26,7 @@ export async function POST() {
   const supabase = getSupabaseAdmin();
 
   // Store token in a telegram_bind_tokens table (or use a simple approach)
-  await supabase.from("telegram_bind_tokens").upsert(
+  const { error } = await supabase.from("telegram_bind_tokens").upsert(
     {
       email: session.user.email,
       token,
@@ -30,6 +34,9 @@ export async function POST() {
     },
     { onConflict: "email" }
   );
+  if (error) {
+    return NextResponse.json({ error: "Unable to create Telegram bind token" }, { status: 500 });
+  }
 
   return NextResponse.json({ token });
 }

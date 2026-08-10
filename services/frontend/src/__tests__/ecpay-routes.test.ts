@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next-auth", () => ({ getServerSession: mocks.getServerSession }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/supabase", () => ({ getSupabaseAdmin: mocks.getSupabaseAdmin }));
+vi.mock("@/lib/http-security", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/http-security")>();
+  return { ...actual, isTrustedMutationRequest: () => true, isJsonRequest: () => true };
+});
 vi.mock("@/lib/ecpay-callback", () => ({
   applyEcpayCallback: mocks.applyEcpayCallback,
 }));
@@ -45,6 +49,7 @@ function chain(result: { data: unknown; error: unknown }) {
   query.single = vi.fn().mockResolvedValue(result);
   query.maybeSingle = vi.fn().mockResolvedValue(result);
   query.insert = vi.fn().mockResolvedValue(result);
+  query.then = vi.fn((resolve) => Promise.resolve(result).then(resolve));
   return query;
 }
 
@@ -77,13 +82,15 @@ describe("ECPay API routes", () => {
       data: { id: "user_1", plan: "free", subscription_status: "inactive" },
       error: null,
     });
-    const pendingQuery = chain({ data: null, error: null });
     const insertQuery = chain({ data: null, error: { code: "23505" } });
+    const rpc = vi.fn(async (name: string) => ({
+      data: name === "reserve_billing_checkout" ? "intent_1" : true, error: null,
+    }));
     mocks.getSupabaseAdmin.mockReturnValue({
       from: vi.fn()
         .mockReturnValueOnce(userQuery)
-        .mockReturnValueOnce(pendingQuery)
         .mockReturnValueOnce(insertQuery),
+      rpc,
     });
     const { POST } = await import("@/app/api/ecpay/checkout/route");
     const response = await POST(new Request("https://example.com/api/ecpay/checkout", {
@@ -91,6 +98,21 @@ describe("ECPay API routes", () => {
       body: JSON.stringify({ plan: "pro" }),
     }));
 
+    expect(response.status).toBe(409);
+  });
+
+  it("rejects ECPay checkout while another provider entitlement is active", async () => {
+    vi.stubEnv("ECPAY_CHECKOUT_ENABLED", "true");
+    mocks.getServerSession.mockResolvedValue({ user: { email: "member@example.com" } });
+    const userQuery = chain({ data: { id: "user_1", plan: "free", subscription_status: "inactive" }, error: null });
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: { message: "Another checkout is already reserved" } });
+    mocks.getSupabaseAdmin.mockReturnValue({
+      from: vi.fn().mockReturnValueOnce(userQuery), rpc,
+    });
+    const { POST } = await import("@/app/api/ecpay/checkout/route");
+    const response = await POST(new Request("https://example.com/api/ecpay/checkout", {
+      method: "POST", body: JSON.stringify({ plan: "pro" }),
+    }));
     expect(response.status).toBe(409);
   });
 
@@ -127,23 +149,25 @@ describe("ECPay API routes", () => {
     const from = vi.fn()
       .mockReturnValueOnce(userQuery)
       .mockReturnValueOnce(subscriptionQuery);
-    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: "intent_1", error: null })
+      .mockResolvedValue({ data: true, error: null });
     mocks.getSupabaseAdmin.mockReturnValue({ from, rpc });
-    vi.mocked(fetch).mockResolvedValue(Response.json({
-      MerchantID: "3002607",
-      MerchantTradeNo: "VP260807ABC123",
-      RtnCode: 1,
-      RtnMsg: "OK",
-      CheckMacValue: "SIGNED",
+    vi.mocked(fetch).mockImplementation(async () => Response.json({
+      MerchantID: "3002607", MerchantTradeNo: "VP260807ABC123",
+      RtnCode: 1, RtnMsg: "OK", CheckMacValue: "SIGNED",
     }));
     const { POST } = await import("@/app/api/ecpay/cancel/route");
     const response = await POST();
 
     expect(response.status).toBe(200);
-    expect(rpc).toHaveBeenCalledWith("mark_ecpay_subscription_canceling", {
+    expect(rpc).toHaveBeenCalledWith("create_ecpay_cancel_intent", {
       target_subscription_id: "sub_1",
       target_user_id: "user_1",
     });
+    expect(rpc).toHaveBeenCalledWith("finalize_ecpay_cancel_intent", expect.objectContaining({
+      target_intent_id: "intent_1",
+    }));
   });
 
   it("does not mark a subscription canceled when the provider response is unsigned", async () => {
@@ -156,13 +180,18 @@ describe("ECPay API routes", () => {
     const from = vi.fn()
       .mockReturnValueOnce(userQuery)
       .mockReturnValueOnce(subscriptionQuery);
-    mocks.getSupabaseAdmin.mockReturnValue({ from });
+    const rpc = vi.fn()
+      .mockResolvedValueOnce({ data: "intent_1", error: null })
+      .mockResolvedValue({ data: true, error: null });
+    mocks.getSupabaseAdmin.mockReturnValue({ from, rpc });
     mocks.verifyEcpayCallback.mockReturnValue(false);
-    vi.mocked(fetch).mockResolvedValue(new Response("RtnCode=1&RtnMsg=OK"));
+    vi.mocked(fetch).mockImplementation(async () => new Response("RtnCode=1&RtnMsg=OK"));
     const { POST } = await import("@/app/api/ecpay/cancel/route");
     const response = await POST();
 
     expect(response.status).toBe(502);
-    expect(from).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledWith("fail_ecpay_cancel_intent", expect.objectContaining({
+      target_intent_id: "intent_1",
+    }));
   });
 });

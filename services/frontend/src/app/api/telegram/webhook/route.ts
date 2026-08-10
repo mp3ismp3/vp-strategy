@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { hasTelegramEntitlement } from "@/lib/billing";
 import { verifyTelegramWebhookSecret } from "@/lib/telegram-webhook";
+import { PayloadTooLargeError, readRequestBodyWithLimit } from "@/lib/http-security";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 
@@ -21,9 +22,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid webhook secret" }, { status: 401 });
   }
 
-  const rawBody = await req.text();
-  if (Buffer.byteLength(rawBody, "utf8") > 64 * 1024) {
-    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  let rawBody: string;
+  try {
+    rawBody = await readRequestBodyWithLimit(req, 64 * 1024);
+  } catch (error) {
+    if (error instanceof PayloadTooLargeError) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+    throw error;
   }
   let update: { message?: { text?: string; from?: { id: number; username?: string } } };
   try {
@@ -60,64 +66,25 @@ export async function POST(req: NextRequest) {
     // Verify bind token
     const supabase = getSupabaseAdmin();
 
-    const { data: tokenRecord } = await supabase
-      .from("telegram_bind_tokens")
-      .delete()
-      .eq("token", bindToken)
-      .gt("expires_at", new Date().toISOString())
-      .select("email")
-      .maybeSingle();
+    const { data: claimed, error: claimError } = await supabase.rpc("claim_telegram_bind_token", {
+      bind_token: bindToken,
+      target_telegram_user_id: telegramUserId,
+      target_telegram_username: telegramUsername,
+    });
+    const tokenRecord = Array.isArray(claimed) ? claimed[0] : claimed;
 
-    if (!tokenRecord) {
+    if (claimError || !tokenRecord) {
       await sendTelegramMessage(telegramUserId, "❌ 綁定碼無效或已過期。請重新產生。");
       return NextResponse.json({ ok: true });
     }
 
     const email = tokenRecord.email;
-
-    const { data: user } = await supabase
-      .from("users")
-      .select("plan, subscription_status, current_period_end, cancel_at_period_end")
-      .eq("email", email)
-      .single();
-
-    const canUseTelegram = Boolean(user && hasTelegramEntitlement({
-      plan: user.plan,
-      subscriptionStatus: user.subscription_status,
-      currentPeriodEnd: user.current_period_end,
-      cancelAtPeriodEnd: user.cancel_at_period_end,
-    }));
-    if (!canUseTelegram) {
-      await sendTelegramMessage(
-        telegramUserId,
-        `❌ Telegram 即時信號僅提供 Premium 方案。\n\n` +
-          `請升級 Premium 後重新產生綁定碼。`
-      );
-      return NextResponse.json({ ok: true });
-    }
-
-    const { error: bindError } = await supabase
-      .from("users")
-      .update({
-        telegram_user_id: telegramUserId,
-        telegram_username: telegramUsername,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("email", email);
-    if (bindError) {
-      console.error("Telegram binding persistence failed", bindError);
-      await sendTelegramMessage(telegramUserId, "❌ 綁定失敗，請回網站重新產生綁定碼。");
-      return NextResponse.json({ ok: true });
-    }
-
-    if (user) {
-      await sendTelegramMessage(
-        telegramUserId,
-        `✅ 綁定成功！（${email}）\n\n` +
-          `你的方案：${user.plan.toUpperCase()}\n` +
-          `即時交易信號將直接私訊給你。📈`
-      );
-    }
+    await sendTelegramMessage(
+      telegramUserId,
+      `✅ 綁定成功！（${email}）\n\n` +
+        `你的方案：${String(tokenRecord.plan).toUpperCase()}\n` +
+        `即時交易信號將直接私訊給你。📈`
+    );
 
     return NextResponse.json({ ok: true });
   }

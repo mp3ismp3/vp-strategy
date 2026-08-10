@@ -15,7 +15,6 @@ import os
 import sys
 import asyncio
 import logging
-from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from telegram import Update, Bot
@@ -64,10 +63,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bind_token = args[0]
     supabase = get_supabase()
 
-    # 驗證 token
-    result = supabase.table("telegram_bind_tokens").delete().eq(
-        "token", bind_token
-    ).gt("expires_at", datetime.now(timezone.utc).isoformat()).execute()
+    # Token claim、Premium entitlement 與 user bind 必須在同一 transaction。
+    result = supabase.rpc("claim_telegram_bind_token", {
+        "bind_token": bind_token,
+        "target_telegram_user_id": telegram_user_id,
+        "target_telegram_username": telegram_username,
+    }).execute()
 
     if not result.data:
         await update.message.reply_text("❌ 綁定碼無效或已過期。請重新產生。")
@@ -75,30 +76,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     token_record = result.data[0]
     email = token_record["email"]
-
-    user_result = supabase.table("users").select(
-        "plan, subscription_status, current_period_end, cancel_at_period_end"
-    ).eq("email", email).execute()
-    user = user_result.data[0] if user_result.data else None
-    if not user or not has_telegram_entitlement(user):
-        await update.message.reply_text(
-            "❌ Telegram 即時信號僅提供 Premium 方案。\n\n"
-            "請升級 Premium 後重新產生綁定碼。"
-        )
-        return
-
-    supabase.table("users").update({
-        "telegram_user_id": telegram_user_id,
-        "telegram_username": telegram_username,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("email", email).execute()
-
-    if user:
-        await update.message.reply_text(
-            f"✅ 綁定成功！（{email}）\n\n"
-            f"你的方案：{user['plan'].upper()}\n"
-            f"即時交易信號將直接私訊給你。📈"
-        )
+    await update.message.reply_text(
+        f"✅ 綁定成功！（{email}）\n\n"
+        f"你的方案：{token_record['plan'].upper()}\n"
+        f"即時交易信號將直接私訊給你。📈"
+    )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

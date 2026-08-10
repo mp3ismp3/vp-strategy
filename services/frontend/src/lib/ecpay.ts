@@ -11,6 +11,7 @@ const PLAN_AMOUNTS: Record<PaidPlan, number> = { pro: 320, premium: 620 };
 export interface EcpayConfig {
   checkoutUrl: string;
   periodActionUrl: string;
+  periodQueryUrl: string;
   merchantId: string;
   hashKey: string;
   hashIv: string;
@@ -41,6 +42,7 @@ export function getEcpayConfig(env: Env = process.env): EcpayConfig {
     mode,
     checkoutUrl: `${base}/Cashier/AioCheckOut/V5`,
     periodActionUrl: `${base}/Cashier/CreditCardPeriodAction`,
+    periodQueryUrl: `${base}/Cashier/QueryCreditCardPeriodInfo`,
   };
 }
 
@@ -194,6 +196,22 @@ export function buildEcpayCancelFields(
     MerchantID: config.merchantId,
     MerchantTradeNo: merchantTradeNo,
     Action: "Cancel",
+    TimeStamp: String(timestamp),
+  };
+  return {
+    ...fields,
+    CheckMacValue: createCheckMacValue(fields, config.hashKey, config.hashIv),
+  };
+}
+
+export function buildEcpayPeriodQueryFields(
+  config: EcpayConfig,
+  merchantTradeNo: string,
+  timestamp = Math.floor(Date.now() / 1000)
+): EcpayFields {
+  const fields: EcpayFields = {
+    MerchantID: config.merchantId,
+    MerchantTradeNo: merchantTradeNo,
     TimeStamp: String(timestamp),
   };
   return {
