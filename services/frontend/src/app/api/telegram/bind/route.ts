@@ -3,12 +3,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import crypto from "crypto";
+import { getServerPlan } from "@/lib/server-entitlement";
 
 export async function POST() {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (await getServerPlan() !== "premium") {
+    return NextResponse.json({ error: "Premium subscription required" }, { status: 403 });
   }
 
   // Generate a short-lived bind token

@@ -34,10 +34,16 @@ export function hasActiveEntitlement(input: {
   if (input.plan === "free" || !["active", "trialing"].includes(input.subscriptionStatus)) {
     return false;
   }
-  if (!input.cancelAtPeriodEnd) return true;
   if (!input.currentPeriodEnd) return false;
   const periodEnd = new Date(input.currentPeriodEnd).getTime();
   return Number.isFinite(periodEnd) && periodEnd > now.getTime();
+}
+
+export function hasTelegramEntitlement(
+  input: Parameters<typeof hasActiveEntitlement>[0],
+  now = new Date()
+): boolean {
+  return input.plan === "premium" && hasActiveEntitlement(input, now);
 }
 
 export function buildBillingSubscriptionRecord(input: BillingSubscriptionInput) {

@@ -12,36 +12,17 @@ describe("Next.js production structure", () => {
     expect(source).toContain("export async function proxy(");
   });
 
-  it("keeps runtime JSON reads out of automatic file tracing", () => {
+  it("reads production analysis data through server-side Supabase", () => {
     const config = readFileSync(resolve(process.cwd(), "next.config.ts"), "utf8");
 
-    expect(config).toContain("outputFileTracingIncludes");
-    expect(config).not.toContain("./data/**/*");
-    expect(config).toContain(
-      '"/api/data/scan-results": ["./data/scan_results.json"]'
-    );
-    expect(config).toContain(
-      '"/api/data/chart-data": ["./data/frontend_charts.json"]'
-    );
-    expect(config).toContain(
-      '"/api/data/accum-state": ["./data/accum_state.json"]'
-    );
-    for (const [routeName, fileName] of [
-      ["scan-results", "scan_results.json"],
-      ["chart-data", "frontend_charts.json"],
-      ["accum-state", "accum_state.json"],
-    ]) {
+    expect(config).not.toContain("outputFileTracingIncludes");
+    for (const routeName of ["scan-results", "chart-data", "accum-state"]) {
       const route = readFileSync(
         resolve(process.cwd(), `src/app/api/data/${routeName}/route.ts`),
         "utf8"
       );
-      expect(route).toContain(
-        `path.join(process.cwd(), "data", "${fileName}")`
-      );
-      expect(route).toContain("NODE_ENV === \"development\"");
-      expect(route).toContain(
-        "fs.readFile(/* turbopackIgnore: true */ p, \"utf-8\")"
-      );
+      expect(route).toContain("getSupabaseAdmin");
+      expect(route).not.toContain("fs.readFile");
     }
   });
 });

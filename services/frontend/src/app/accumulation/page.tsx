@@ -9,57 +9,45 @@ import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
 import {
   GUEST_ACCUMULATION_LIMIT,
-  limitAccumulationItems,
 } from "@/lib/preview-access";
 import { formatTrigger } from "@/lib/triggers";
-
-interface AccumulationRow {
-  state: Omit<AccumulationState, "ticker"> | null;
-  ticker: string;
-}
+import type { Plan } from "@/types/user";
 
 function AccumulationContent() {
   const { data: session, status } = useSession();
   const [states, setStates] = useState<AccumulationState[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [accessPlan, setAccessPlan] = useState<Plan>("free");
 
   useEffect(() => {
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      supabase
-        .from("accum_data")
-        .select("ticker, state")
-        .then(({ data, error }) => {
-          if (error || !data) {
-            setLoading(false);
-            return;
-          }
-          const transformed = (data as AccumulationRow[]).map((row) => ({
-            ticker: row.ticker,
-            phase: row.state?.phase || "UNKNOWN",
-            tier: row.state?.tier || "watch",
-            decay_score: row.state?.decay_score || 0,
-            raw_score: row.state?.raw_score || 0,
-            support_primary: row.state?.support_primary || 0,
-            support_dynamic: row.state?.support_dynamic || 0,
-            resistance: row.state?.resistance || 0,
-            failing: row.state?.failing || false,
-            triggers_fired: row.state?.triggers_fired || [],
-          }));
-          setStates(transformed);
-          setLoading(false);
-        });
-    });
-  }, []);
+    if (!session?.user?.email) {
+      return;
+    }
+    fetch("/api/data/accum-state")
+      .then(async (response) => response.ok ? response.json() : Promise.reject())
+      .then((data) => {
+        setStates(data.states || []);
+        setAccessPlan(data.accessPlan || "free");
+      })
+      .catch(() => setStates([]))
+      .finally(() => setLoading(false));
+  }, [session?.user?.email]);
 
-  if (loading || status === "loading") {
+  if (status === "loading" || (session && loading)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
+        <h1 className="text-2xl font-bold">登入後免費查看 Accumulation 摘要</h1>
+        <p className="text-gray-600">Free 方案可查看即時前 10 名摘要。</p>
+        <Link href="/login" className="rounded-md bg-black px-6 py-3 font-medium text-white">免費登入</Link>
       </div>
     );
   }
@@ -74,7 +62,8 @@ function AccumulationContent() {
   };
 
   const isAuthenticated = Boolean(session);
-  const visibleStates = limitAccumulationItems(states, isAuthenticated);
+  const isPaid = accessPlan === "pro" || accessPlan === "premium";
+  const visibleStates = states;
   const selectedState = visibleStates.find((s) => s.ticker === selectedTicker);
 
   return (
@@ -99,7 +88,7 @@ function AccumulationContent() {
       <StrategyGuide type="accumulation" />
 
       {/* Chart Area */}
-      {selectedState && (
+      {isPaid && selectedState && (
         <div className="mb-8 bg-white rounded-xl border p-4">
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-3">
@@ -144,17 +133,17 @@ function AccumulationContent() {
                 <th className="py-3 px-4">Tier</th>
                 <th className="py-3 px-4">Raw Score</th>
                 <th className="py-3 px-4">Decay Score</th>
-                <th className="py-3 px-4">Support</th>
-                <th className="py-3 px-4">Resistance</th>
-                <th className="py-3 px-4">Triggers</th>
+                {isPaid && <th className="py-3 px-4">Support</th>}
+                {isPaid && <th className="py-3 px-4">Resistance</th>}
+                {isPaid && <th className="py-3 px-4">Triggers</th>}
               </tr>
             </thead>
             <tbody>
               {visibleStates.map((s) => (
                 <tr
                   key={s.ticker}
-                  onClick={() => setSelectedTicker(s.ticker)}
-                  className={`border-b cursor-pointer transition ${
+                  onClick={() => isPaid && setSelectedTicker(s.ticker)}
+                  className={`border-b transition ${isPaid ? "cursor-pointer" : ""} ${
                     selectedTicker === s.ticker
                       ? "bg-blue-50"
                       : "hover:bg-gray-50"
@@ -195,13 +184,13 @@ function AccumulationContent() {
                       <span className="text-sm">{s.decay_score.toFixed(1)}</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-sm">
+                  {isPaid && <td className="py-3 px-4 text-sm">
                     ${s.support_primary.toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4 text-sm">
+                  </td>}
+                  {isPaid && <td className="py-3 px-4 text-sm">
                     ${s.resistance.toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4">
+                  </td>}
+                  {isPaid && <td className="py-3 px-4">
                     {s.triggers_fired.length > 0 ? (
                       <Badge className="bg-orange-100 text-orange-800">
                       {s.triggers_fired.map(formatTrigger).join(", ")}
@@ -209,7 +198,7 @@ function AccumulationContent() {
                     ) : (
                       <span className="text-gray-400 text-sm">—</span>
                     )}
-                  </td>
+                  </td>}
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { hasActiveEntitlement } from "@/lib/billing";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -17,13 +18,12 @@ export async function GET() {
     .eq("email", session.user.email)
     .single();
 
-  const cancellationExpired = Boolean(
-    data?.cancel_at_period_end && data.current_period_end && new Date(data.current_period_end).getTime() <= Date.now()
-  );
-  if (cancellationExpired) {
-    await supabase.from("users").update({ plan: "free", subscription_status: "canceled", cancel_at_period_end: false }).eq("email", session.user.email);
-    await supabase.from("billing_subscriptions").update({ status: "canceled", cancel_at_period_end: false, updated_at: new Date().toISOString() }).eq("user_id", data!.id).eq("status", "canceling");
-  }
+  const entitlementExpired = Boolean(data && data.plan !== "free" && !hasActiveEntitlement({
+    plan: data.plan,
+    subscriptionStatus: data.subscription_status,
+    currentPeriodEnd: data.current_period_end,
+    cancelAtPeriodEnd: data.cancel_at_period_end,
+  }));
   const { data: billingSubscription } = data
     ? await supabase
         .from("billing_subscriptions")
@@ -35,11 +35,11 @@ export async function GET() {
         .maybeSingle()
     : { data: null };
   return NextResponse.json({
-    plan: cancellationExpired ? "free" : data?.plan || "free",
-    subscriptionStatus: cancellationExpired ? "canceled" : data?.subscription_status || "inactive",
+    plan: entitlementExpired ? "free" : data?.plan || "free",
+    subscriptionStatus: entitlementExpired ? "canceled" : data?.subscription_status || "inactive",
     trialEnd: data?.trial_end || null,
     currentPeriodEnd: data?.current_period_end || null,
     billingProvider: billingSubscription?.provider || null,
-    cancelAtPeriodEnd: cancellationExpired ? false : data?.cancel_at_period_end || false,
+    cancelAtPeriodEnd: entitlementExpired ? false : data?.cancel_at_period_end || false,
   });
 }

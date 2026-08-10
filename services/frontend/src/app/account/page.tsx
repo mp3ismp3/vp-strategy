@@ -42,6 +42,7 @@ export default function AccountPage() {
   const subscriptionStatus = planInfo?.subscriptionStatus ?? user?.subscriptionStatus ?? "inactive";
   const displayedSubscriptionStatus = subscriptionStatus === "trialing" ? "active" : subscriptionStatus;
   const isPastDue = subscriptionStatus === "past_due";
+  const hasPremiumTelegram = planInfo?.plan === "premium" && ["active", "trialing"].includes(subscriptionStatus);
 
   const handleBindTelegram = async () => {
     setBindingTelegram(true);
@@ -171,8 +172,14 @@ export default function AccountPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-gray-600">
-            綁定 Telegram 後，即時交易信號會直接私訊給你。
+            Premium 方案可綁定 Telegram，接收即時交易信號私訊。
           </p>
+
+          {!hasPremiumTelegram && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Telegram 僅提供有效 Premium 訂閱使用。請先升級 Premium。
+            </div>
+          )}
 
           <div className="bg-gray-50 rounded-lg p-3 text-sm">
             <p className="font-medium mb-1">步驟：</p>
@@ -198,7 +205,7 @@ export default function AccountPage() {
           ) : (
             <button
               onClick={handleBindTelegram}
-              disabled={bindingTelegram}
+              disabled={bindingTelegram || !hasPremiumTelegram}
               className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
             >
               {bindingTelegram ? "產生中..." : "綁定 Telegram"}

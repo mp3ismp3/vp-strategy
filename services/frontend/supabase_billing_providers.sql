@@ -84,9 +84,66 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_subscriptions_one_open_ecpay_per_u
 ALTER TABLE public.billing_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.billing_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.billing_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.telegram_bind_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subscription_events ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.billing_customers TO service_role;
 GRANT ALL ON public.billing_subscriptions TO service_role;
 GRANT ALL ON public.billing_events TO service_role;
+GRANT ALL ON public.users TO service_role;
+GRANT ALL ON public.telegram_bind_tokens TO service_role;
+GRANT ALL ON public.subscription_events TO service_role;
+
+REVOKE ALL ON public.users FROM anon, authenticated;
+REVOKE ALL ON public.telegram_bind_tokens FROM anon, authenticated;
+REVOKE ALL ON public.subscription_events FROM anon, authenticated;
+
+-- Existing deployments previously exposed analysis tables to anon clients.
+-- All production data now flows through Next.js entitlement APIs.
+DROP POLICY IF EXISTS "Anyone can read scan results" ON public.scan_results;
+DROP POLICY IF EXISTS "Anyone can read scan_data" ON public.scan_data;
+DROP POLICY IF EXISTS "Anyone can read chart_data" ON public.chart_data;
+DROP POLICY IF EXISTS "Anyone can read accum_data" ON public.accum_data;
+REVOKE ALL ON public.scan_results FROM anon, authenticated;
+REVOKE ALL ON public.scan_data FROM anon, authenticated;
+REVOKE ALL ON public.chart_data FROM anon, authenticated;
+REVOKE ALL ON public.accum_data FROM anon, authenticated;
+
+-- Persist provider cancellation and the entitlement snapshot atomically.
+CREATE OR REPLACE FUNCTION public.mark_ecpay_subscription_canceling(
+    target_user_id UUID,
+    target_subscription_id UUID
+) RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    changed_rows INTEGER;
+BEGIN
+    UPDATE public.billing_subscriptions
+    SET status = 'canceling', cancel_at_period_end = TRUE, updated_at = NOW()
+    WHERE id = target_subscription_id
+      AND user_id = target_user_id
+      AND provider = 'ecpay'
+      AND status IN ('active', 'past_due');
+    GET DIAGNOSTICS changed_rows = ROW_COUNT;
+    IF changed_rows <> 1 THEN
+        RETURN FALSE;
+    END IF;
+
+    UPDATE public.users
+    SET subscription_status = 'active', cancel_at_period_end = TRUE, updated_at = NOW()
+    WHERE id = target_user_id;
+    GET DIAGNOSTICS changed_rows = ROW_COUNT;
+    IF changed_rows <> 1 THEN
+        RAISE EXCEPTION 'ECPay cancellation user snapshot was not updated';
+    END IF;
+    RETURN TRUE;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.mark_ecpay_subscription_canceling(UUID, UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.mark_ecpay_subscription_canceling(UUID, UUID) TO service_role;
 
 -- Backfill legacy Stripe data. These statements are idempotent.
 INSERT INTO public.billing_customers (

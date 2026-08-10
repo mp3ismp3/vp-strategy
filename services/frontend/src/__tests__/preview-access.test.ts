@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FREE_TICKERS,
   GUEST_ACCUMULATION_LIMIT,
+  filterScanItemsForPlan,
   filterIndicatorItems,
   getIndicatorCategories,
   isIndicatorTickerAllowed,
@@ -25,10 +27,18 @@ describe("indicator preview access", () => {
     expect(isIndicatorTickerAllowed("AMD", false)).toBe(false);
   });
 
-  it("keeps all indicator tickers for authenticated users", () => {
-    expect(filterIndicatorItems(rows, true)).toEqual(rows);
-    expect(Object.keys(getIndicatorCategories(true)).length).toBeGreaterThan(1);
-    expect(isIndicatorTickerAllowed("AMD", true)).toBe(true);
+  it("keeps free users inside the fixed seven-ticker universe", () => {
+    expect(FREE_TICKERS).toHaveLength(7);
+    expect(filterIndicatorItems(rows, "free").map((row) => row.ticker)).toEqual([
+      "NVDA",
+      "AAPL",
+    ]);
+    expect(isIndicatorTickerAllowed("AMD", "free")).toBe(false);
+  });
+
+  it("returns every ticker only for paid plans", () => {
+    expect(filterIndicatorItems(rows, "pro")).toEqual(rows);
+    expect(filterScanItemsForPlan(rows, "premium")).toEqual(rows);
   });
 });
 
@@ -46,8 +56,14 @@ describe("accumulation preview access", () => {
     expect(visible.at(-1)?.decay_score).toBe(2);
   });
 
-  it("returns the complete sorted list for authenticated users", () => {
-    const visible = limitAccumulationItems(rows, true);
+  it("keeps free users on the same top-ten boundary", () => {
+    expect(limitAccumulationItems(rows, "free")).toHaveLength(
+      GUEST_ACCUMULATION_LIMIT
+    );
+  });
+
+  it("returns the complete sorted list for paid users", () => {
+    const visible = limitAccumulationItems(rows, "pro");
 
     expect(visible).toHaveLength(12);
     expect(visible.map((row) => row.decay_score)).toEqual([

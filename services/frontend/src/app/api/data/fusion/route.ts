@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import type { Trigger } from "@/lib/triggers";
+import { getServerPlan } from "@/lib/server-entitlement";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 // Confidence matrix (replicated from fusion_report.py)
 const CONFIDENCE_MATRIX: Record<string, { stars: number; label: string; action: string }> = {
@@ -64,11 +65,15 @@ function getMacroDirection(vp: VPInfo): string {
 }
 
 export async function GET() {
+  const plan = await getServerPlan();
+  if (!plan) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (plan !== "premium") {
+    return NextResponse.json({ error: "Premium subscription required" }, { status: 403 });
+  }
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = getSupabaseAdmin();
 
     // Fetch scan data
     const { data: scanRow } = await supabase

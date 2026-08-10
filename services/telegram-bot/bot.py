@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from telegram import Update, Bot
 from telegram.ext import Application, CommandHandler, ContextTypes
 from supabase import create_client
-from entitlement import has_active_entitlement
+from entitlement import has_telegram_entitlement
 
 load_dotenv()
 
@@ -65,48 +65,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     supabase = get_supabase()
 
     # 驗證 token
-    result = supabase.table("telegram_bind_tokens").select("*").eq("token", bind_token).execute()
+    result = supabase.table("telegram_bind_tokens").delete().eq(
+        "token", bind_token
+    ).gt("expires_at", datetime.now(timezone.utc).isoformat()).execute()
 
     if not result.data:
         await update.message.reply_text("❌ 綁定碼無效或已過期。請重新產生。")
         return
 
     token_record = result.data[0]
-    expires_at = datetime.fromisoformat(token_record["expires_at"].replace("Z", "+00:00"))
-
-    if datetime.now(timezone.utc) > expires_at:
-        await update.message.reply_text("❌ 綁定碼已過期。請重新產生。")
-        return
-
     email = token_record["email"]
 
-    # 更新用戶的 telegram_user_id
+    user_result = supabase.table("users").select(
+        "plan, subscription_status, current_period_end, cancel_at_period_end"
+    ).eq("email", email).execute()
+    user = user_result.data[0] if user_result.data else None
+    if not user or not has_telegram_entitlement(user):
+        await update.message.reply_text(
+            "❌ Telegram 即時信號僅提供 Premium 方案。\n\n"
+            "請升級 Premium 後重新產生綁定碼。"
+        )
+        return
+
     supabase.table("users").update({
         "telegram_user_id": telegram_user_id,
         "telegram_username": telegram_username,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }).eq("email", email).execute()
 
-    # 刪除已使用的 token
-    supabase.table("telegram_bind_tokens").delete().eq("token", bind_token).execute()
-
-    # 檢查用戶方案
-    user_result = supabase.table("users").select(
-        "plan, subscription_status, current_period_end, cancel_at_period_end"
-    ).eq("email", email).execute()
-    user = user_result.data[0] if user_result.data else None
-
-    if user and has_active_entitlement(user):
+    if user:
         await update.message.reply_text(
             f"✅ 綁定成功！（{email}）\n\n"
             f"你的方案：{user['plan'].upper()}\n"
             f"即時交易信號將直接私訊給你。📈"
-        )
-    else:
-        await update.message.reply_text(
-            f"✅ 綁定成功！（{email}）\n\n"
-            f"目前為免費方案，升級後即可收到即時通知。\n"
-            f"👉 到網站查看方案"
         )
 
 
@@ -129,7 +120,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user = result.data[0]
-    status_emoji = "✅" if has_active_entitlement(user) else "❌"
+    status_emoji = "✅" if has_telegram_entitlement(user) else "❌"
 
     await update.message.reply_text(
         f"📊 <b>VP Strategy 訂閱狀態</b>\n\n"

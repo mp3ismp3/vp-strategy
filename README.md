@@ -189,22 +189,25 @@ npm run dev
 
 Next.js Web 預覽權限：
 
-- 未登入的 Indicator 僅能選擇 Mega Cap Tech；每個頁面的圖表仍完整顯示，圖表下方的信號明細集中在一個馬賽克區塊。
-- 登入後解鎖 Indicator 全部標的與完整信號。
-- 未登入的 Accumulation 顯示 Decay Score 前 10 名；登入後顯示完整排行榜。
-- Strategy Lab 的進場信號未登入時以馬賽克隱藏，登入後解鎖。
+- 未登入訪客只能使用公開介紹與示例，不得讀取 production 即時分析 API。
+- 登入 Free 可查看 Mega Cap Tech 7 檔即時 Scanner／Chart／Indicator，以及 Accumulation Decay Score 前 10 名摘要；摘要不包含支撐、壓力與 triggers。
+- Pro（NT$320／月）解鎖全部標的、完整 Accumulation levels/triggers 與 Strategy Lab 信號。
+- Premium（NT$620／月）包含 Pro，另解鎖 Fusion 與 Telegram 帳號綁定／即時信號；Free 與 Pro 都不能產生 Telegram 綁定碼。歷史回顧尚未形成獨立付費功能，正式實作 server-side retention gate 前不列入方案承諾。
+- 所有資料裁切與方案驗證都在 server API 執行；前端 Paywall 只負責呈現，不能作為資料安全邊界。
 
 Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
-Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。文件式 data API 在 production 只讀 frontend `data/`，repo-root JSON 路徑僅作為本機開發 fallback，且 runtime file reads 不參與自動 tracing，避免 production bundle 誤納整個 repository。
+Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
 Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。品牌 icon 使用 `services/frontend/public/ptrade.svg`，首頁、登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
 
 Stripe Checkout 已退出新訂閱 UI 且 production 必須保持 `STRIPE_CHECKOUT_ENABLED=false`；既有 Stripe Customer Portal 與 webhook 仍保留，避免既有訂閱失去取消或狀態同步能力。原有 server-only Price allowlist、Test/Live 隔離、Session 冪等與禁止直接切換方案的安全邊界維持不變。
 
-台灣新訂閱改用綠界信用卡定期定額：Pro 為 NT$320／月、Premium 為 NT$620／月，不提供免費試用。首頁採免費預覽優先流程，主按鈕直接進入 Scanner，登入後解鎖完整 client view；Premium 才提供 Telegram 即時信號私訊。網站不顯示試用 CTA、倒數或徽章；既有 Stripe `trialing` 欄位僅保留作歷史資料與 webhook 相容。`ECPAY_CHECKOUT_ENABLED` 與 `NEXT_PUBLIC_ECPAY_ENABLED` 必須同時為 `true` 才會顯示並開放付款；預設皆為 `false`，UI 顯示「台灣地區金流建置中」。後端驗證首次及每期通知的 SHA256 `CheckMacValue`、拒絕模擬付款開通並以 provider event ID 去重。Stripe、綠界及未來 provider 共用 `billing_customers`、`billing_subscriptions`、`billing_events`；provider-specific identifiers 放在通用欄位或 metadata，`users` 只保留 entitlement snapshot 與既有 Stripe rollback 欄位。上線前執行 `services/frontend/supabase_billing_providers.sql`，步驟見 `docs/ecpay-recurring.md`。
+台灣新訂閱改用綠界信用卡定期定額：Pro 為 NT$320／月、Premium 為 NT$620／月，不提供免費試用。`ECPAY_CHECKOUT_ENABLED` 與 `NEXT_PUBLIC_ECPAY_ENABLED` 預設皆為 `false`。後端驗證首次及每期通知的 SHA256 `CheckMacValue`、拒絕模擬付款開通並以 provider event ID 去重。所有付費權益（包括未取消的 active 訂閱）都必須有尚未到期的 `current_period_end`，缺失或到期即 fail-closed。上線前執行 `services/frontend/supabase_billing_providers.sql`，撤除 analysis tables 的 anon/authenticated 讀取並建立原子取消 RPC；步驟見 `docs/ecpay-recurring.md`。
 
-Pro 與 Premium 不支援直接升降級：已有有效訂閱的 Checkout 請求會回傳 `409`，使用者必須先取消並待目前週期結束後再訂閱另一方案。綠界另以 partial unique index 原子限制每位使用者只能有一筆未結束的訂閱，並發或重複 Checkout 同樣回傳 `409`。既有 Stripe 使用者透過固定 configuration 的 Customer Portal 管理；綠界使用者則由 CreditCardPeriodAction 停止後續授權，取消 API 同時接受綠界現行 JSON 與 legacy form-encoded 回應，且兩者都必須通過 MerchantID 與 CheckMacValue 驗證；每期通知相容官方 `ProcessDate` 與 `process_date` 欄位，網站與 Telegram consumers 都會依取消週期截止時間 fail-closed。所有 provider webhook 以 `billing_events` ledger 去重及失敗重試，Stripe 延遲刪除與綠界亂序授權都不得覆蓋較新的有效訂閱。Stripe 管理員 reconciliation 預設 dry-run，只有明確 `apply: true` 才修正安全且無歧義的差異；綠界每期通知只送一次，目前仍需在正式開放前補定期對帳與漏單監控。
+Telegram webhook 必須設定 `TELEGRAM_WEBHOOK_SECRET`；route 會在解析 payload 前驗證 `X-Telegram-Bot-Api-Secret-Token`，而 `setup_telegram_webhook.py` 會把相同 secret 註冊至 Telegram。綁定碼以原子 delete-and-return claim，只能被有效 Premium 使用一次。
+
+Pro 與 Premium 不支援直接升降級：已有有效訂閱的 Checkout 請求會回傳 `409`，使用者必須先取消並待目前週期結束後再訂閱另一方案。綠界另以 partial unique index 原子限制每位使用者只能有一筆未結束的訂閱，並發或重複 Checkout 同樣回傳 `409`。取消通過綠界驗簽後，以單一 DB transaction 同步 subscription 與 user，callback 不得清除已確認取消。管理員可呼叫 `GET /api/admin/ecpay-reconcile` 檢視過期 active、漏 callback 與未解決 events；此稽核不等同綠界端真實交易查詢，因此正式 Checkout 仍須保持關閉，直到外部對帳/補帳流程完成。
 
 ### 回測/優化
 

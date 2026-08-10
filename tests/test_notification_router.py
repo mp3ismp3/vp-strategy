@@ -39,3 +39,34 @@ def test_canceling_entitlement_remains_active_before_period_end():
     assert entitlement.has_active_entitlement(
         user, datetime(2026, 8, 7, 0, 0, 0, tzinfo=timezone.utc)
     )
+
+
+def test_active_entitlement_expires_even_without_cancel_flag():
+    user = {
+        "plan": "premium",
+        "subscription_status": "active",
+        "cancel_at_period_end": False,
+        "current_period_end": "2026-08-07T00:00:00Z",
+    }
+    assert not entitlement.has_active_entitlement(
+        user, datetime(2026, 8, 7, 0, 0, 1, tzinfo=timezone.utc)
+    )
+
+
+def test_paid_entitlement_requires_period_end():
+    assert not entitlement.has_active_entitlement({
+        "plan": "pro",
+        "subscription_status": "active",
+        "cancel_at_period_end": False,
+        "current_period_end": None,
+    })
+
+
+def test_telegram_entitlement_requires_premium():
+    base = {
+        "subscription_status": "active",
+        "current_period_end": "2026-09-01T00:00:00Z",
+    }
+    now = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    assert not entitlement.has_telegram_entitlement({**base, "plan": "pro"}, now)
+    assert entitlement.has_telegram_entitlement({**base, "plan": "premium"}, now)

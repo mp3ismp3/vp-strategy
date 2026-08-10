@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { hasActiveEntitlement } from "@/lib/billing";
+import { hasTelegramEntitlement } from "@/lib/billing";
+import { verifyTelegramWebhookSecret } from "@/lib/telegram-webhook";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 
@@ -16,8 +17,20 @@ export async function POST(req: NextRequest) {
   if (!BOT_TOKEN) {
     return NextResponse.json({ error: "Bot not configured" }, { status: 500 });
   }
+  if (!verifyTelegramWebhookSecret(req.headers.get("x-telegram-bot-api-secret-token"))) {
+    return NextResponse.json({ error: "Invalid webhook secret" }, { status: 401 });
+  }
 
-  const update = await req.json();
+  const rawBody = await req.text();
+  if (Buffer.byteLength(rawBody, "utf8") > 64 * 1024) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+  let update: { message?: { text?: string; from?: { id: number; username?: string } } };
+  try {
+    update = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
   // Handle /start command
   const message = update.message;
@@ -49,25 +62,41 @@ export async function POST(req: NextRequest) {
 
     const { data: tokenRecord } = await supabase
       .from("telegram_bind_tokens")
-      .select("*")
+      .delete()
       .eq("token", bindToken)
-      .single();
+      .gt("expires_at", new Date().toISOString())
+      .select("email")
+      .maybeSingle();
 
     if (!tokenRecord) {
       await sendTelegramMessage(telegramUserId, "❌ 綁定碼無效或已過期。請重新產生。");
       return NextResponse.json({ ok: true });
     }
 
-    const expiresAt = new Date(tokenRecord.expires_at);
-    if (new Date() > expiresAt) {
-      await sendTelegramMessage(telegramUserId, "❌ 綁定碼已過期。請重新產生。");
+    const email = tokenRecord.email;
+
+    const { data: user } = await supabase
+      .from("users")
+      .select("plan, subscription_status, current_period_end, cancel_at_period_end")
+      .eq("email", email)
+      .single();
+
+    const canUseTelegram = Boolean(user && hasTelegramEntitlement({
+      plan: user.plan,
+      subscriptionStatus: user.subscription_status,
+      currentPeriodEnd: user.current_period_end,
+      cancelAtPeriodEnd: user.cancel_at_period_end,
+    }));
+    if (!canUseTelegram) {
+      await sendTelegramMessage(
+        telegramUserId,
+        `❌ Telegram 即時信號僅提供 Premium 方案。\n\n` +
+          `請升級 Premium 後重新產生綁定碼。`
+      );
       return NextResponse.json({ ok: true });
     }
 
-    const email = tokenRecord.email;
-
-    // Update user's telegram_user_id
-    await supabase
+    const { error: bindError } = await supabase
       .from("users")
       .update({
         telegram_user_id: telegramUserId,
@@ -75,35 +104,18 @@ export async function POST(req: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("email", email);
+    if (bindError) {
+      console.error("Telegram binding persistence failed", bindError);
+      await sendTelegramMessage(telegramUserId, "❌ 綁定失敗，請回網站重新產生綁定碼。");
+      return NextResponse.json({ ok: true });
+    }
 
-    // Delete used token
-    await supabase.from("telegram_bind_tokens").delete().eq("token", bindToken);
-
-    // Check user plan
-    const { data: user } = await supabase
-      .from("users")
-      .select("plan, subscription_status, current_period_end, cancel_at_period_end")
-      .eq("email", email)
-      .single();
-
-    if (user && hasActiveEntitlement({
-      plan: user.plan,
-      subscriptionStatus: user.subscription_status,
-      currentPeriodEnd: user.current_period_end,
-      cancelAtPeriodEnd: user.cancel_at_period_end,
-    })) {
+    if (user) {
       await sendTelegramMessage(
         telegramUserId,
         `✅ 綁定成功！（${email}）\n\n` +
           `你的方案：${user.plan.toUpperCase()}\n` +
           `即時交易信號將直接私訊給你。📈`
-      );
-    } else {
-      await sendTelegramMessage(
-        telegramUserId,
-        `✅ 綁定成功！（${email}）\n\n` +
-          `目前為免費方案，升級後即可收到即時通知。\n` +
-          `👉 到網站查看方案`
       );
     }
 
@@ -126,7 +138,7 @@ export async function POST(req: NextRequest) {
         "❌ 尚未綁定帳號。\n請到網站「帳號設定」進行綁定。"
       );
     } else {
-      const statusEmoji = hasActiveEntitlement({
+      const statusEmoji = hasTelegramEntitlement({
         plan: user.plan,
         subscriptionStatus: user.subscription_status,
         currentPeriodEnd: user.current_period_end,

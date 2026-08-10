@@ -278,7 +278,8 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
 
 export default function FVGPage() {
   const { data: session } = useSession();
-  const isAuthenticated = Boolean(session);
+  const accessPlan = (session?.user as { plan?: "free" | "pro" | "premium" } | undefined)?.plan ?? "free";
+  const isPaid = accessPlan === "pro" || accessPlan === "premium";
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
   const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
@@ -287,10 +288,10 @@ export default function FVGPage() {
   const [showFilled, setShowFilled] = useState(false);
   const [maxAge, setMaxAge] = useState(30);
   const indicatorCategories = useMemo(
-    () => getIndicatorCategories(isAuthenticated),
-    [isAuthenticated]
+    () => getIndicatorCategories(accessPlan),
+    [accessPlan]
   );
-  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
+  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, accessPlan)
     ? selectedTicker
     : "NVDA";
   const loading = loadedTicker !== effectiveTicker;
@@ -298,26 +299,17 @@ export default function FVGPage() {
   // Fetch OHLC for selected ticker
   useEffect(() => {
     let cancelled = false;
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      supabase
-        .from("chart_data")
-        .select("data")
-        .eq("ticker", effectiveTicker.toUpperCase())
-        .single()
-        .then(({ data: row }) => {
-          if (cancelled) return;
-          if (row?.data?.daily?.ohlc) {
-            setOhlc(row.data.daily.ohlc);
-          } else {
-            setOhlc([]);
-          }
-          setLoadedTicker(effectiveTicker);
-        });
-    });
+    fetch(`/api/data/chart-data?ticker=${encodeURIComponent(effectiveTicker)}`)
+      .then(async (response) => response.ok ? response.json() : Promise.reject())
+      .then((chart) => {
+        if (!cancelled) setOhlc(chart?.daily?.ohlc || []);
+      })
+      .catch(() => {
+        if (!cancelled) setOhlc([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedTicker(effectiveTicker);
+      });
     return () => {
       cancelled = true;
     };
@@ -340,20 +332,17 @@ export default function FVGPage() {
   // Scan all tickers
   const handleScan = async () => {
     setScanning(true);
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    const { data: rows } = await supabase
-      .from("chart_data")
-      .select("ticker, data");
+    const response = await fetch("/api/data/chart-data?include=data");
+    const chartRows = (response.ok ? await response.json() : {}) as Record<
+      string,
+      { daily?: { ohlc?: OHLCBar[] } }
+    >;
+    const rows = Object.entries(chartRows).map(([ticker, data]) => ({ ticker, data }));
 
     const results: ScanResult[] = [];
 
     if (rows) {
-      for (const row of filterIndicatorItems(rows, isAuthenticated)) {
+      for (const row of filterIndicatorItems(rows, accessPlan)) {
         const dailyOhlc: OHLCBar[] = row.data?.daily?.ohlc || [];
         if (dailyOhlc.length < 30) continue;
 
@@ -381,7 +370,7 @@ export default function FVGPage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void handleScan(), 0);
     return () => window.clearTimeout(timeoutId);
-  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accessPlan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -467,7 +456,7 @@ export default function FVGPage() {
       </div>
 
       {/* Signal details */}
-      <SignalMosaic locked={!isAuthenticated}>
+      <SignalMosaic locked={!isPaid}>
         {visibleFvgs.length > 0 && (
           <div className="bg-white rounded-xl border p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">

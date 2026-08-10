@@ -14,7 +14,7 @@
 
 若曾執行較早版本的同名 migration，必須安全重跑最新版；其中的 `DROP CONSTRAINT IF EXISTS billing_customers_user_id_provider_mode_key` 允許同一使用者在 Customer 被供應商刪除後建立替代 Customer，並補上 `last_provider_event_at` 與 `users.last_billing_event_at`，讓 subscription 及 entitlement snapshot 都只能被相同或較新的 callback 更新。重跑不會刪除 billing records。
 
-最新版 migration 另建立 `idx_billing_subscriptions_one_open_ecpay_per_user`，原子限制每位使用者只能有一筆 `pending`、`active`、`past_due` 或 `canceling` 的綠界訂閱。若 Production 已存在同一使用者的多筆未結束綠界訂閱，index 會拒絕建立；必須先人工核對綠界後台並終止重複訂單，不可自動刪除付款紀錄。
+最新版 migration 另建立 `idx_billing_subscriptions_one_open_ecpay_per_user`，原子限制每位使用者只能有一筆 `pending`、`active`、`past_due` 或 `canceling` 的綠界訂閱，並建立 `mark_ecpay_subscription_canceling` transaction RPC。Migration 也會撤除 analysis tables 的 anon/authenticated 讀取；前端 production data 必須走 Next.js entitlement API。若 Production 已存在同一使用者的多筆未結束綠界訂閱，index 會拒絕建立；必須先人工核對綠界後台並終止重複訂單，不可自動刪除付款紀錄。
 
 ## Environment
 
@@ -50,7 +50,9 @@ OrderResultURL=https://vp-strategy-nu.vercel.app/api/ecpay/result
 5. 重送通知不得重複處理；`SimulatePaid=1` 不得開通。
 6. 驗證 Premium NT$620，既有付費者不得建立另一方案。
 7. Account 取消後確認後續授權停止、`cancel_at_period_end=true`，本期結束後回 Free。
+8. 以 Free/Pro/Premium 直接呼叫 data APIs，確認 Free 僅 7 檔/前 10 名摘要、Pro 無法讀 Fusion、Premium 可讀 Fusion，anon Supabase SELECT 被拒絕。
+9. 呼叫 `GET /api/admin/ecpay-reconcile`，確認沒有過期 active、漏 callback 或 failed/processing events。
 
 任何驗收失敗，立即將兩個 ECPay flags 設回 `false` 並 redeploy；保留 callback 路徑供既有訂閱持續同步。
 
-綠界的 `PeriodReturnURL` 每期只通知一次，不保證在應用程式回傳 5xx 後重送。目前尚未實作綠界定期定額查詢 API reconciliation；正式開放前必須建立定期對帳，否則漏收 callback 時可能產生狀態漂移。功能 flags 應維持關閉，直到此營運風險已有監控與補帳流程。
+綠界的 `PeriodReturnURL` 每期只通知一次，不保證在應用程式回傳 5xx 後重送。系統會在任何 entitlement consumer 依 `current_period_end` fail-closed，且管理員稽核 API 會列出到期未續約與未解決 event，避免漏 callback 造成永久權益；但目前尚未實作綠界端交易查詢，因此無法自動判定「實際已扣款但 callback 遺失」。功能 flags 必須維持關閉，直到有 provider-side reconciliation、告警排程與人工補帳流程。

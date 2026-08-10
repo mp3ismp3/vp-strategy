@@ -124,14 +124,11 @@ describe("ECPay API routes", () => {
       data: { id: "sub_1", provider_order_id: "VP260807ABC123" },
       error: null,
     });
-    const subscriptionUpdate = chain({ data: null, error: null });
-    const userUpdate = chain({ data: null, error: null });
     const from = vi.fn()
       .mockReturnValueOnce(userQuery)
-      .mockReturnValueOnce(subscriptionQuery)
-      .mockReturnValueOnce(subscriptionUpdate)
-      .mockReturnValueOnce(userUpdate);
-    mocks.getSupabaseAdmin.mockReturnValue({ from });
+      .mockReturnValueOnce(subscriptionQuery);
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    mocks.getSupabaseAdmin.mockReturnValue({ from, rpc });
     vi.mocked(fetch).mockResolvedValue(Response.json({
       MerchantID: "3002607",
       MerchantTradeNo: "VP260807ABC123",
@@ -143,13 +140,10 @@ describe("ECPay API routes", () => {
     const response = await POST();
 
     expect(response.status).toBe(200);
-    expect(subscriptionUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
-      status: "canceling",
-      cancel_at_period_end: true,
-    }));
-    expect(userUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
-      cancel_at_period_end: true,
-    }));
+    expect(rpc).toHaveBeenCalledWith("mark_ecpay_subscription_canceling", {
+      target_subscription_id: "sub_1",
+      target_user_id: "user_1",
+    });
   });
 
   it("does not mark a subscription canceled when the provider response is unsigned", async () => {

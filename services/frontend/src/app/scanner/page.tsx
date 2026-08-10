@@ -9,25 +9,8 @@ import { StrategyGuide } from "@/components/StrategyGuide";
 import { SYMBOL_CATEGORIES, ALL_CATEGORIES } from "@/lib/categories";
 import type { Plan } from "@/types/user";
 
-type VPPosition = "above_va" | "inside_va" | "below_va";
-
-interface RawVPFrame {
-  poc?: number;
-  position?: VPPosition;
-  position_pct?: number;
-  vah?: number;
-  val?: number;
-}
-
-interface RawVPInfo {
-  daily?: RawVPFrame;
-  monthly?: RawVPFrame;
-  price?: number;
-  weekly?: RawVPFrame;
-}
-
 function ScannerContent() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [results, setResults] = useState<ScanResult[]>([]);
   const [scanTime, setScanTime] = useState("");
   const [loading, setLoading] = useState(true);
@@ -58,56 +41,33 @@ function ScannerContent() {
   }, [session]);
 
   useEffect(() => {
-    // Read from Supabase
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      supabase
-        .from("scan_data")
-        .select("*")
-        .eq("id", "latest")
-        .single()
-        .then(({ data, error }) => {
-          if (error || !data) {
-            setLoading(false);
-            return;
-          }
-          const vpData = data.vp_data || {};
-          const transformed: ScanResult[] = Object.entries(
-            vpData as Record<string, RawVPInfo>
-          ).map(([ticker, info]) => {
-            const daily = info.daily || {};
-            const weekly = info.weekly || {};
-            const monthly = info.monthly || {};
-            const positions = [daily.position, weekly.position, monthly.position];
-            const aboveCount = positions.filter((p) => p === "above_va").length;
-            const belowCount = positions.filter((p) => p === "below_va").length;
-            let consensus = "neutral";
-            if (aboveCount >= 2) consensus = "bullish";
-            else if (belowCount >= 2) consensus = "bearish";
-            return {
-              ticker,
-              price: info.price || 0,
-              daily: { poc: daily.poc || 0, vah: daily.vah || 0, val: daily.val || 0, position: daily.position || "inside_va", pct_from_poc: daily.position_pct || 0 },
-              weekly: { poc: weekly.poc || 0, vah: weekly.vah || 0, val: weekly.val || 0, position: weekly.position || "inside_va", pct_from_poc: weekly.position_pct || 0 },
-              monthly: { poc: monthly.poc || 0, vah: monthly.vah || 0, val: monthly.val || 0, position: monthly.position || "inside_va", pct_from_poc: monthly.position_pct || 0 },
-              consensus,
-              suggestion: "",
-            };
-          });
-          setResults(transformed);
-          setScanTime(data.scan_time || "");
-          setLoading(false);
-        });
-    });
-  }, []);
+    if (!session?.user?.email) {
+      return;
+    }
+    fetch("/api/data/scan-results")
+      .then(async (response) => response.ok ? response.json() : Promise.reject())
+      .then((data) => {
+        setResults(data.results || []);
+        setScanTime(data.scan_time || "");
+      })
+      .catch(() => setResults([]))
+      .finally(() => setLoading(false));
+  }, [session?.user?.email]);
 
-  if (loading) {
+  if (status === "loading" || (session && loading)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
+        <h1 className="text-2xl font-bold">登入後免費查看即時 Scanner</h1>
+        <p className="text-gray-600">Free 方案包含 Mega Cap Tech 7 檔即時 VP 分析。</p>
+        <a href="/login" className="rounded-md bg-black px-6 py-3 font-medium text-white">免費登入</a>
       </div>
     );
   }
