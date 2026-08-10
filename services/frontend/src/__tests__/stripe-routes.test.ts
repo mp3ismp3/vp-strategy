@@ -20,6 +20,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next-auth", () => ({ getServerSession: mocks.getServerSession }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/supabase", () => ({ getSupabaseAdmin: mocks.getSupabaseAdmin }));
+vi.mock("@/lib/http-security", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/http-security")>();
+  return { ...actual, isTrustedMutationRequest: () => true, isJsonRequest: () => true };
+});
 vi.mock("@/lib/stripe", () => ({
   stripe: {
     webhooks: { constructEvent: mocks.constructEvent },
@@ -50,6 +54,13 @@ function supabaseQuery(result: { data: unknown; error: unknown }) {
   query.maybeSingle = vi.fn().mockResolvedValue(result);
   query.upsert = vi.fn().mockResolvedValue({ data: null, error: null });
   return query;
+}
+
+function reservationRpc() {
+  return vi.fn(async (name: string) => ({
+    data: name === "reserve_billing_checkout" ? "intent_1" : true,
+    error: null,
+  }));
 }
 
 describe("Stripe route safety", () => {
@@ -84,7 +95,7 @@ describe("Stripe route safety", () => {
     process.env.STRIPE_CHECKOUT_ENABLED = "true";
     mocks.getServerSession.mockResolvedValue({ user: { email: "member@example.com" } });
     const query = supabaseQuery({ data: null, error: { message: "database unavailable" } });
-    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query), rpc: reservationRpc() });
     const { POST } = await import("@/app/api/stripe/checkout/route");
 
     const response = await POST(
@@ -111,7 +122,7 @@ describe("Stripe route safety", () => {
       },
       error: null,
     });
-    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query), rpc: reservationRpc() });
     mocks.customerRetrieve.mockResolvedValue({ id: "cus_1" });
     mocks.sessionRetrieve.mockResolvedValue({
       id: "cs_1",
@@ -150,7 +161,7 @@ describe("Stripe route safety", () => {
       },
       error: null,
     });
-    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query), rpc: reservationRpc() });
     mocks.customerRetrieve.mockResolvedValue({ id: "cus_1" });
     mocks.sessionRetrieve.mockResolvedValue({
       id: "cs_1",
@@ -187,7 +198,7 @@ describe("Stripe route safety", () => {
       },
       error: null,
     });
-    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query), rpc: reservationRpc() });
     mocks.customerCreate.mockResolvedValue({ id: "cus_new" });
     mocks.subscriptionList.mockResolvedValue({ data: [] });
     mocks.sessionCreate.mockResolvedValue({
@@ -226,7 +237,7 @@ describe("Stripe route safety", () => {
       },
       error: null,
     });
-    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query), rpc: reservationRpc() });
     mocks.customerRetrieve.mockResolvedValue({ id: "cus_1" });
     mocks.subscriptionList.mockResolvedValue({
       data: [{ id: "sub_1", status: "active" }],
@@ -253,7 +264,7 @@ describe("Stripe route safety", () => {
       data: { stripe_customer_id: "cus_1", stripe_mode: "test" },
       error: null,
     });
-    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query) });
+    mocks.getSupabaseAdmin.mockReturnValue({ from: vi.fn(() => query), rpc: reservationRpc() });
     mocks.portalCreate.mockResolvedValue({ url: "https://billing.stripe.test/session" });
     const { POST } = await import("@/app/api/stripe/portal/route");
 
@@ -313,6 +324,7 @@ describe("Stripe route safety", () => {
         if (table === "users" && selectQuery.select.mock.calls.length === 0) return selectQuery;
         return updateQuery;
       }),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     });
     mocks.subscriptionList.mockResolvedValue({ data: [] });
     mocks.markWebhookProcessed.mockResolvedValue(undefined);
@@ -329,7 +341,11 @@ describe("Stripe route safety", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.markWebhookProcessed).toHaveBeenCalledWith(expect.anything(), "evt_deleted");
+    expect(mocks.markWebhookProcessed).not.toHaveBeenCalled();
+    expect(mocks.getSupabaseAdmin.mock.results[0].value.rpc).toHaveBeenCalledWith(
+      "cancel_stripe_subscription",
+      expect.objectContaining({ stripe_event_id: "evt_deleted" })
+    );
     expect(mocks.markWebhookFailed).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
     delete process.env.TELEGRAM_BOT_TOKEN;

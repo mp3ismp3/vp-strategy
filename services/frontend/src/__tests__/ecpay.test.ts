@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildEcpayCheckoutFields,
@@ -151,57 +151,9 @@ describe("ECPay recurring billing", () => {
     });
   });
 
-  function callbackDb(options: {
-    eventInsertError?: { code: string } | null;
-    existingEvent?: { processing_status: string; processing_started_at: string | null };
-    subscriptionUpdated?: boolean;
-    userUpdated?: boolean;
-    lastProviderEventAt?: string;
-  } = {}) {
-    const updates: Array<{ table: string; value: Record<string, unknown> }> = [];
-    const order = {
-      id: "billing_1",
-      user_id: "user_1",
-      plan: "pro",
-      amount: 320,
-      status: "active",
-      metadata: {},
-      last_provider_event_at:
-        options.lastProviderEventAt ?? "2026-01-01T00:00:00.000Z",
-    };
-    const from = (table: string) => {
-      let operation: "select" | "update" | null = null;
-      const query = {
-        insert: async () => ({ error: options.eventInsertError ?? null }),
-        select: () => {
-          if (!operation) operation = "select";
-          return query;
-        },
-        update: (value: Record<string, unknown>) => {
-          operation = "update";
-          updates.push({ table, value });
-          return query;
-        },
-        eq: () => query,
-        in: () => query,
-        or: () => query,
-        single: async () => ({
-          data: table === "billing_subscriptions" ? order : options.existingEvent,
-          error: null,
-        }),
-        maybeSingle: async () => ({
-          data:
-            operation === "update" && table === "billing_subscriptions"
-              ? options.subscriptionUpdated === false ? null : { id: order.id }
-              : operation === "update" && table === "users"
-                ? options.userUpdated === false ? null : { id: "user_1" }
-              : operation === "update" ? { id: "event_1" } : options.existingEvent,
-          error: null,
-        }),
-      };
-      return query;
-    };
-    return { db: { from } as never, updates };
+  function callbackDb(result: string = "processed", error: unknown = null) {
+    const rpc = vi.fn().mockResolvedValue({ data: result, error });
+    return { db: { rpc } as never, rpc };
   }
 
   const successfulCallback = {
@@ -214,88 +166,39 @@ describe("ECPay recurring billing", () => {
     ProcessDate: "2026/01/31 12:34:56",
   };
 
-  it("applies a verified recurring authorization to generic billing and entitlement state", async () => {
-    const { db, updates } = callbackDb();
+  it("applies a recurring authorization through one transaction RPC", async () => {
+    const { db, rpc } = callbackDb();
     await expect(applyEcpayCallback(db, successfulCallback)).resolves.toBe("processed");
-    expect(updates).toContainEqual({
-      table: "billing_subscriptions",
-      value: expect.objectContaining({
-        status: "active",
-        current_period_end: "2026-02-28T04:34:56.000Z",
-        last_provider_event_at: "2026-01-31T04:34:56.000Z",
-      }),
-    });
-    expect(updates).toContainEqual({
-      table: "users",
-      value: expect.objectContaining({ plan: "pro", subscription_status: "active" }),
-    });
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("apply_ecpay_callback", expect.objectContaining({
+      callback_amount: 320,
+      callback_order_id: "VP260807ABC123",
+      callback_period_end: "2026-02-28T04:34:56.000Z",
+      callback_payload: expect.not.objectContaining({ MerchantID: expect.anything() }),
+    }));
   });
 
-  it("does not let an out-of-order authorization overwrite entitlement", async () => {
-    const { db, updates } = callbackDb({ subscriptionUpdated: false });
+  it("returns the transaction result for stale and duplicate callbacks", async () => {
+    const { db } = callbackDb("stale");
     await expect(applyEcpayCallback(db, successfulCallback)).resolves.toBe("stale");
-    expect(updates.some((item) => item.table === "users")).toBe(false);
-  });
-
-  it("resumes entitlement sync when the same failed callback is retried", async () => {
-    const { db, updates } = callbackDb({
-      eventInsertError: { code: "23505" },
-      existingEvent: {
-        processing_status: "failed",
-        processing_started_at: "2026-01-31T04:35:00.000Z",
-      },
-      lastProviderEventAt: "2026-01-31T04:34:56.000Z",
-    });
-
-    await expect(applyEcpayCallback(db, successfulCallback)).resolves.toBe("processed");
-    expect(updates.some((item) => item.table === "billing_subscriptions")).toBe(false);
-    expect(updates).toContainEqual({
-      table: "users",
-      value: expect.objectContaining({ plan: "pro", subscription_status: "active" }),
-    });
-  });
-
-  it("does not let an older callback overwrite a newer users snapshot", async () => {
-    const { db, updates } = callbackDb({ userUpdated: false });
-
-    await expect(applyEcpayCallback(db, successfulCallback)).resolves.toBe("stale");
-    expect(updates).toContainEqual({
-      table: "users",
-      value: expect.objectContaining({
-        last_billing_event_at: "2026-01-31T04:34:56.000Z",
-      }),
-    });
   });
 
   it("records but never fulfills simulated payments", async () => {
-    const { db, updates } = callbackDb();
+    const { db, rpc } = callbackDb("simulated");
     await expect(
       applyEcpayCallback(db, { ...successfulCallback, SimulatePaid: "1" })
     ).resolves.toBe("simulated");
-    expect(updates.some((item) => item.table === "users")).toBe(false);
+    expect(rpc).toHaveBeenCalledWith("apply_ecpay_callback", expect.objectContaining({ callback_simulated: true }));
   });
 
-  it("fails closed on amount mismatch and marks the event retryable", async () => {
-    const { db, updates } = callbackDb();
-    await expect(
-      applyEcpayCallback(db, { ...successfulCallback, Amount: "620" })
-    ).rejects.toThrow("amount mismatch");
-    expect(updates).toContainEqual({
-      table: "billing_events",
-      value: expect.objectContaining({ processing_status: "failed" }),
-    });
+  it("propagates a transaction rejection without partial local writes", async () => {
+    const { db } = callbackDb("processed", new Error("amount mismatch"));
+    await expect(applyEcpayCallback(db, successfulCallback)).rejects.toThrow("amount mismatch");
   });
 
-  it("does not reclaim a fresh concurrent callback", async () => {
-    const { db } = callbackDb({
-      eventInsertError: { code: "23505" },
-      existingEvent: {
-        processing_status: "processing",
-        processing_started_at: new Date().toISOString(),
-      },
-    });
-    await expect(applyEcpayCallback(db, successfulCallback)).rejects.toThrow(
-      "already processing"
-    );
+  it("rejects malformed callback amounts before calling the database", async () => {
+    const { db, rpc } = callbackDb();
+    await expect(applyEcpayCallback(db, { ...successfulCallback, Amount: "3.2e2" })).rejects.toThrow("invalid");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

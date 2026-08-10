@@ -7,8 +7,12 @@ import {
   getStripeMode,
   getStripePortalConfigurationId,
 } from "@/lib/stripe-config";
+import { getCanonicalAppUrl, isTrustedMutationRequest } from "@/lib/http-security";
 
-export async function POST() {
+export async function POST(request?: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
@@ -46,7 +50,7 @@ export async function POST() {
   const portalSession = await stripe.billingPortal.sessions.create({
     configuration: getStripePortalConfigurationId(),
     customer: customerId,
-    return_url: `${process.env.NEXT_PUBLIC_APP_URL}/account`,
+    return_url: `${getCanonicalAppUrl()}/account`,
   });
 
   return NextResponse.json({ url: portalSession.url });

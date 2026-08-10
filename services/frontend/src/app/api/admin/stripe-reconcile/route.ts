@@ -7,6 +7,7 @@ import { stripe } from "@/lib/stripe";
 import { getStripeMode } from "@/lib/stripe-config";
 import { buildReconciliationResult } from "@/lib/stripe-reconciliation";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { isJsonRequest, isTrustedMutationRequest } from "@/lib/http-security";
 
 function isAdmin(email: string): boolean {
   return (process.env.ADMIN_EMAILS || "")
@@ -24,6 +25,9 @@ function isMissingStripeResource(error: unknown): boolean {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request) || !isJsonRequest(request)) {
+    return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
   if (!session?.user?.email || !isAdmin(session.user.email)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -73,43 +77,34 @@ export async function POST(request: Request) {
       let applied = false;
 
       if (apply && result.safeToApply && result.expected && result.differences.length > 0) {
-        const { error: updateError } = await supabase
-          .from("users")
-          .update({
-            ...result.expected,
-            ...(result.expected.trial_start
-              ? { trial_used_at: result.expected.trial_start }
-              : {}),
-            stripe_checkout_session_id: null,
-            stripe_checkout_expires_at: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", user.id);
-        if (updateError) throw updateError;
         const expectedSubscription = subscriptions.data.find(
           (item) => item.id === result.expected?.stripe_subscription_id
         );
         if (expectedSubscription) {
           const price = expectedSubscription.items.data[0]?.price;
           const interval = price?.recurring?.interval;
-          const { error: billingError } = await supabase
-            .from("billing_subscriptions")
-            .upsert({
-              user_id: user.id,
-              provider: "stripe",
-              provider_customer_id: user.stripe_customer_id,
-              provider_subscription_id: expectedSubscription.id,
-              provider_order_id: null,
-              plan: result.expected.plan,
-              amount: price?.unit_amount ?? 0,
-              currency: (price?.currency ?? "usd").toUpperCase(),
-              billing_interval: interval === "day" || interval === "year" ? interval : "month",
-              status: expectedSubscription.status,
-              current_period_end: result.expected.current_period_end,
-              cancel_at_period_end: expectedSubscription.cancel_at_period_end,
-              metadata: { priceId: price?.id ?? null, source: "stripe_reconciliation" },
-              updated_at: new Date().toISOString(),
-            }, { onConflict: "provider,provider_subscription_id" });
+          const { error: billingError } = await supabase.rpc("sync_stripe_subscription", {
+            target_user_id: user.id,
+            stripe_customer: user.stripe_customer_id,
+            stripe_subscription: expectedSubscription.id,
+            stripe_plan: result.expected.plan,
+            stripe_amount: price?.unit_amount ?? 0,
+            stripe_currency: (price?.currency ?? "usd").toUpperCase(),
+            stripe_interval: interval === "day" || interval === "year" ? interval : "month",
+            stripe_status: expectedSubscription.status,
+            stripe_period_end: result.expected.current_period_end,
+            stripe_cancel_at_period_end: expectedSubscription.cancel_at_period_end,
+            stripe_price_id: price?.id ?? null,
+            stripe_trial_start: result.expected.trial_start,
+            stripe_trial_end: result.expected.trial_end,
+            stripe_mode_value: stripeMode,
+            stripe_event_id: null,
+          });
+          if (billingError) throw billingError;
+        } else {
+          const { error: billingError } = await supabase.rpc("cancel_all_stripe_subscriptions", {
+            target_user_id: user.id,
+          });
           if (billingError) throw billingError;
         }
         applied = true;

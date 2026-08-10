@@ -10,11 +10,12 @@ describe("provider-neutral billing model", () => {
     expect(migration).toMatch(/UNIQUE INDEX[\s\S]*user_id[\s\S]*provider = 'ecpay'[\s\S]*pending[\s\S]*active[\s\S]*past_due[\s\S]*canceling/);
   });
 
-  it("persists ECPay cancellation through one atomic database function", () => {
+  it("persists ECPay callback and cancellation through transaction RPCs", () => {
     const migration = readFileSync("supabase_billing_providers.sql", "utf8");
-    expect(migration).toContain("mark_ecpay_subscription_canceling");
-    expect(migration).toMatch(/UPDATE public\.billing_subscriptions[\s\S]*UPDATE public\.users/);
-    expect(migration).toContain("REVOKE ALL ON FUNCTION public.mark_ecpay_subscription_canceling");
+    expect(migration).toContain("apply_ecpay_callback");
+    expect(migration).toContain("create_ecpay_cancel_intent");
+    expect(migration).toContain("finalize_ecpay_cancel_intent");
+    expect(migration).toMatch(/UPDATE public\.billing_subscriptions[\s\S]*refresh_user_entitlement/);
   });
 
   it("fails closed after a canceled subscription reaches its period end", () => {

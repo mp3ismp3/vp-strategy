@@ -13,6 +13,7 @@ import {
 } from "@/lib/stripe-config";
 import { Plan } from "@/types/user";
 import Stripe from "stripe";
+import { getCanonicalAppUrl, isJsonRequest, isTrustedMutationRequest } from "@/lib/http-security";
 
 function isMissingStripeResource(error: unknown): boolean {
   return (
@@ -22,6 +23,9 @@ function isMissingStripeResource(error: unknown): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isTrustedMutationRequest(req) || !isJsonRequest(req)) {
+    return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
@@ -55,6 +59,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unable to load billing profile" }, { status: 500 });
   }
 
+  const { data: checkoutIntentId, error: reservationError } = await supabase.rpc("reserve_billing_checkout", {
+    target_user_id: user.id, target_provider: "stripe", target_plan: plan,
+  });
+  if (reservationError || !checkoutIntentId) {
+    return NextResponse.json({ error: "An existing billing subscription or checkout must be resolved first" }, { status: 409 });
+  }
+  const releaseReservation = () => supabase.rpc("release_billing_checkout", {
+    target_intent_id: checkoutIntentId, target_user_id: user.id,
+  });
+
   // Get or create Stripe customer
   let customerId = user?.stripe_customer_id;
   const stripeMode = getStripeMode();
@@ -86,14 +100,13 @@ export async function POST(req: NextRequest) {
         stripe_customer_id: customerId,
         stripe_subscription_id: null,
         stripe_mode: stripeMode,
-        subscription_status: "inactive",
-        plan: "free",
         stripe_checkout_session_id: null,
         stripe_checkout_expires_at: null,
       })
       .eq("email", session.user.email);
 
     if (customerUpdateError) {
+      await releaseReservation();
       console.error("Stripe customer persistence failed", customerUpdateError);
       return NextResponse.json({ error: "Unable to save billing profile" }, { status: 500 });
     }
@@ -110,6 +123,7 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     }, { onConflict: "provider,provider_customer_id" });
   if (billingCustomerError) {
+    await releaseReservation();
     console.error("Generic billing customer persistence failed", billingCustomerError);
     return NextResponse.json({ error: "Unable to save billing profile" }, { status: 500 });
   }
@@ -124,6 +138,7 @@ export async function POST(req: NextRequest) {
   );
 
   if (existingSubscription) {
+    await releaseReservation();
     return NextResponse.json(
       {
         error:
@@ -157,6 +172,7 @@ export async function POST(req: NextRequest) {
         )
       ) {
         if (pendingSession.metadata?.plan !== plan) {
+          await releaseReservation();
           return NextResponse.json(
             {
               error: "A Checkout Session for another plan is already open",
@@ -166,6 +182,11 @@ export async function POST(req: NextRequest) {
             { status: 409 }
           );
         }
+        const { data: attached } = await supabase.rpc("attach_billing_checkout", {
+          target_intent_id: checkoutIntentId, target_user_id: user.id,
+          target_external_reference: pendingSession.id,
+        });
+        if (!attached) return NextResponse.json({ error: "Unable to reserve Checkout Session" }, { status: 500 });
         return NextResponse.json({ url: pendingSession.url, reusedSession: true });
       }
     } catch (error: unknown) {
@@ -181,7 +202,9 @@ export async function POST(req: NextRequest) {
 
   // Create checkout session
   const expiresAt = Math.floor(Date.now() / 1000) + 30 * 60;
-  const checkoutSession = await stripe.checkout.sessions.create({
+  let checkoutSession: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>;
+  try {
+    checkoutSession = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     payment_method_types: ["card"],
@@ -194,17 +217,29 @@ export async function POST(req: NextRequest) {
     subscription_data: {
       metadata: { plan, userId: user.id },
     },
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/account?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+    success_url: `${getCanonicalAppUrl()}/account?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${getCanonicalAppUrl()}/pricing`,
     expires_at: expiresAt,
     metadata: {
       plan,
       userId: user.id,
       userEmail: session.user.email,
     },
-  }, {
-    idempotencyKey: buildCheckoutIdempotencyKey(user.id),
+    }, { idempotencyKey: buildCheckoutIdempotencyKey(user.id) });
+  } catch (error) {
+    await releaseReservation();
+    throw error;
+  }
+
+  const { data: attached, error: attachError } = await supabase.rpc("attach_billing_checkout", {
+    target_intent_id: checkoutIntentId, target_user_id: user.id,
+    target_external_reference: checkoutSession.id,
   });
+  if (attachError || !attached) {
+    await stripe.checkout.sessions.expire(checkoutSession.id).catch(() => undefined);
+    await releaseReservation();
+    return NextResponse.json({ error: "Unable to reserve Checkout Session" }, { status: 500 });
+  }
 
   const { error: pendingUpdateError } = await supabase
     .from("users")

@@ -177,10 +177,10 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/app/api/data/*`：唯一的 Web production analysis data 邊界。訪客回 `401`；Free 由 server 裁切為 7 檔與 Accumulation 前 10 名摘要；Pro 取得完整一般分析；Fusion 僅 Premium。Client 不得直接以 anon key 讀 analysis tables。
 - `src/app/api/auth/*`、`src/lib/auth.ts`：NextAuth/Supabase authentication。
 - `src/app/api/stripe/*`、`src/lib/stripe.ts`：checkout、portal、webhook。Checkout 由 `STRIPE_CHECKOUT_ENABLED` 控制，Price ID 僅從 server-side allowlist 取得；`stripe-config.ts` 隔離 Test/Live mode，並為 Customer/30 分鐘同方案 pending Checkout 提供冪等保護，方案不一致時回傳衝突。已有有效訂閱者不得透過 Checkout 直接切換 Pro/Premium；Portal session 固定使用 `STRIPE_PORTAL_CONFIGURATION_ID` 指定的無方案切換設定，只提供付款方式、發票、取消與恢復。`stripe-webhook.ts` 以 event ledger 與 observed timestamp CAS 提供冪等 claim/retry，取消通知在 ledger 完成後才 best-effort 發送，延遲的舊訂閱刪除事件會保留較新的有效訂閱。
-- `src/lib/billing.ts`、`billing_customers`、`billing_subscriptions`、`billing_events`：provider-neutral 金流契約。所有付費 entitlement 都要求 active/trialing 且 `current_period_end` 尚未到期；缺失或過期即 fail-closed。Billing tables、`users`、`telegram_bind_tokens`、`subscription_events` 均啟用 RLS、撤除 anon/authenticated grants，只允許 server-side service role；`users` 維持快速 entitlement snapshot，`last_billing_event_at` 防止舊 callback 覆寫新權限。
-- `src/app/api/ecpay/*`、`src/lib/ecpay.ts`：台灣新訂閱的綠界信用卡定期定額 adapter。ReturnURL 與 PeriodReturnURL 必須驗 MerchantID 與 SHA256 CheckMacValue、拒絕金額不符與模擬付款開通；OrderResultURL 只導頁。資料庫以 partial unique index 防止並發訂閱；取消透過 CreditCardPeriodAction Cancel 後呼叫 transaction RPC 原子更新 subscription/user，callback CAS 不得覆寫取消。`admin/ecpay-reconcile` 提供本地過期、漏 callback 與失敗 event 稽核，但不取代 provider-side reconciliation。
+- `src/lib/billing.ts`、`billing_customers`、`billing_subscriptions`、`billing_events`：provider-neutral 金流契約。`billing_checkout_intents` 以 user row lock 與 partial unique index 原子保留跨 Stripe/ECPay Checkout；`billing_subscriptions` 是權威來源，DB transaction 會跨 provider 選擇仍有效的最高 entitlement 寫入 `users` snapshot。任何單一 provider 的延遲取消不得覆寫另一個 provider 的有效權益。所有付費 entitlement 都要求 active/trialing 且 `current_period_end` 尚未到期；缺失或過期即 fail-closed。Billing tables、checkout intent、cancel outbox、`users`、`telegram_bind_tokens`、`subscription_events` 均啟用 RLS並撤除 anon/authenticated grants，只允許 service role。Event payload 僅保存必要摘要，processed events 預設保留 90 天。
+- `src/app/api/ecpay/*`、`src/lib/ecpay.ts`：台灣新訂閱的綠界信用卡定期定額 adapter。ReturnURL 與 PeriodReturnURL 必須驗 MerchantID 與 SHA256 CheckMacValue、拒絕金額不符與模擬付款開通；OrderResultURL 只導頁。Callback 只負責驗簽/正規化，event、subscription 與 entitlement 由 `apply_ecpay_callback` transaction RPC 一次提交。取消先寫 `billing_cancel_outbox` 再呼叫 CreditCardPeriodAction，重試會先以 `QueryCreditCardPeriodInfo` 判斷 provider 是否已終止。`admin/ecpay-reconcile` 逐筆核對 provider 金額/執行狀態並可送告警。
 - `src/app/api/admin/stripe-reconcile/route.ts`、`stripe-reconciliation.ts`：限 `ADMIN_EMAILS` 管理員使用的 Stripe/Supabase reconciliation。預設 dry-run；只有單一或零個非終止訂閱才可 apply，多重訂閱必須人工處理。
-- `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；完整 `supabase_migration.sql` 則供新環境初始化。
+- `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；`supabase_migration.sql` 建立新環境 base schema，新環境與既有環境都必須再套用最新版 `supabase_billing_providers.sql` 取得完整 transaction RPC 與 outbox contract。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。Client 方案 snapshot 必須綁定 session email；帳號不匹配或尚未完成查詢時 fail-closed，不得沿用前一個帳號的付費狀態。
 - `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
 - `public/ptrade.svg`：前端共用品牌 icon，由首頁、登入頁、Navbar 與 root metadata 的瀏覽器 icon 引用。
@@ -194,7 +194,7 @@ Web entitlement boundary：未登入訪客不得讀 production data。登入 Fre
 ### Supabase 與 Telegram bot
 
 - `upload_to_supabase.py`：把 scan、chart、accum JSON 清理後 upsert 至 Supabase。
-- `services/telegram-bot/bot.py`：Telegram webhook/bot commands 與 Premium-only 帳號綁定；Next.js webhook 先驗 secret header，綁定 token 以原子 claim 防止重放。
+- `services/telegram-bot/bot.py`：Telegram webhook/bot commands 與 Premium-only 帳號綁定；Next.js webhook 先驗 secret header，Python/Next.js 都以同一 transaction RPC 原子完成 token claim、Premium entitlement 檢查與 bind。
 - `services/telegram-bot/notification_router.py`：讀 Supabase 訂閱者並分發 scanner/accumulation 摘要；與 bot 共用 `entitlement.py`，所有付費狀態均依週期截止時間 fail-closed，不依賴使用者再次登入網站。
 - `setup_telegram_webhook.py`：部署時設定 webhook；屬外部狀態變更，不可當一般測試執行。
 

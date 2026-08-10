@@ -2,10 +2,14 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
-import { buildEcpayCancelFields, getEcpayConfig, parseEcpayResponse, verifyEcpayCallback } from "@/lib/ecpay";
+import { processEcpayCancellation } from "@/lib/ecpay-cancel";
+import { isTrustedMutationRequest } from "@/lib/http-security";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-export async function POST() {
+export async function POST(request?: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
+  }
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = getSupabaseAdmin();
@@ -23,29 +27,30 @@ export async function POST() {
     .limit(1)
     .maybeSingle();
   if (!subscription?.provider_order_id) return NextResponse.json({ error: "No ECPay subscription found" }, { status: 400 });
-  const config = getEcpayConfig();
-  const fields = buildEcpayCancelFields(config, subscription.provider_order_id);
-  const response = await fetch(config.periodActionUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(fields),
-  });
-  let result: Record<string, string>;
-  try {
-    result = parseEcpayResponse(await response.text());
-  } catch {
-    return NextResponse.json({ error: "Invalid response from ECPay" }, { status: 502 });
-  }
-  if (!response.ok || result.RtnCode !== "1" || !verifyEcpayCallback(result, config)) {
-    return NextResponse.json({ error: result.RtnMsg || "Unable to cancel ECPay subscription" }, { status: 502 });
-  }
-  const { data: persisted, error: persistenceError } = await supabase.rpc(
-    "mark_ecpay_subscription_canceling",
+  const { data: intentId, error: intentError } = await supabase.rpc(
+    "create_ecpay_cancel_intent",
     { target_user_id: user.id, target_subscription_id: subscription.id }
   );
-  if (persistenceError || !persisted) {
-    console.error("ECPay cancellation persistence failed", persistenceError);
-    return NextResponse.json({ error: "扣款已停止，但本地狀態同步失敗，請聯絡客服" }, { status: 500 });
+  if (intentError || !intentId) {
+    return NextResponse.json({ error: "Unable to persist cancellation request" }, { status: 500 });
+  }
+  const { data: claimed } = await supabase.rpc("claim_ecpay_cancel_intent", {
+    target_intent_id: intentId,
+  });
+  if (!claimed) {
+    return NextResponse.json({ error: "取消請求已由其他工作處理中" }, { status: 409 });
+  }
+  try {
+    await processEcpayCancellation({
+      supabase,
+      intentId,
+      providerOrderId: subscription.provider_order_id,
+    });
+  } catch {
+    return NextResponse.json({
+      error: "取消請求已保存並排入重試；若狀態未更新請聯絡客服",
+      retryScheduled: true,
+    }, { status: 502 });
   }
   return NextResponse.json({ canceledAtPeriodEnd: true });
 }
