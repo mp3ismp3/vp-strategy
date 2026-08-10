@@ -138,6 +138,7 @@ export async function applyEcpayCallback(
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.user_id)
+      .eq("cancel_at_period_end", false)
       .or(`last_billing_event_at.is.null,last_billing_event_at.lte.${authorizationTime}`)
       .select("id")
       .maybeSingle();

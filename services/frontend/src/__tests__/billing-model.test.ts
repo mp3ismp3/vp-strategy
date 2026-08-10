@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-import { buildBillingSubscriptionRecord, hasActiveEntitlement } from "@/lib/billing";
+import { buildBillingSubscriptionRecord, hasActiveEntitlement, hasTelegramEntitlement } from "@/lib/billing";
 
 describe("provider-neutral billing model", () => {
   it("enforces one open ECPay subscription per user at the database boundary", () => {
     const migration = readFileSync("supabase_billing_providers.sql", "utf8");
     expect(migration).toContain("idx_billing_subscriptions_one_open_ecpay_per_user");
     expect(migration).toMatch(/UNIQUE INDEX[\s\S]*user_id[\s\S]*provider = 'ecpay'[\s\S]*pending[\s\S]*active[\s\S]*past_due[\s\S]*canceling/);
+  });
+
+  it("persists ECPay cancellation through one atomic database function", () => {
+    const migration = readFileSync("supabase_billing_providers.sql", "utf8");
+    expect(migration).toContain("mark_ecpay_subscription_canceling");
+    expect(migration).toMatch(/UPDATE public\.billing_subscriptions[\s\S]*UPDATE public\.users/);
+    expect(migration).toContain("REVOKE ALL ON FUNCTION public.mark_ecpay_subscription_canceling");
   });
 
   it("fails closed after a canceled subscription reaches its period end", () => {
@@ -26,6 +33,31 @@ describe("provider-neutral billing model", () => {
       cancelAtPeriodEnd: true,
       currentPeriodEnd: "2026-08-08T00:00:00.000Z",
     }, new Date("2026-08-07T00:00:00.000Z"))).toBe(true);
+  });
+
+  it("fails closed when an active subscription has passed its period end", () => {
+    expect(hasActiveEntitlement({
+      plan: "pro",
+      subscriptionStatus: "active",
+      currentPeriodEnd: "2026-01-01T00:00:00.000Z",
+    }, new Date("2026-01-02T00:00:00.000Z"))).toBe(false);
+  });
+
+  it("requires a known future period end for every paid entitlement", () => {
+    expect(hasActiveEntitlement({
+      plan: "premium",
+      subscriptionStatus: "active",
+      currentPeriodEnd: null,
+    })).toBe(false);
+  });
+
+  it("reserves Telegram linking and signals for Premium", () => {
+    const base = {
+      subscriptionStatus: "active" as const,
+      currentPeriodEnd: "2026-09-01T00:00:00.000Z",
+    };
+    expect(hasTelegramEntitlement({ ...base, plan: "pro" }, new Date("2026-08-01T00:00:00.000Z"))).toBe(false);
+    expect(hasTelegramEntitlement({ ...base, plan: "premium" }, new Date("2026-08-01T00:00:00.000Z"))).toBe(true);
   });
 
   it.each([

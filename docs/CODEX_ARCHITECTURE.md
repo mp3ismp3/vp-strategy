@@ -174,28 +174,28 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 ### Next.js `services/frontend/`
 
 - `src/app/**/page.tsx`：scanner、accumulation、fusion、strategy、indicator、liquidity、FVG、MACD、account/pricing 等頁面。
-- `src/app/api/data/*`：從 Supabase 提供 scan、accumulation、fusion、chart data。
+- `src/app/api/data/*`：唯一的 Web production analysis data 邊界。訪客回 `401`；Free 由 server 裁切為 7 檔與 Accumulation 前 10 名摘要；Pro 取得完整一般分析；Fusion 僅 Premium。Client 不得直接以 anon key 讀 analysis tables。
 - `src/app/api/auth/*`、`src/lib/auth.ts`：NextAuth/Supabase authentication。
 - `src/app/api/stripe/*`、`src/lib/stripe.ts`：checkout、portal、webhook。Checkout 由 `STRIPE_CHECKOUT_ENABLED` 控制，Price ID 僅從 server-side allowlist 取得；`stripe-config.ts` 隔離 Test/Live mode，並為 Customer/30 分鐘同方案 pending Checkout 提供冪等保護，方案不一致時回傳衝突。已有有效訂閱者不得透過 Checkout 直接切換 Pro/Premium；Portal session 固定使用 `STRIPE_PORTAL_CONFIGURATION_ID` 指定的無方案切換設定，只提供付款方式、發票、取消與恢復。`stripe-webhook.ts` 以 event ledger 與 observed timestamp CAS 提供冪等 claim/retry，取消通知在 ledger 完成後才 best-effort 發送，延遲的舊訂閱刪除事件會保留較新的有效訂閱。
-- `src/lib/billing.ts`、`billing_customers`、`billing_subscriptions`、`billing_events`：provider-neutral 金流契約。Stripe、綠界與未來 provider 使用相同 customer/subscription/event 欄位，供應商額外資料放 `metadata`；provider 為開放字串，不以 DB enum 阻擋新增金流。三張 billing tables 啟用 RLS 且不提供 anon/authenticated policy，只允許 server-side service role；`users` 維持快速 entitlement snapshot，`last_billing_event_at` 防止舊 callback 覆寫新權限，既有 `stripe_*` 舊欄位與 `subscription_events` 暫留供 rollback/backfill。
-- `src/app/api/ecpay/*`、`src/lib/ecpay.ts`：台灣新訂閱的綠界信用卡定期定額 adapter。Checkout 僅允許 Pro NT$320/Premium NT$620，無試用且 server/public flags 預設關閉；前台只呈現 Free/Pro/Premium，不顯示試用 CTA、倒數或徽章，歷史 Stripe `trialing` 狀態僅保留相容並在帳號 UI 顯示為 active。ReturnURL 與 PeriodReturnURL 必須驗 MerchantID 與 SHA256 CheckMacValue、拒絕金額不符與模擬付款開通，並寫入通用 billing tables；OrderResultURL 只導頁。資料庫以 partial unique index 保證每位使用者最多一筆 pending/active/past_due/canceling 綠界訂閱，避免並發 Checkout 建立多筆扣款。取消透過 CreditCardPeriodAction Cancel 停止後續授權，相容 JSON 與 legacy form-encoded 回應，權限保留至當期結束。
+- `src/lib/billing.ts`、`billing_customers`、`billing_subscriptions`、`billing_events`：provider-neutral 金流契約。所有付費 entitlement 都要求 active/trialing 且 `current_period_end` 尚未到期；缺失或過期即 fail-closed。Billing tables、`users`、`telegram_bind_tokens`、`subscription_events` 均啟用 RLS、撤除 anon/authenticated grants，只允許 server-side service role；`users` 維持快速 entitlement snapshot，`last_billing_event_at` 防止舊 callback 覆寫新權限。
+- `src/app/api/ecpay/*`、`src/lib/ecpay.ts`：台灣新訂閱的綠界信用卡定期定額 adapter。ReturnURL 與 PeriodReturnURL 必須驗 MerchantID 與 SHA256 CheckMacValue、拒絕金額不符與模擬付款開通；OrderResultURL 只導頁。資料庫以 partial unique index 防止並發訂閱；取消透過 CreditCardPeriodAction Cancel 後呼叫 transaction RPC 原子更新 subscription/user，callback CAS 不得覆寫取消。`admin/ecpay-reconcile` 提供本地過期、漏 callback 與失敗 event 稽核，但不取代 provider-side reconciliation。
 - `src/app/api/admin/stripe-reconcile/route.ts`、`stripe-reconciliation.ts`：限 `ADMIN_EMAILS` 管理員使用的 Stripe/Supabase reconciliation。預設 dry-run；只有單一或零個非終止訂閱才可 apply，多重訂閱必須人工處理。
 - `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；完整 `supabase_migration.sql` 則供新環境初始化。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。Client 方案 snapshot 必須綁定 session email；帳號不匹配或尚未完成查詢時 fail-closed，不得沿用前一個帳號的付費狀態。
 - `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
 - `public/ptrade.svg`：前端共用品牌 icon，由首頁、登入頁、Navbar 與 root metadata 的瀏覽器 icon 引用。
 
-`src/app/api/data/scan-results`、`chart-data`、`accum-state` 的 JSON 路徑在 production 固定於 frontend `data/`；repo-root 路徑僅供 local development fallback，runtime file reads 不得讓 production tracing 擴張至整個 repository。
+`src/app/api/data/scan-results`、`chart-data`、`accum-state` 以 server-side service role 讀取 CI 上傳至 Supabase 的 production rows，再依有效方案裁切；不得退回 client-side anon query 或依賴未部署的 frontend JSON。
 
-Web preview boundary：未登入的 Indicator 只顯示 Mega Cap Tech；MACD/FVG/Liquidity 圖表保持可見，每頁只用一個 `SignalMosaic` 遮罩圖表下方的信號明細。未登入的 Accumulation 只顯示依 decay score 排序的前 10 名；Strategy Lab 只遮罩進場信號。登入 session 解鎖上述完整 client view。`/accumulation` 因此不是 proxy auth-protected route，`/fusion` 與 `/account` 仍要求登入。這些是產品顯示 gate，不取代 Supabase RLS 或 server-side authorization。
+Web entitlement boundary：未登入訪客不得讀 production data。登入 Free 可讀 Mega Cap Tech 7 檔即時資料與 Accumulation 前 10 名非行動摘要；Pro 解鎖全部一般分析、levels/triggers 與 Strategy Lab；Premium 另解鎖 Fusion，以及 Telegram 綁定與即時信號。Free/Pro 不可產生或兌換 Telegram 綁定碼。Supabase analysis tables 撤除 anon/authenticated access，client pages 一律透過 server API；UI Paywall 不取代 server authorization。
 
 修改 frontend 前另讀 `services/frontend/AGENTS.md`，使用 `npm`/`package-lock.json`，至少依變更執行 lint、test、build 中適用的 checks。
 
 ### Supabase 與 Telegram bot
 
 - `upload_to_supabase.py`：把 scan、chart、accum JSON 清理後 upsert 至 Supabase。
-- `services/telegram-bot/bot.py`：Telegram webhook/bot commands 與帳號綁定。
-- `services/telegram-bot/notification_router.py`：讀 Supabase 訂閱者並分發 scanner/accumulation 摘要；與 bot 共用 `entitlement.py`，取消到期即 fail-closed，不依賴使用者再次登入網站。
+- `services/telegram-bot/bot.py`：Telegram webhook/bot commands 與 Premium-only 帳號綁定；Next.js webhook 先驗 secret header，綁定 token 以原子 claim 防止重放。
+- `services/telegram-bot/notification_router.py`：讀 Supabase 訂閱者並分發 scanner/accumulation 摘要；與 bot 共用 `entitlement.py`，所有付費狀態均依週期截止時間 fail-closed，不依賴使用者再次登入網站。
 - `setup_telegram_webhook.py`：部署時設定 webhook；屬外部狀態變更，不可當一般測試執行。
 
 ## 7. Runtime 資料與外部邊界

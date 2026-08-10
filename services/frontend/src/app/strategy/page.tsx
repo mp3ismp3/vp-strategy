@@ -30,44 +30,33 @@ export default function StrategyPage() {
   const { data: session } = useSession();
   const [symbols, setSymbols] = useState<AccumSymbol[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessPlan, setAccessPlan] = useState<"free" | "pro" | "premium">("free");
 
   useEffect(() => {
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      supabase
-        .from("scan_data")
-        .select("*")
-        .eq("id", "accum_state")
-        .single()
-        .then(({ data, error }) => {
-          if (error || !data) {
-            setLoading(false);
-            return;
-          }
-          const state = data.accum_data || data.vp_data || {};
-          const items: AccumSymbol[] = Object.entries(
-            state as Record<string, AccumStateValue>
-          )
-            .filter(([, value]) => Boolean(value?.tier))
-            .map(([sym, v]) => ({
-              symbol: sym,
-              tier: v.tier || "watch",
-              phase: v.phase || "?",
-              decay_score: v.decay_score || 0,
-              support_dynamic: v.support_dynamic || 0,
-              resistance: v.resistance || 0,
-              triggers_fired: v.triggers_fired || [],
-              pending_triggers: v.pending_triggers || [],
-            }))
-            .sort((a, b) => b.decay_score - a.decay_score);
-          setSymbols(items);
-          setLoading(false);
-        });
-    });
-  }, []);
+    if (!session?.user?.email) {
+      return;
+    }
+    fetch("/api/data/accum-state")
+      .then(async (response) => response.ok ? response.json() : Promise.reject())
+      .then((data) => {
+        setAccessPlan(data.accessPlan || "free");
+        const items: AccumSymbol[] = (data.states || []).map(
+          (value: AccumStateValue & { ticker: string }) => ({
+            symbol: value.ticker,
+            tier: value.tier || "watch",
+            phase: value.phase || "?",
+            decay_score: value.decay_score || 0,
+            support_dynamic: value.support_dynamic || 0,
+            resistance: value.resistance || 0,
+            triggers_fired: value.triggers_fired || [],
+            pending_triggers: value.pending_triggers || [],
+          })
+        );
+        setSymbols(items);
+      })
+      .catch(() => setSymbols([]))
+      .finally(() => setLoading(false));
+  }, [session?.user?.email]);
 
   const confirmed = symbols.filter((s) => s.tier === "confirmed");
   const withTriggers = confirmed.filter((s) => s.triggers_fired.length > 0);
@@ -150,7 +139,7 @@ export default function StrategyPage() {
       </div>
 
       {/* Entry Signals */}
-      <SignalMosaic locked={!session} message="登入後解鎖策略進場信號">
+      <SignalMosaic locked={accessPlan === "free"} message="升級 Pro 解鎖策略進場信號">
         <div className="bg-white rounded-xl border p-6 mb-8">
         <h2 className="text-xl font-bold mb-4">⚡ 進場信號</h2>
 

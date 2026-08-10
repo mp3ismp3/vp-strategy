@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { FREE_TICKERS } from "@/lib/preview-access";
+import { getServerPlan } from "@/lib/server-entitlement";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 interface ChartInfo {
   daily?: { position?: string };
@@ -11,45 +12,46 @@ interface ChartInfo {
 }
 
 export async function GET(req: NextRequest) {
+  const plan = await getServerPlan();
+  if (!plan) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const ticker = req.nextUrl.searchParams.get("ticker");
+  const includeData = req.nextUrl.searchParams.get("include") === "data";
 
   try {
-    let raw: string = "";
-    const paths = [path.join(process.cwd(), "data", "frontend_charts.json")];
-    if (process.env.NODE_ENV === "development") {
-      paths.unshift(
-        path.join(
-          /* turbopackIgnore: true */ process.cwd(),
-          "../../data/frontend_charts.json"
-        )
-      );
-    }
-
-    for (const p of paths) {
-      try {
-        raw = await fs.readFile(/* turbopackIgnore: true */ p, "utf-8");
-        break;
-      } catch {}
-    }
-
-    if (!raw) {
-      return NextResponse.json({ error: "Data file not found" }, { status: 404 });
-    }
-
-    const data = JSON.parse(raw) as Record<string, ChartInfo>;
+    const supabase = getSupabaseAdmin();
 
     if (ticker) {
+      const normalizedTicker = ticker.toUpperCase();
+      if (plan === "free" && !FREE_TICKERS.includes(normalizedTicker as typeof FREE_TICKERS[number])) {
+        return NextResponse.json({ error: "Upgrade required" }, { status: 403 });
+      }
       // Return single symbol
-      const symbolData = data[ticker.toUpperCase()];
-      if (!symbolData) {
+      const { data: row, error } = await supabase
+        .from("chart_data")
+        .select("data")
+        .eq("ticker", normalizedTicker)
+        .single();
+      if (error || !row?.data) {
         return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
       }
-      return NextResponse.json(symbolData);
+      return NextResponse.json(row.data);
     }
 
-    // Return all tickers (without OHLC to keep response small)
+    const { data: rows, error } = await supabase.from("chart_data").select("ticker, data");
+    if (error || !rows) return NextResponse.json({ error: "Chart data not found" }, { status: 404 });
+    const data = Object.fromEntries(
+      rows.map((row) => [row.ticker, row.data as ChartInfo])
+    ) as Record<string, ChartInfo>;
+    const visibleEntries = plan === "free"
+      ? Object.entries(data).filter(([sym]) => FREE_TICKERS.includes(sym as typeof FREE_TICKERS[number]))
+      : Object.entries(data);
+    if (includeData) {
+      return NextResponse.json(Object.fromEntries(visibleEntries));
+    }
     const summary = Object.fromEntries(
-      Object.entries(data).map(([sym, info]) => [
+      visibleEntries.map(([sym, info]) => [
         sym,
         { price: info.price, daily: info.daily?.position, weekly: info.weekly?.position, monthly: info.monthly?.position },
       ])

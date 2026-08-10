@@ -47,26 +47,11 @@ export function VPChart({ ticker }: VPChartProps) {
   const [timeframe, setTimeframe] = useState<"daily" | "weekly" | "monthly">("daily");
 
   useEffect(() => {
-    // Read from Supabase chart_data
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      supabase
-        .from("chart_data")
-        .select("data")
-        .eq("ticker", ticker.toUpperCase())
-        .single()
-        .then(({ data: row, error }) => {
-          if (error || !row) {
-            setData(null);
-          } else {
-            setData(row.data);
-          }
-          setLoading(false);
-        });
-    });
+    fetch(`/api/data/chart-data?ticker=${encodeURIComponent(ticker)}`)
+      .then(async (response) => response.ok ? response.json() : Promise.reject())
+      .then((chart) => setData(chart))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
   }, [ticker]);
 
   if (loading) {

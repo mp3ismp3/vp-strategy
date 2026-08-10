@@ -15,7 +15,6 @@ export interface PlanConfig {
     accumulation: boolean;
     fusion: boolean;
     telegramSignals: boolean;
-    historyDays: number;
   };
   highlights: string[];
 }
@@ -30,12 +29,11 @@ export const PLANS: Record<Plan, PlanConfig> = {
       accumulation: true,
       fusion: false,
       telegramSignals: false,
-      historyDays: 0,
     },
     highlights: [
       "VP Scanner — Mega Cap Tech 7 檔",
       "多時間框架 VP 圖表",
-      "登入解鎖 Accumulation 完整排行榜",
+      "Accumulation 即時前 10 名摘要",
       "基本操作建議",
     ],
   },
@@ -48,13 +46,12 @@ export const PLANS: Record<Plan, PlanConfig> = {
       accumulation: true,
       fusion: false,
       telegramSignals: false,
-      historyDays: 7,
     },
     highlights: [
       "VP Scanner — 全部 78 檔",
       "Accumulation Tracker",
+      "完整支撐、壓力與 Triggers",
       "類別篩選",
-      "7 天歷史回顧",
     ],
   },
   premium: {
@@ -66,13 +63,11 @@ export const PLANS: Record<Plan, PlanConfig> = {
       accumulation: true,
       fusion: true,
       telegramSignals: true,
-      historyDays: 30,
     },
     highlights: [
       "所有 Pro 功能",
       "Fusion 多策略綜合分析",
       "Telegram 即時信號私訊",
-      "30 天歷史回顧",
       "優先客服支援",
     ],
   },

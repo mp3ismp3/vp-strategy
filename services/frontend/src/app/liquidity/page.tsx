@@ -470,7 +470,8 @@ type SourceFilter = "EQH" | "EQL" | "PDH" | "PDL" | "PWH" | "PWL" | "Swing";
 
 export default function LiquidityPage() {
   const { data: session } = useSession();
-  const isAuthenticated = Boolean(session);
+  const accessPlan = (session?.user as { plan?: "free" | "pro" | "premium" } | undefined)?.plan ?? "free";
+  const isPaid = accessPlan === "pro" || accessPlan === "premium";
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
   const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
@@ -479,37 +480,28 @@ export default function LiquidityPage() {
   );
   const [showSwept, setShowSwept] = useState(true);
   const indicatorCategories = useMemo(
-    () => getIndicatorCategories(isAuthenticated),
-    [isAuthenticated]
+    () => getIndicatorCategories(accessPlan),
+    [accessPlan]
   );
-  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, isAuthenticated)
+  const effectiveTicker = isIndicatorTickerAllowed(selectedTicker, accessPlan)
     ? selectedTicker
     : "NVDA";
   const loading = loadedTicker !== effectiveTicker;
 
-  // Fetch OHLC from Supabase
+  // Fetch OHLC through the server-side entitlement boundary.
   useEffect(() => {
     let cancelled = false;
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      supabase
-        .from("chart_data")
-        .select("data")
-        .eq("ticker", effectiveTicker.toUpperCase())
-        .single()
-        .then(({ data: row }) => {
-          if (cancelled) return;
-          if (row?.data?.daily?.ohlc) {
-            setOhlc(row.data.daily.ohlc);
-          } else {
-            setOhlc([]);
-          }
-          setLoadedTicker(effectiveTicker);
-        });
-    });
+    fetch(`/api/data/chart-data?ticker=${encodeURIComponent(effectiveTicker)}`)
+      .then(async (response) => response.ok ? response.json() : Promise.reject())
+      .then((chart) => {
+        if (!cancelled) setOhlc(chart?.daily?.ohlc || []);
+      })
+      .catch(() => {
+        if (!cancelled) setOhlc([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadedTicker(effectiveTicker);
+      });
     return () => {
       cancelled = true;
     };
@@ -650,7 +642,7 @@ export default function LiquidityPage() {
       </div>
 
       {/* Signal details */}
-      <SignalMosaic locked={!isAuthenticated}>
+      <SignalMosaic locked={!isPaid}>
         {/* Liquidity Levels Table */}
         {visibleLevels.length > 0 && (
         <div className="bg-white rounded-xl border p-6 mb-6">

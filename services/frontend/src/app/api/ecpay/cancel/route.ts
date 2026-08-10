@@ -39,10 +39,12 @@ export async function POST() {
   if (!response.ok || result.RtnCode !== "1" || !verifyEcpayCallback(result, config)) {
     return NextResponse.json({ error: result.RtnMsg || "Unable to cancel ECPay subscription" }, { status: 502 });
   }
-  const { error: subscriptionError } = await supabase.from("billing_subscriptions").update({ status: "canceling", cancel_at_period_end: true, updated_at: new Date().toISOString() }).eq("id", subscription.id);
-  const { error: userError } = await supabase.from("users").update({ subscription_status: "active", cancel_at_period_end: true }).eq("id", user.id);
-  if (subscriptionError || userError) {
-    console.error("ECPay cancellation persisted incompletely", subscriptionError ?? userError);
+  const { data: persisted, error: persistenceError } = await supabase.rpc(
+    "mark_ecpay_subscription_canceling",
+    { target_user_id: user.id, target_subscription_id: subscription.id }
+  );
+  if (persistenceError || !persisted) {
+    console.error("ECPay cancellation persistence failed", persistenceError);
     return NextResponse.json({ error: "扣款已停止，但本地狀態同步失敗，請聯絡客服" }, { status: 500 });
   }
   return NextResponse.json({ canceledAtPeriodEnd: true });

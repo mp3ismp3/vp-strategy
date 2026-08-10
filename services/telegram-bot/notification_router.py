@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import Bot
 from supabase import create_client
-from entitlement import has_active_entitlement
+from entitlement import has_telegram_entitlement
 
 load_dotenv()
 
@@ -51,7 +51,7 @@ def get_subscribers(min_plan: str = "pro") -> list[dict]:
     subscribers = []
     for user in result.data:
         user_level = plan_hierarchy.get(user["plan"], 0)
-        if user_level >= min_level and has_active_entitlement(user):
+        if user_level >= min_level and has_telegram_entitlement(user):
             subscribers.append(user)
 
     return subscribers

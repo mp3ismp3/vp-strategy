@@ -76,9 +76,9 @@ export default function IndicatorPage() {
 
       {!isAuthenticated && (
         <div className="border-b bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">
-          未登入僅可瀏覽 Mega Cap Tech，信號細節已隱藏。
+          登入後可免費瀏覽 Mega Cap Tech 7 檔即時資料。
           <Link href="/login" className="ml-2 font-semibold underline">
-            登入解鎖全部標的
+            免費登入
           </Link>
         </div>
       )}

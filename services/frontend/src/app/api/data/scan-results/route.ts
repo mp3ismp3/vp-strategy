@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { filterScanItemsForPlan } from "@/lib/preview-access";
+import { getServerPlan } from "@/lib/server-entitlement";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 interface VolumeProfileFrame {
   poc?: number;
@@ -24,37 +25,24 @@ interface ScanResults {
 }
 
 export async function GET() {
+  const plan = await getServerPlan();
+  if (!plan) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    // Try multiple paths: local dev → Vercel serverless
-    let raw: string = "";
-    const paths = [path.join(process.cwd(), "data", "scan_results.json")];
-    if (process.env.NODE_ENV === "development") {
-      // Repo-root fallback is local-only and must not expand the production
-      // server trace beyond the frontend project.
-      paths.unshift(
-        path.join(
-          /* turbopackIgnore: true */ process.cwd(),
-          "../../data/scan_results.json"
-        )
-      );
+    const { data: row, error } = await getSupabaseAdmin()
+      .from("scan_data")
+      .select("vp_data, market_ctx, scan_time")
+      .eq("id", "latest")
+      .single();
+    if (error || !row) {
+      return NextResponse.json({ results: [], error: "Scan data not found" }, { status: 404 });
     }
-
-    for (const p of paths) {
-      try {
-        raw = await fs.readFile(/* turbopackIgnore: true */ p, "utf-8");
-        break;
-      } catch {}
-    }
-
-    if (!raw) {
-      return NextResponse.json({ results: [], error: "Data file not found" }, { status: 404 });
-    }
-
-    const data = JSON.parse(raw) as ScanResults;
+    const data = row as ScanResults;
 
     // 轉換格式給前端用
     const vpData = data.vp_data || {};
-    const results = Object.entries(vpData).map(([ticker, info]) => {
+    const results = filterScanItemsForPlan(Object.entries(vpData).map(([ticker, info]) => {
       const daily = info.daily || {};
       const weekly = info.weekly || {};
       const monthly = info.monthly || {};
@@ -95,7 +83,7 @@ export async function GET() {
         consensus,
         suggestion: "",
       };
-    });
+    }), plan);
 
     return NextResponse.json({
       results,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
+import { sanitizeAccumulationForPlan } from "@/lib/data-entitlement";
+import { getServerPlan } from "@/lib/server-entitlement";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 interface AccumulationInfo {
   decay_score?: number;
@@ -15,34 +16,23 @@ interface AccumulationInfo {
 }
 
 export async function GET() {
+  const plan = await getServerPlan();
+  if (!plan) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    let raw: string = "";
-    const paths = [path.join(process.cwd(), "data", "accum_state.json")];
-    if (process.env.NODE_ENV === "development") {
-      paths.unshift(
-        path.join(
-          /* turbopackIgnore: true */ process.cwd(),
-          "../../data/accum_state.json"
-        )
-      );
+    const { data: rows, error } = await getSupabaseAdmin()
+      .from("accum_data")
+      .select("ticker, state");
+    if (error || !rows) {
+      return NextResponse.json({ states: [], error: "Accumulation data not found" }, { status: 404 });
     }
-
-    for (const p of paths) {
-      try {
-        raw = await fs.readFile(/* turbopackIgnore: true */ p, "utf-8");
-        break;
-      } catch {}
-    }
-
-    if (!raw) {
-      return NextResponse.json({ states: [], error: "Data file not found" }, { status: 404 });
-    }
-
-    const data = JSON.parse(raw) as Record<string, AccumulationInfo>;
 
     // 轉換 dict → array
-    const states = Object.entries(data).map(([ticker, info]) => ({
-      ticker,
+    const states = sanitizeAccumulationForPlan(rows.map((row) => {
+      const info = (row.state || {}) as AccumulationInfo & { pending_triggers?: unknown[] };
+      return {
+      ticker: row.ticker,
       phase: info.phase || "UNKNOWN",
       tier: info.tier || "watch",
       decay_score: info.decay_score || 0,
@@ -52,9 +42,10 @@ export async function GET() {
       resistance: info.resistance || 0,
       failing: info.failing || false,
       triggers_fired: info.triggers_fired || [],
-    }));
+      pending_triggers: info.pending_triggers || [],
+    };}), plan);
 
-    return NextResponse.json({ states });
+    return NextResponse.json({ states, accessPlan: plan });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Error reading accum state:", message);
