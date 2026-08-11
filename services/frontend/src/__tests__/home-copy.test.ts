@@ -9,8 +9,14 @@ describe("home page subscription copy", () => {
     expect(source).not.toMatch(/免費試用|查看訂閱方案/);
     expect(source).toContain('href="/scanner"');
     expect(source).toContain("免費瀏覽 Scanner");
-    expect(source).toContain("登入即可解鎖完整預覽");
+    expect(source).toContain("快速掌握市場方向，登入即可查看完整分析與交易信號");
     expect(source).toContain("Premium 方案提供 Telegram 即時信號私訊");
+  });
+
+  it("keeps the strategy cards free of decorative emoji icons", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+
+    expect(source).not.toMatch(/[📊🔍📉⚡]/u);
   });
 });
 
