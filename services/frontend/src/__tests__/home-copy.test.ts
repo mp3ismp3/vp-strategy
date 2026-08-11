@@ -18,6 +18,25 @@ describe("home page subscription copy", () => {
 
     expect(source).not.toMatch(/[📊🔍📉⚡]/u);
   });
+
+  it("uses a text-free animated trading chart in the right-side visual", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/app/page.tsx"), "utf8");
+    const styles = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+
+    expect(source).toContain('aria-label="動態交易趨勢圖"');
+    expect(source).toContain('data-testid="animated-trend-chart"');
+    const chartStart = source.indexOf('data-testid="animated-trend-chart"');
+    const chartEnd = source.indexOf("</svg>", chartStart);
+    const chartVisual = source.slice(chartStart, chartEnd);
+    expect(chartVisual).not.toMatch(
+      /LIVE MARKET STRUCTURE|SMART MONEY ANALYTICS|資金流向視覺化|市場方向/,
+    );
+    expect(chartVisual).not.toContain("<text");
+    expect(chartVisual).toContain('className="trend-chart-line"');
+    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(styles).toContain(".trend-chart-line");
+    expect(source).toContain("lg:grid-cols-2");
+  });
 });
 
 describe("trial-free product UI", () => {
@@ -46,11 +65,11 @@ describe("product branding", () => {
     const navbar = readFileSync(resolve(process.cwd(), "src/components/Navbar.tsx"), "utf8");
 
     expect([home, login, navbar].join("\n")).not.toContain("💰");
-    for (const source of [home, login, layout, navbar]) {
+    for (const source of [login, layout, navbar]) {
       expect(source).toContain("/ptrade.svg");
     }
     expect([home, login].join("\n")).not.toMatch(/\bpriority\b/);
-    expect([home, login].join("\n").match(/\bpreload\b/g)).toHaveLength(2);
+    expect([home, login].join("\n").match(/\bpreload\b/g)).toHaveLength(1);
     expect(existsSync(resolve(process.cwd(), "src/app/favicon.ico"))).toBe(false);
     expect(existsSync(resolve(process.cwd(), "public/ptrade.svg"))).toBe(true);
   });

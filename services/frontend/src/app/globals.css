@@ -128,3 +128,62 @@
     @apply font-sans;
   }
 }
+
+@keyframes trend-chart-draw {
+  0% {
+    stroke-dashoffset: 900;
+  }
+  65%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes trend-chart-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes trend-chart-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.3);
+  }
+}
+
+.trend-chart-line {
+  animation: trend-chart-draw 5s ease-in-out infinite;
+  stroke-dashoffset: 900;
+}
+
+.trend-chart-fill {
+  animation: trend-chart-breathe 4s ease-in-out infinite;
+}
+
+.trend-chart-point {
+  animation: trend-chart-pulse 1.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trend-chart-line,
+  .trend-chart-fill,
+  .trend-chart-point {
+    animation: none;
+  }
+
+  .trend-chart-line {
+    stroke-dashoffset: 0;
+  }
+}

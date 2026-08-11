@@ -1,42 +1,99 @@
 import Link from "next/link";
-import Image from "next/image";
 
 export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
-        <Image
-          src="/ptrade.svg"
-          alt="P Trade"
-          width={96}
-          height={96}
-          preload
-          className="mb-6 rounded-2xl"
-        />
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight max-w-3xl">
-          SMART STRATEGY
-          <br />
-          交易分析平台
-        </h1>
-        <p className="mt-6 text-lg text-gray-600 max-w-2xl">
-          每天自動分析美股走勢，找出關鍵價位與潛在機會。
-          <br />
-          快速掌握市場方向，登入即可查看完整分析與交易信號。
-        </p>
-        <div className="mt-8 flex gap-4">
-          <Link
-            href="/scanner"
-            className="bg-black text-white px-8 py-3 rounded-md font-medium hover:bg-gray-800 text-lg"
+      <section className="px-6 py-14 lg:py-20">
+        <div className="mx-auto grid min-h-[72vh] max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
+          <div className="max-w-2xl">
+            <h1 className="text-5xl font-semibold leading-[0.95] tracking-[-0.055em] text-gray-950 sm:text-6xl lg:text-7xl xl:text-8xl">
+              SMART
+              <br />
+              STRATEGY
+            </h1>
+            <p className="mt-5 text-2xl font-medium text-gray-900">交易分析平台</p>
+            <p className="mt-7 max-w-xl text-lg leading-8 text-gray-600">
+              每天自動分析美股走勢，找出關鍵價位與潛在機會。
+              <br className="hidden sm:block" />
+              快速掌握市場方向，登入即可查看完整分析與交易信號。
+            </p>
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/scanner"
+                className="rounded-full bg-blue-600 px-8 py-3.5 text-center text-lg font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                免費瀏覽 Scanner
+              </Link>
+              <Link
+                href="/login"
+                className="rounded-full border border-gray-300 px-8 py-3.5 text-center text-lg font-semibold text-gray-900 transition-colors hover:bg-gray-50"
+              >
+                登入
+              </Link>
+            </div>
+          </div>
+
+          <div
+            role="img"
+            aria-label="動態交易趨勢圖"
+            data-testid="animated-trend-chart"
+            className="relative min-h-[420px] overflow-hidden rounded-[2.75rem] bg-black shadow-2xl shadow-blue-950/20 sm:min-h-[560px]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(37, 99, 235, 0.6) 1.2px, transparent 1.3px)",
+              backgroundSize: "32px 32px",
+            }}
           >
-            免費瀏覽 Scanner
-          </Link>
-          <Link
-            href="/login"
-            className="border border-gray-300 px-8 py-3 rounded-md font-medium hover:bg-gray-50 text-lg"
-          >
-            登入
-          </Link>
+            <svg
+              viewBox="0 0 640 560"
+              className="absolute inset-0 h-full w-full"
+              aria-hidden="true"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                <linearGradient id="trendLine" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#1d4ed8" />
+                  <stop offset="55%" stopColor="#3b82f6" />
+                  <stop offset="100%" stopColor="#93c5fd" />
+                </linearGradient>
+                <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#2563eb" stopOpacity="0.32" />
+                  <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+                </linearGradient>
+                <filter id="trendGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="7" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <path
+                d="M45 430 C105 425 125 365 185 382 S275 440 320 318 S410 275 455 300 S525 205 595 115 L595 500 L45 500 Z"
+                fill="url(#trendFill)"
+                className="trend-chart-fill"
+              />
+              <path
+                d="M45 430 C105 425 125 365 185 382 S275 440 320 318 S410 275 455 300 S525 205 595 115"
+                fill="none"
+                stroke="url(#trendLine)"
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray="900"
+                filter="url(#trendGlow)"
+                className="trend-chart-line"
+              />
+              <circle
+                cx="595"
+                cy="115"
+                r="10"
+                fill="#60a5fa"
+                filter="url(#trendGlow)"
+                className="trend-chart-point"
+              />
+            </svg>
+          </div>
         </div>
       </section>
 
