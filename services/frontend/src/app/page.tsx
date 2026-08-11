@@ -15,14 +15,14 @@ export default function HomePage() {
           className="mb-6 rounded-2xl"
         />
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight max-w-3xl">
-          Market Auction Theory
+          SMART STRATEGY
           <br />
           交易分析平台
         </h1>
         <p className="mt-6 text-lg text-gray-600 max-w-2xl">
-          Volume Profile 多時間框架分析 + Wyckoff 機構吸籌追蹤。
+          每天自動分析美股走勢，找出關鍵價位與潛在機會。
           <br />
-          先瀏覽市場結構，登入即可解鎖完整預覽。
+          快速掌握市場方向，登入即可查看完整分析與交易信號。
         </p>
         <div className="mt-8 flex gap-4">
           <Link
@@ -47,7 +47,6 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-8">
             {/* VP Scanner */}
             <div className="bg-white rounded-xl p-8 shadow-sm border">
-              <div className="text-3xl mb-4">📊</div>
               <h3 className="text-xl font-bold mb-3">VP Position Viewer</h3>
               <p className="text-gray-600 mb-4">
                 日線 / 周線 / 月線 Volume Profile，一眼看出價格相對公允價值的位置。
@@ -62,7 +61,6 @@ export default function HomePage() {
 
             {/* Accumulation */}
             <div className="bg-white rounded-xl p-8 shadow-sm border">
-              <div className="text-3xl mb-4">🔍</div>
               <h3 className="text-xl font-bold mb-3">Accumulation Tracker</h3>
               <p className="text-gray-600 mb-4">
                 Wyckoff 機構吸籌追蹤，跨天累積狀態，在突破前提早發現。
@@ -78,7 +76,6 @@ export default function HomePage() {
 
             {/* Indicator */}
             <div className="bg-white rounded-xl p-8 shadow-sm border">
-              <div className="text-3xl mb-4">📉</div>
               <h3 className="text-xl font-bold mb-3">Indicator Suite</h3>
               <p className="text-gray-600 mb-4">
                 MACD 背離、FVG 與 Liquidity Sweep，集中查看技術結構信號。
@@ -92,7 +89,6 @@ export default function HomePage() {
 
             {/* Strategy Lab */}
             <div className="bg-white rounded-xl p-8 shadow-sm border">
-              <div className="text-3xl mb-4">⚡</div>
               <h3 className="text-xl font-bold mb-3">Strategy Lab</h3>
               <p className="text-gray-600 mb-4">
                 將 Wyckoff 結構、RSI 時機與回測績效整合成可執行的交易流程。
