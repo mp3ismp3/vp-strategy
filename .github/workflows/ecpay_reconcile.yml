@@ -1,0 +1,121 @@
+name: ECPay Reconciliation Monitor
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecpay-reconciliation-monitor
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RECONCILE_URL: https://vp-strategy-nu.vercel.app/api/admin/ecpay-reconcile
+      BILLING_RECONCILIATION_SECRET: ${{ secrets.BILLING_RECONCILIATION_SECRET }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      BILLING_ALERT_TELEGRAM_CHAT_ID: ${{ secrets.BILLING_ALERT_TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Validate monitor secrets
+        shell: bash
+        run: |
+          if [[ -z "${BILLING_RECONCILIATION_SECRET}" ]]; then
+            echo "::error::BILLING_RECONCILIATION_SECRET is not configured"
+            exit 1
+          fi
+          if [[ -z "${TELEGRAM_BOT_TOKEN}" || -z "${BILLING_ALERT_TELEGRAM_CHAT_ID}" ]]; then
+            echo "::error::Billing Telegram notification secrets are not configured"
+            exit 1
+          fi
+
+      - name: Audit ECPay subscription state
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="${RUNNER_TEMP}/ecpay-reconciliation.json"
+          message_file="${RUNNER_TEMP}/ecpay-reconciliation-message.txt"
+          telegram_response="${RUNNER_TEMP}/telegram-response.json"
+
+          send_telegram() {
+            curl --silent --show-error --fail-with-body \
+              --connect-timeout 10 --max-time 30 \
+              --request POST \
+              --data-urlencode "chat_id=${BILLING_ALERT_TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text@${message_file}" \
+              --output "${telegram_response}" \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"
+            jq -e '.ok == true' "${telegram_response}" >/dev/null
+          }
+
+          if ! curl --silent --show-error --fail-with-body \
+              --retry 2 --retry-all-errors \
+              --connect-timeout 10 --max-time 120 \
+              --header "Authorization: Bearer ${BILLING_RECONCILIATION_SECRET}" \
+              --output "${response_file}" \
+              "${RECONCILE_URL}"; then
+            printf '%s\n' \
+              '🚨 ECPay reconciliation request failed' \
+              "Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+              > "${message_file}"
+            send_telegram || echo "::error::Telegram failure notification could not be sent"
+            exit 1
+          fi
+
+          if ! jq -e '
+            (.safeToEnableCheckout | type) == "boolean" and
+            (.localStateHealthy | type) == "boolean" and
+            (.findings | type) == "array" and
+            (.unresolvedEvents | type) == "array"
+          ' "${response_file}" >/dev/null; then
+            printf '%s\n' \
+              '🚨 ECPay reconciliation returned an invalid response' \
+              "Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+              > "${message_file}"
+            send_telegram || echo "::error::Telegram failure notification could not be sent"
+            echo "::error::Reconciliation API returned an invalid response schema"
+            exit 1
+          fi
+
+          checked_subscriptions="$(jq -r '.checkedSubscriptions // 0' "${response_file}")"
+          finding_count="$(jq -r '.findings | length' "${response_file}")"
+          unresolved_count="$(jq -r '.unresolvedEvents | length' "${response_file}")"
+          {
+            echo "### ECPay reconciliation"
+            echo "- Checked subscriptions: ${checked_subscriptions}"
+            echo "- Findings: ${finding_count}"
+            echo "- Unresolved events: ${unresolved_count}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          if ! jq -e '
+            .safeToEnableCheckout == true and
+            .localStateHealthy == true and
+            (.findings | length == 0) and
+            (.unresolvedEvents | length == 0)
+          ' "${response_file}" >/dev/null; then
+            raw_message="${RUNNER_TEMP}/ecpay-reconciliation-message-raw.txt"
+            {
+              echo '🚨 ECPay reconciliation detected inconsistencies'
+              echo "Checked subscriptions: ${checked_subscriptions}"
+              echo "Findings: ${finding_count}"
+              echo "Unresolved events: ${unresolved_count}"
+              jq -r '
+                (.findings // [])[0:10][] |
+                "- finding=\(.issue // "unknown") severity=\(.severity // "unknown") subscription_id=\(.subscriptionId // "n/a") user_id=\(.userId // "n/a")"
+              ' "${response_file}"
+              jq -r '
+                (.unresolvedEvents // [])[0:10][] |
+                "- event=\(.providerEventId // "n/a") status=\(.processingStatus // "unknown") has_error=\(.hasError // false)"
+              ' "${response_file}"
+              echo "Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            } > "${raw_message}"
+            head -c 3500 "${raw_message}" > "${message_file}"
+            send_telegram || echo "::error::Telegram failure notification could not be sent"
+            echo "::error::ECPay reconciliation detected billing inconsistencies"
+            exit 1
+          fi
