@@ -216,7 +216,7 @@ Web entitlement boundary：未登入訪客不得讀 production data。登入 Fre
 - `tests.yml`：push/PR 執行 Python pytest。
 - `vp_scanner.yml`：平日 21:05 UTC 依序跑 scanner、accumulation、MACD、chart export、Supabase upload、subscriber notification，最後 auto-commit accumulation state。
 - `pre_market.yml`：平日 13:00 UTC 執行盤前 watchlist。
-- `ecpay_reconcile.yml`：每日 02:30 UTC 以 repository secret 呼叫 production ECPay reconciliation API；HTTP/schema 錯誤、provider findings 或 unresolved events 會使 workflow 失敗，獨立 billing Telegram 管理群接收受長度限制的 trace identifiers，不與交易掃描 chat 共用，GitHub Actions failure notification 作為備援。
+- `ecpay_reconcile.yml`：每日 02:30 UTC 以 repository secret 呼叫 production ECPay reconciliation API；HTTP/schema 錯誤、provider findings 或 unresolved events 會使 workflow 失敗，獨立 billing Telegram 管理群接收受長度限制的 trace identifiers 與安全化 provider rejection detail，不與交易掃描 chat 共用，GitHub Actions failure notification 作為備援。
 - `backtest.yml`：手動觸發 multi-strategy backtest。
 - `deploy/docker-compose.yml`：部署服務編排；`.env.example` 只列變數名稱，不放 secrets。
 

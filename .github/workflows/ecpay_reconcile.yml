@@ -106,7 +106,7 @@ jobs:
               echo "Unresolved events: ${unresolved_count}"
               jq -r '
                 (.findings // [])[0:10][] |
-                "- finding=\(.issue // "unknown") severity=\(.severity // "unknown") subscription_id=\(.subscriptionId // "n/a") user_id=\(.userId // "n/a")"
+                "- finding=\(.issue // "unknown") severity=\(.severity // "unknown") subscription_id=\(.subscriptionId // "n/a") user_id=\(.userId // "n/a") detail=\(.error // "n/a")"
               ' "${response_file}"
               jq -r '
                 (.unresolvedEvents // [])[0:10][] |

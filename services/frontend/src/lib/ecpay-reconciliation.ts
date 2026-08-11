@@ -35,6 +35,16 @@ export async function queryEcpaySubscription(
   const raw = await response.text();
   if (Buffer.byteLength(raw, "utf8") > 256 * 1024) throw new Error("ECPay reconciliation response too large");
   const fields = JSON.parse(raw) as EcpayFields & { ExecLog?: unknown };
+  const rtnCode = String(fields.RtnCode ?? "");
+  if (rtnCode && rtnCode !== "1") {
+    const safeCode = rtnCode.replace(/[^0-9-]/g, "").slice(0, 16) || "unknown";
+    const safeMessage = String(fields.RtnMsg ?? "Unknown provider rejection")
+      .replace(/[\u0000-\u001f\u007f]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160) || "Unknown provider rejection";
+    throw new Error(`ECPay reconciliation rejected (RtnCode=${safeCode}): ${safeMessage}`);
+  }
   if (fields.MerchantID !== config.merchantId || fields.MerchantTradeNo !== merchantTradeNo) {
     throw new Error("ECPay reconciliation identity mismatch");
   }
