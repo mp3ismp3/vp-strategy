@@ -33,7 +33,7 @@ BILLING_ALERT_WEBHOOK_URL=https://內部告警接收端
 
 Preview 不得使用正式金鑰。Sandbox 驗收通過後才切換 `ECPAY_MODE=live`、換正式憑證並同時開啟兩個 ECPay flags，然後 redeploy。
 
-GitHub repository Actions secrets 必須設定與 Vercel Production 相同的 `BILLING_RECONCILIATION_SECRET`、既有的 `TELEGRAM_BOT_TOKEN`，以及只指向私人 billing 管理群的 `BILLING_ALERT_TELEGRAM_CHAT_ID`；不可沿用交易掃描的 `TELEGRAM_CHAT_ID`。`.github/workflows/ecpay_reconcile.yml` 每日 02:30 UTC 呼叫 production reconcile API；HTTP/API schema 錯誤、`safeToEnableCheckout=false`、findings 或 unresolved events 都會讓 workflow 失敗並通知 billing Telegram。異常訊息最多列出各 10 筆 finding/event，以 3500 bytes 截斷，包含 issue 與 subscription/user/event ID 供 Supabase trace，不包含 email、secret 或完整 provider payload。Repository owner 仍應在 GitHub `Settings → Notifications → Actions` 啟用失敗 workflow email 作為備援。API 回應只在 runner 暫存，公開 log 與 job summary 僅記錄檢查數量。
+GitHub repository Actions secrets 必須設定與 Vercel Production 相同的 `BILLING_RECONCILIATION_SECRET`、既有的 `TELEGRAM_BOT_TOKEN`，以及只指向私人 billing 管理群的 `BILLING_ALERT_TELEGRAM_CHAT_ID`；不可沿用交易掃描的 `TELEGRAM_CHAT_ID`。`.github/workflows/ecpay_reconcile.yml` 每日 02:30 UTC 呼叫 production reconcile API；HTTP/API schema 錯誤、`safeToEnableCheckout=false`、findings 或 unresolved events 都會讓 workflow 失敗並通知 billing Telegram。provider 拒絕查詢時，API 會在 identity 驗證前回報單行化且最多 160 字元的 `RtnCode/RtnMsg`；異常訊息最多列出各 10 筆 finding/event，以 3500 bytes 截斷，包含 issue、subscription/user/event ID 與安全化 detail 供 Supabase trace，不包含 email、secret 或完整 provider payload。Repository owner 仍應在 GitHub `Settings → Notifications → Actions` 啟用失敗 workflow email 作為備援。API 回應只在 runner 暫存，公開 log 與 job summary 僅記錄檢查數量。
 
 ## 回呼
 

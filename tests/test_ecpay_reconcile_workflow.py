@@ -20,6 +20,7 @@ class EcpayReconcileWorkflowTest(unittest.TestCase):
         self.assertIn("/sendMessage", source)
         self.assertIn("--data-urlencode", source)
         self.assertIn("[0:10][]", source)
+        self.assertIn('detail=\\(.error // "n/a")', source)
         self.assertIn("head -c 3500", source)
         self.assertIn("--fail-with-body", source)
         self.assertIn("safeToEnableCheckout == true", source)

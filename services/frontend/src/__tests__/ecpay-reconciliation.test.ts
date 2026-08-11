@@ -23,6 +23,31 @@ describe("ECPay reconciliation audit", () => {
     expect(snapshot.periodAmount).toBe(320);
   });
 
+  it("reports a sanitized provider rejection before identity validation", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      RtnCode: 0,
+      RtnMsg: `MerchantTradeNo not found\n${"x".repeat(300)}`,
+    })));
+
+    let thrown: unknown;
+    try {
+      await queryEcpaySubscription("VP260807MISSING", {
+        checkoutUrl: "https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5",
+        periodActionUrl: "https://payment-stage.ecpay.com.tw/Cashier/CreditCardPeriodAction",
+        periodQueryUrl: "https://payment-stage.ecpay.com.tw/Cashier/QueryCreditCardPeriodInfo",
+        merchantId: "3002607", hashKey: "key", hashIv: "iv", mode: "test",
+      }, fetcher);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/^ECPay reconciliation rejected \(RtnCode=0\): MerchantTradeNo not found x+$/);
+    expect(message).not.toContain("\n");
+    expect(message.length).toBeLessThanOrEqual(207);
+  });
+
   it("flags provider termination and amount drift", () => {
     expect(compareEcpayProviderState({
       subscriptionId: "sub_1", localStatus: "active", localAmount: 320,
