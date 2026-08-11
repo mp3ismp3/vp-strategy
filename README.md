@@ -199,7 +199,7 @@ Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
-Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。首頁 Hero 以 `SMART STRATEGY` 作為展示名稱並使用一般使用者可理解的市場分析文案；四大策略卡片不顯示裝飾性 emoji。品牌 icon 使用 `services/frontend/public/ptrade.svg`，首頁、登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
+Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。首頁 Hero 以 `SMART STRATEGY` 作為展示名稱，採響應式左右分欄宣傳排版，左側使用一般使用者可理解的市場分析文案，右側只顯示無文字的原生動態交易趨勢圖；四大策略卡片不顯示裝飾性 emoji。品牌 icon 使用 `services/frontend/public/ptrade.svg`，登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
 
 Stripe Checkout 已退出新訂閱 UI 且 production 必須保持 `STRIPE_CHECKOUT_ENABLED=false`；既有 Stripe Customer Portal 與 webhook 仍保留，避免既有訂閱失去取消或狀態同步能力。原有 server-only Price allowlist、Test/Live 隔離、Session 冪等與禁止直接切換方案的安全邊界維持不變。
 
