@@ -33,6 +33,8 @@ BILLING_ALERT_WEBHOOK_URL=https://內部告警接收端
 
 Preview 不得使用正式金鑰。Sandbox 驗收通過後才切換 `ECPAY_MODE=live`、換正式憑證並同時開啟兩個 ECPay flags，然後 redeploy。
 
+GitHub repository Actions secrets 必須設定與 Vercel Production 相同的 `BILLING_RECONCILIATION_SECRET`、既有的 `TELEGRAM_BOT_TOKEN`，以及只指向私人 billing 管理群的 `BILLING_ALERT_TELEGRAM_CHAT_ID`；不可沿用交易掃描的 `TELEGRAM_CHAT_ID`。`.github/workflows/ecpay_reconcile.yml` 每日 02:30 UTC 呼叫 production reconcile API；HTTP/API schema 錯誤、`safeToEnableCheckout=false`、findings 或 unresolved events 都會讓 workflow 失敗並通知 billing Telegram。異常訊息最多列出各 10 筆 finding/event，以 3500 bytes 截斷，包含 issue 與 subscription/user/event ID 供 Supabase trace，不包含 email、secret 或完整 provider payload。Repository owner 仍應在 GitHub `Settings → Notifications → Actions` 啟用失敗 workflow email 作為備援。API 回應只在 runner 暫存，公開 log 與 job summary 僅記錄檢查數量。
+
 ## 回呼
 
 ```text
@@ -53,7 +55,7 @@ OrderResultURL=https://vp-strategy-nu.vercel.app/api/ecpay/result
 6. 驗證 Premium NT$620，既有付費者不得建立另一方案。
 7. Account 取消後確認後續授權停止、`cancel_at_period_end=true`，本期結束後回 Free。
 8. 以 Free/Pro/Premium 直接呼叫 data APIs，確認 Free 僅 7 檔/前 10 名摘要、Pro 無法讀 Fusion、Premium 可讀 Fusion，anon Supabase SELECT 被拒絕。
-9. 呼叫 `GET /api/admin/ecpay-reconcile`，確認 provider query、金額、執行狀態、過期 active 與 unresolved events 全部正常；設定排程以 `Authorization: Bearer $BILLING_RECONCILIATION_SECRET` 至少每日執行一次，並驗證告警接收端。
+9. 手動觸發 `ECPay Reconciliation Monitor` workflow，確認它以 `Authorization: Bearer $BILLING_RECONCILIATION_SECRET` 呼叫 `GET /api/admin/ecpay-reconcile`，provider query、金額、執行狀態、過期 active 與 unresolved events 全部正常；以測試異常驗證 Telegram trace 通知、workflow failure email 與告警接收端。
 10. 模擬 provider Cancel 成功但本地 finalize 失敗，確認 outbox 保留且 `POST /api/admin/ecpay-cancel-retry` 可依 provider query 完成同步。
 11. 驗證跨 provider：有效 ECPay Premium 不會被 Stripe deleted event 降級，有效 Stripe Premium 也不會被 ECPay past-due callback 降級。
 12. 執行 `POST /api/admin/billing-retention`（預設 90 天），確認只清除逾期且 processed 的最小化 event，不刪除 processing/failed 稽核資料。
