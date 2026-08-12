@@ -76,8 +76,8 @@ function FusionContent() {
   const inactive = signals.filter((s) => s.stars <= 0);
 
   return (
-    <div className="analysis-page">
-      <div className="analysis-header">
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-6">
         <div>
           <h1 className="text-3xl font-bold">Fusion Analysis</h1>
           <p className="text-gray-600 mt-1">

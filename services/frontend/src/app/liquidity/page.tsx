@@ -547,9 +547,9 @@ export default function LiquidityPage() {
   };
 
   return (
-    <div className="analysis-page">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="analysis-header">
+      <div className="mb-6">
         <div>
           <h1 className="text-3xl font-bold">Liquidity Sweep</h1>
           <p className="text-gray-600 mt-1">

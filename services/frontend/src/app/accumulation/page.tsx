@@ -67,8 +67,8 @@ function AccumulationContent() {
   const selectedState = visibleStates.find((s) => s.ticker === selectedTicker);
 
   return (
-    <div className="analysis-page">
-      <div className="analysis-header">
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-6">
         <div>
           <h1 className="text-3xl font-bold">Accumulation Tracker</h1>
           <p className="text-gray-600 mt-1">

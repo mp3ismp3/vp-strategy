@@ -131,19 +131,15 @@
 
 @layer components {
   .analysis-page {
-    @apply mx-auto min-h-screen max-w-7xl bg-gray-50/60 px-4 py-8;
+    @apply mx-auto max-w-7xl px-4 py-8;
   }
 
   .analysis-header {
-    @apply mb-8 flex flex-wrap items-end justify-between gap-4;
+    @apply flex flex-wrap items-end justify-between gap-4;
   }
 
   .analysis-panel {
     @apply rounded-xl border bg-white p-5 shadow-sm;
-  }
-
-  .analysis-page :where(.bg-white.rounded-xl, .overflow-x-auto.bg-white) {
-    @apply shadow-sm;
   }
 }
 

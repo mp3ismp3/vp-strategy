@@ -29,12 +29,17 @@ describe("analysis UI consistency", () => {
     expect(source).not.toContain('"Not configured"');
   });
 
-  it("defines shared dashboard surfaces", () => {
+  it("keeps shared card styles scoped to Crypto Liquidity", () => {
     const styles = read("src/app/globals.css");
 
     expect(styles).toContain(".analysis-page");
-    expect(styles).toContain(".analysis-header");
-    expect(styles).toContain(".analysis-panel");
+    expect(styles).not.toContain("min-h-screen");
+    expect(styles).not.toContain("bg-gray-50/60");
+    expect(styles).not.toContain(":where(.bg-white.rounded-xl");
+
+    for (const path of analysisSurfaces.filter((path) => path !== "src/app/crypto-liquidity/page.tsx")) {
+      expect(read(path), path).not.toContain("analysis-page");
+    }
   });
 
   it("does not use decorative emoji on analysis surfaces", () => {
