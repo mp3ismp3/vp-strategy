@@ -9,22 +9,19 @@ import LiquidityPage from "@/app/liquidity/page";
 
 type IndicatorTab = "macd" | "fvg" | "liquidity";
 
-const tabs: { key: IndicatorTab; icon: string; label: string; description: string }[] = [
+const tabs: { key: IndicatorTab; label: string; description: string }[] = [
   {
     key: "macd",
-    icon: "📉",
     label: "MACD Divergence",
     description: "日線 + 周線背離偵測",
   },
   {
     key: "fvg",
-    icon: "📐",
     label: "FVG",
     description: "公允價值缺口",
   },
   {
     key: "liquidity",
-    icon: "💧",
     label: "Liquidity Sweep",
     description: "流動性掃蕩偵測",
   },
@@ -59,7 +56,6 @@ export default function IndicatorPage() {
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
-                <span>{tab.icon}</span>
                 <span>{tab.label}</span>
                 <span
                   className={`hidden sm:inline text-xs ${

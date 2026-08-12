@@ -547,13 +547,15 @@ export default function LiquidityPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="analysis-page">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">💧 Liquidity Sweep</h1>
-        <p className="text-gray-600 mt-1">
-          專業級流動性掃蕩偵測 — Equal Highs/Lows、PDH/PDL/PWH/PWL、顯著 Swing
-        </p>
+      <div className="analysis-header">
+        <div>
+          <h1 className="text-3xl font-bold">Liquidity Sweep</h1>
+          <p className="text-gray-600 mt-1">
+            專業級流動性掃蕩偵測 — Equal Highs/Lows、PDH/PDL/PWH/PWL、顯著 Swing
+          </p>
+        </div>
       </div>
 
       {/* Controls */}
@@ -589,10 +591,10 @@ export default function LiquidityPage() {
 
           <div className="flex items-center gap-3 ml-auto">
             <Badge className="bg-green-100 text-green-800">
-              🟢 Bullish: {bullishSweeps.length}
+              Bullish: {bullishSweeps.length}
             </Badge>
             <Badge className="bg-red-100 text-red-800">
-              🔴 Bearish: {bearishSweeps.length}
+              Bearish: {bearishSweeps.length}
             </Badge>
           </div>
         </div>
@@ -646,7 +648,7 @@ export default function LiquidityPage() {
         {/* Liquidity Levels Table */}
         {visibleLevels.length > 0 && (
         <div className="bg-white rounded-xl border p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">📋 流動性水平一覽</h2>
+          <h2 className="text-xl font-bold mb-4">流動性水平一覽</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -674,9 +676,9 @@ export default function LiquidityPage() {
                     </td>
                     <td className="p-3">
                       {level.type === "high" ? (
-                        <span className="text-red-600">⬆ 上方流動性</span>
+                        <span className="text-red-600">上方流動性</span>
                       ) : (
-                        <span className="text-green-600">⬇ 下方流動性</span>
+                        <span className="text-green-600">下方流動性</span>
                       )}
                     </td>
                     <td className="p-3 font-mono font-medium">${level.price.toFixed(2)}</td>
@@ -692,7 +694,7 @@ export default function LiquidityPage() {
                       {level.swept ? (
                         <Badge className="bg-gray-100 text-gray-500">已掃蕩 ({level.sweepTime})</Badge>
                       ) : (
-                        <Badge className="bg-blue-100 text-blue-700 font-medium">有效 ✓</Badge>
+                        <Badge className="bg-blue-100 text-blue-700 font-medium">有效</Badge>
                       )}
                     </td>
                   </tr>
@@ -706,7 +708,7 @@ export default function LiquidityPage() {
       {/* Sweep Events Table */}
         {visibleSweeps.length > 0 && (
         <div className="bg-white rounded-xl border p-6">
-          <h2 className="text-xl font-bold mb-4">⚡ Sweep 事件</h2>
+          <h2 className="text-xl font-bold mb-4">Sweep 事件</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -726,9 +728,9 @@ export default function LiquidityPage() {
                     <td className="p-3 font-mono">{s.time}</td>
                     <td className="p-3">
                       {s.direction === "bullish" ? (
-                        <Badge className="bg-green-100 text-green-800">🟢 Bullish</Badge>
+                        <Badge className="bg-green-100 text-green-800">Bullish</Badge>
                       ) : (
-                        <Badge className="bg-red-100 text-red-800">🔴 Bearish</Badge>
+                        <Badge className="bg-red-100 text-red-800">Bearish</Badge>
                       )}
                     </td>
                     <td className="p-3 font-mono">${s.level.price.toFixed(2)}</td>
@@ -856,7 +858,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     textposition: "bottom center",
     textfont: { size: 9, color: "#4caf50" },
     name: "Bullish Sweep",
-    hovertemplate: "🟢 Bullish Sweep<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
+    hovertemplate: "Bullish Sweep<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
     customdata: bullSweeps.map((s) => [s.level.source, s.level.price, s.volumeRatio]),
     xaxis: "x",
     yaxis: "y",
@@ -872,7 +874,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     textposition: "top center",
     textfont: { size: 9, color: "#f44336" },
     name: "Bearish Sweep",
-    hovertemplate: "🔴 Bearish Sweep<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
+    hovertemplate: "Bearish Sweep<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
     customdata: bearSweeps.map((s) => [s.level.source, s.level.price, s.volumeRatio]),
     xaxis: "x",
     yaxis: "y",

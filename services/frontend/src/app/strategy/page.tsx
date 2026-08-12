@@ -65,20 +65,22 @@ export default function StrategyPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="analysis-page">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">📊 Strategy Lab</h1>
-        <p className="text-gray-600 mt-1">
-          回測驗證過的交易策略，明確的進場時機與規則
-        </p>
+      <div className="analysis-header">
+        <div>
+          <h1 className="text-3xl font-bold">Strategy Lab</h1>
+          <p className="text-gray-600 mt-1">
+            回測驗證過的交易策略，明確的進場時機與規則
+          </p>
+        </div>
       </div>
 
       {/* Strategy Card */}
       <div className="bg-white rounded-xl border p-6 mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-bold">🏛️ Wyckoff Accumulation + RSI(2)</h2>
+            <h2 className="text-xl font-bold">Wyckoff Accumulation + RSI(2)</h2>
             <p className="text-sm text-gray-500 mt-1">
               Swing (10-20天) | Long only | ~30 筆/年
             </p>
@@ -141,7 +143,7 @@ export default function StrategyPage() {
       {/* Entry Signals */}
       <SignalMosaic locked={accessPlan === "free"} message="升級 Pro 解鎖策略進場信號">
         <div className="bg-white rounded-xl border p-6 mb-8">
-        <h2 className="text-xl font-bold mb-4">⚡ 進場信號</h2>
+        <h2 className="text-xl font-bold mb-4">進場信號</h2>
 
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -171,7 +173,7 @@ export default function StrategyPage() {
                     Resistance ${s.resistance.toFixed(1)}
                   </div>
                   <div className="mt-2 text-sm font-medium text-green-700">
-                    ⏳ 等待 RSI(2) {"<"} 30 → 次日 Open 買入
+                    等待 RSI(2) {"<"} 30 → 次日 Open 買入
                   </div>
                 </div>
               );
@@ -185,7 +187,7 @@ export default function StrategyPage() {
 
         {withPending.length > 0 && (
           <div className="mt-4">
-            <h3 className="font-semibold text-gray-700 mb-2">⏳ 等待確認中</h3>
+            <h3 className="font-semibold text-gray-700 mb-2">等待確認中</h3>
             <div className="space-y-2">
               {withPending.map((s) => (
                 <div key={s.symbol} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -206,10 +208,10 @@ export default function StrategyPage() {
 
       {/* Entry Checklist */}
       <div className="bg-white rounded-xl border p-6 mb-8">
-        <h2 className="text-xl font-bold mb-4">📋 進場 Checklist</h2>
+        <h2 className="text-xl font-bold mb-4">進場 Checklist</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <h3 className="font-semibold text-green-700 mb-2">✅ 買入條件（全部滿足）</h3>
+            <h3 className="font-semibold text-green-700 mb-2">買入條件（全部滿足）</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm">
               <li>Confirmed tier（上方信號區顯示）</li>
               <li>Trigger fired — Spring / LPS / SOS</li>
@@ -220,7 +222,7 @@ export default function StrategyPage() {
             </ol>
           </div>
           <div>
-            <h3 className="font-semibold text-red-700 mb-2">❌ 不要進場</h3>
+            <h3 className="font-semibold text-red-700 mb-2">不要進場</h3>
             <ul className="list-disc list-inside space-y-2 text-sm">
               <li>RSI(2) {">"} 30 — 還沒超賣</li>
               <li>Watch tier — 未確認，不可靠</li>
@@ -233,7 +235,7 @@ export default function StrategyPage() {
 
       {/* Position Sizing */}
       <div className="bg-white rounded-xl border p-6 mb-8">
-        <h2 className="text-xl font-bold mb-4">💰 倉位計算</h2>
+        <h2 className="text-xl font-bold mb-4">倉位計算</h2>
         <div className="bg-gray-50 rounded-lg p-4 text-sm font-mono">
           <p>帳戶: $100,000 | Risk: 2% = $2,000/trade</p>
           <p>Entry: $150.00 | SL: $142.50 (trigger 給的)</p>
@@ -250,7 +252,7 @@ export default function StrategyPage() {
       {!loading && confirmed.length > 0 && (
         <div className="bg-white rounded-xl border p-6">
           <h2 className="text-xl font-bold mb-4">
-            📋 Confirmed 清單（{confirmed.length} 檔）
+            Confirmed 清單（{confirmed.length} 檔）
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
             {confirmed.map((s) => (
