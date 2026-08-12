@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Paywall } from "@/components/Paywall";
 import { Badge } from "@/components/ui/badge";
+import { stripDecorativeSymbols } from "@/lib/analysis-display";
 import { formatTrigger, type Trigger } from "@/lib/triggers";
 
 interface FusionSignal {
@@ -47,7 +48,7 @@ function FusionContent() {
     );
   }
 
-  const starsDisplay = (n: number) => (n <= 0 ? "❌" : "⭐".repeat(n));
+  const starsDisplay = (n: number) => `${Math.max(0, n)}/5`;
 
   const positionBadge = (pos: string) => {
     if (pos === "above_va") return <Badge className="bg-green-100 text-green-800">Above VA</Badge>;
@@ -56,9 +57,9 @@ function FusionContent() {
   };
 
   const macroBadge = (dir: string) => {
-    if (dir === "bullish") return <Badge className="bg-green-100 text-green-800">🟢 Bullish</Badge>;
-    if (dir === "bearish") return <Badge className="bg-red-100 text-red-800">🔴 Bearish</Badge>;
-    return <Badge className="bg-gray-100 text-gray-800">⚪ Neutral</Badge>;
+    if (dir === "bullish") return <Badge className="bg-green-100 text-green-800">Bullish</Badge>;
+    if (dir === "bearish") return <Badge className="bg-red-100 text-red-800">Bearish</Badge>;
+    return <Badge className="bg-gray-100 text-gray-800">Neutral</Badge>;
   };
 
   const phaseColor: Record<string, string> = {
@@ -75,19 +76,21 @@ function FusionContent() {
   const inactive = signals.filter((s) => s.stars <= 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Fusion Analysis</h1>
-        <p className="text-gray-600 mt-1">
-          VP + Accumulation 跨系統對齊 — 高信心交易機會
-        </p>
+    <div className="analysis-page">
+      <div className="analysis-header">
+        <div>
+          <h1 className="text-3xl font-bold">Fusion Analysis</h1>
+          <p className="text-gray-600 mt-1">
+            VP + Accumulation 跨系統對齊 — 高信心交易機會
+          </p>
+        </div>
       </div>
 
       {/* Actionable (3+ stars) */}
       {actionable.length > 0 && (
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4 text-green-800">
-            🎯 可操作信號（3+ ⭐）
+            可操作信號（評級 3+）
           </h2>
           <div className="grid gap-4">
             {actionable.map((sig) => (
@@ -102,8 +105,8 @@ function FusionContent() {
                   <span className="text-lg font-medium">${sig.price?.toFixed(2)}</span>
                 </div>
                 <div className="mt-3 p-3 bg-green-50 rounded-lg">
-                  <p className="font-medium text-green-900">{sig.label}</p>
-                  <p className="text-sm text-green-800 mt-1">{sig.action}</p>
+                  <p className="font-medium text-green-900">{stripDecorativeSymbols(sig.label)}</p>
+                  <p className="text-sm text-green-800 mt-1">{stripDecorativeSymbols(sig.action)}</p>
                 </div>
                 <div className="mt-3 flex gap-4 text-sm">
                   <div>Daily: {positionBadge(sig.daily_position)}</div>
@@ -130,7 +133,7 @@ function FusionContent() {
       {watchlist.length > 0 && (
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4 text-yellow-800">
-            👀 觀察清單（1-2 ⭐）
+            觀察清單（評級 1-2）
           </h2>
           <div className="overflow-x-auto bg-white rounded-xl border">
             <table className="w-full">
@@ -155,8 +158,8 @@ function FusionContent() {
                     </td>
                     <td className="py-2 px-4">{positionBadge(sig.daily_position)}</td>
                     <td className="py-2 px-4">{macroBadge(sig.macro_direction)}</td>
-                    <td className="py-2 px-4 text-sm">{sig.label}</td>
-                    <td className="py-2 px-4 text-sm text-gray-600">{sig.action}</td>
+                    <td className="py-2 px-4 text-sm">{stripDecorativeSymbols(sig.label)}</td>
+                    <td className="py-2 px-4 text-sm text-gray-600">{stripDecorativeSymbols(sig.action)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -169,7 +172,7 @@ function FusionContent() {
       {inactive.length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4 text-gray-500">
-            ⏸️ 不活躍（{inactive.length} 檔）
+            不活躍（{inactive.length} 檔）
           </h2>
           <div className="text-sm text-gray-500 flex flex-wrap gap-2">
             {inactive.map((sig) => (

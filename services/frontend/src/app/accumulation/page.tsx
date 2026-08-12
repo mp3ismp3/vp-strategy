@@ -67,12 +67,14 @@ function AccumulationContent() {
   const selectedState = visibleStates.find((s) => s.ticker === selectedTicker);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Accumulation Tracker</h1>
-        <p className="text-gray-600 mt-1">
-          Wyckoff 機構吸籌追蹤 — 顯示 {visibleStates.length} / {states.length} 檔
-        </p>
+    <div className="analysis-page">
+      <div className="analysis-header">
+        <div>
+          <h1 className="text-3xl font-bold">Accumulation Tracker</h1>
+          <p className="text-gray-600 mt-1">
+            Wyckoff 機構吸籌追蹤 — 顯示 {visibleStates.length} / {states.length} 檔
+          </p>
+        </div>
       </div>
 
       {!isAuthenticated && states.length > GUEST_ACCUMULATION_LIMIT && (
@@ -104,7 +106,7 @@ function AccumulationContent() {
               onClick={() => setSelectedTicker(null)}
               className="text-sm text-gray-500 hover:text-gray-700"
             >
-              ✕ 關閉
+              關閉
             </button>
           </div>
           <AccumChart

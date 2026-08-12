@@ -380,7 +380,7 @@ function MACDChart({ ohlc, macdData, divergences, title }: MACDChartProps) {
     y: div.type === "bullish" ? div.priceSwingCurr : div.priceSwingCurr,
     xref: "x",
     yref: "y",
-    text: div.type === "bullish" ? "🟢 Bull Div" : "🔴 Bear Div",
+    text: div.type === "bullish" ? "Bull Div" : "Bear Div",
     showarrow: true,
     arrowhead: 2,
     arrowcolor: div.type === "bullish" ? "#4caf50" : "#f44336",
@@ -610,13 +610,15 @@ export default function MACDPage() {
   const weeklyOnlyResults = scanResults.filter((r) => !r.isDual && r.weeklyDivs.length > 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="analysis-page">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">📉 MACD Divergence</h1>
-        <p className="text-gray-600 mt-1">
-          日線 + 周線 MACD 背離偵測 — 找出動能與價格背離的標的
-        </p>
+      <div className="analysis-header">
+        <div>
+          <h1 className="text-3xl font-bold">MACD Divergence</h1>
+          <p className="text-gray-600 mt-1">
+            日線 + 周線 MACD 背離偵測 — 找出動能與價格背離的標的
+          </p>
+        </div>
       </div>
 
       {/* Controls */}
@@ -703,27 +705,27 @@ export default function MACDPage() {
           <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-3">
             {dailyDivergences.map((d, i) => (
               <Badge key={`d-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                {d.type === "bullish" ? "🟢" : "🔴"} 日線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
+                日線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
               </Badge>
             ))}
             {weeklyDivergences.map((d, i) => (
               <Badge key={`w-${i}`} className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                {d.type === "bullish" ? "🟢" : "🔴"} 周線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
+                周線{d.type === "bullish" ? "看漲" : "看跌"}背離 ({d.barsAgo} bars ago)
               </Badge>
             ))}
             {dailyDivergences.some((d) => weeklyDivergences.some((w) => w.type === d.type)) && (
               <Badge className="bg-orange-100 text-orange-800 font-bold">
-                🔥 日線+周線雙重背離
+                日線+周線雙重背離
               </Badge>
             )}
           </div>
         )}
         {scanResults.length > 0 && (
           <div className="space-y-6">
-          {/* 🔥 Dual Divergence */}
+          {/* Dual Divergence */}
           {dualResults.length > 0 && (
             <div className="bg-white rounded-xl border p-6">
-              <h2 className="text-xl font-bold mb-4">🔥 雙重背離（日線 + 周線同向）</h2>
+              <h2 className="text-xl font-bold mb-4">雙重背離（日線 + 周線同向）</h2>
               <p className="text-sm text-gray-500 mb-4">最強訊號：兩個時間框架都確認動能背離</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -741,7 +743,7 @@ export default function MACDPage() {
                         <td className="p-3 font-bold">{r.ticker}</td>
                         <td className="p-3">
                           <Badge className={r.dualType === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                            {r.dualType === "bullish" ? "🟢 看漲" : "🔴 看跌"}
+                            {r.dualType === "bullish" ? "看漲" : "看跌"}
                           </Badge>
                         </td>
                         <td className="p-3">{r.dailyDivs.find((d) => d.type === r.dualType)?.barsAgo ?? "-"}</td>
@@ -757,7 +759,7 @@ export default function MACDPage() {
           {/* Daily Only */}
           {dailyOnlyResults.length > 0 && (
             <div className="bg-white rounded-xl border p-6">
-              <h2 className="text-xl font-bold mb-4">📊 日線背離</h2>
+              <h2 className="text-xl font-bold mb-4">日線背離</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -775,7 +777,7 @@ export default function MACDPage() {
                           <td className="p-3 font-bold">{r.ticker}</td>
                           <td className="p-3">
                             <Badge className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                              {d.type === "bullish" ? "🟢 看漲" : "🔴 看跌"}
+                              {d.type === "bullish" ? "看漲" : "看跌"}
                             </Badge>
                           </td>
                           <td className="p-3">{d.barsAgo}</td>
@@ -792,7 +794,7 @@ export default function MACDPage() {
           {/* Weekly Only */}
           {weeklyOnlyResults.length > 0 && (
             <div className="bg-white rounded-xl border p-6">
-              <h2 className="text-xl font-bold mb-4">📅 周線背離</h2>
+              <h2 className="text-xl font-bold mb-4">周線背離</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -810,7 +812,7 @@ export default function MACDPage() {
                           <td className="p-3 font-bold">{r.ticker}</td>
                           <td className="p-3">
                             <Badge className={d.type === "bullish" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                              {d.type === "bullish" ? "🟢 看漲" : "🔴 看跌"}
+                              {d.type === "bullish" ? "看漲" : "看跌"}
                             </Badge>
                           </td>
                           <td className="p-3">{d.barsAgo}</td>
@@ -826,7 +828,7 @@ export default function MACDPage() {
 
           {/* Summary */}
           <div className="text-center text-sm text-gray-500">
-            共掃描到 {scanResults.length} 檔有背離訊號 | 🔥 雙重: {dualResults.length} | 日線: {dailyOnlyResults.length} | 周線: {weeklyOnlyResults.length}
+            共掃描到 {scanResults.length} 檔有背離訊號 | 雙重: {dualResults.length} | 日線: {dailyOnlyResults.length} | 周線: {weeklyOnlyResults.length}
           </div>
           </div>
         )}

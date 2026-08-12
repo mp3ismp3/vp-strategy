@@ -104,8 +104,8 @@ function ScannerContent() {
   const selectedResult = results.find((r) => r.ticker === selectedTicker);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="analysis-page">
+      <div className="analysis-header">
         <div>
           <h1 className="text-3xl font-bold">VP Scanner</h1>
           <p className="text-gray-600 mt-1">
@@ -126,7 +126,7 @@ function ScannerContent() {
       {effectiveUserPlan === "free" && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center">
           <span className="text-sm text-yellow-800">
-            🔒 免費方案只顯示 Mega Cap Tech（7 檔）。升級 Pro 解鎖全部 78 檔。
+            免費方案只顯示 Mega Cap Tech（7 檔）。升級 Pro 解鎖全部 78 檔。
           </span>
           <a href="/pricing" className="text-sm font-medium bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800">
             升級
@@ -161,7 +161,7 @@ function ScannerContent() {
               onClick={() => setSelectedTicker(null)}
               className="text-sm text-gray-500 hover:text-gray-700"
             >
-              ✕ 關閉
+              關閉
             </button>
           </div>
           <VPChart ticker={selectedResult.ticker} />
@@ -194,7 +194,7 @@ function ScannerContent() {
         {bullish.length > 0 && (
           <div className="bg-green-50 rounded-xl p-6 border border-green-200">
             <h2 className="text-lg font-bold text-green-800 mb-4">
-              🟢 Bullish（Above VA 2+ TFs）— {bullish.length} 檔
+              Bullish（Above VA 2+ TFs）— {bullish.length} 檔
             </h2>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
               {bullish.map((r) => (
@@ -231,7 +231,7 @@ function ScannerContent() {
         {bearish.length > 0 && (
           <div className="bg-red-50 rounded-xl p-6 border border-red-200">
             <h2 className="text-lg font-bold text-red-800 mb-4">
-              🔴 Bearish（Below VA 2+ TFs）— {bearish.length} 檔
+              Bearish（Below VA 2+ TFs）— {bearish.length} 檔
             </h2>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
               {bearish.map((r) => (
@@ -268,7 +268,7 @@ function ScannerContent() {
         {neutral.length > 0 && (
           <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
             <h2 className="text-lg font-bold text-gray-800 mb-4">
-              ⚪ Neutral — {neutral.length} 檔
+              Neutral — {neutral.length} 檔
             </h2>
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
               {neutral.map((r) => (

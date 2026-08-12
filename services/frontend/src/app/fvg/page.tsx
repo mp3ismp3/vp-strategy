@@ -231,8 +231,8 @@ function FVGChart({ ticker, ohlc, fvgs, showFilled }: FVGChartProps) {
     yref: "y",
     text:
       fvg.type === "bullish"
-        ? `🟢 $${fvg.gapLow.toFixed(1)}-${fvg.gapHigh.toFixed(1)}`
-        : `🔴 $${fvg.gapLow.toFixed(1)}-${fvg.gapHigh.toFixed(1)}`,
+        ? `$${fvg.gapLow.toFixed(1)}-${fvg.gapHigh.toFixed(1)}`
+        : `$${fvg.gapLow.toFixed(1)}-${fvg.gapHigh.toFixed(1)}`,
     showarrow: false,
     font: {
       size: 9,
@@ -373,13 +373,15 @@ export default function FVGPage() {
   }, [accessPlan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="analysis-page">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">📐 FVG (Fair Value Gap)</h1>
-        <p className="text-gray-600 mt-1">
-          日線級別公允價值缺口偵測 — 未填補的 FVG 是潛在支撐/阻力區域
-        </p>
+      <div className="analysis-header">
+        <div>
+          <h1 className="text-3xl font-bold">FVG (Fair Value Gap)</h1>
+          <p className="text-gray-600 mt-1">
+            日線級別公允價值缺口偵測 — 未填補的 FVG 是潛在支撐/阻力區域
+          </p>
+        </div>
       </div>
 
       {/* Controls */}
@@ -427,10 +429,10 @@ export default function FVGPage() {
 
         <div className="flex items-center gap-3 ml-auto">
           <Badge className="bg-green-100 text-green-800">
-            🟢 Bullish: {bullishCount}
+            Bullish: {bullishCount}
           </Badge>
           <Badge className="bg-red-100 text-red-800">
-            🔴 Bearish: {bearishCount}
+            Bearish: {bearishCount}
           </Badge>
         </div>
       </div>
@@ -460,7 +462,7 @@ export default function FVGPage() {
         {visibleFvgs.length > 0 && (
           <div className="bg-white rounded-xl border p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">
-            📋 {effectiveTicker} FVG 列表
+            {effectiveTicker} FVG 列表
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -481,9 +483,9 @@ export default function FVGPage() {
                     <td className="p-3 font-mono">{fvg.date}</td>
                     <td className="p-3">
                       {fvg.type === "bullish" ? (
-                        <Badge className="bg-green-100 text-green-800">🟢 看漲</Badge>
+                        <Badge className="bg-green-100 text-green-800">看漲</Badge>
                       ) : (
-                        <Badge className="bg-red-100 text-red-800">🔴 看跌</Badge>
+                        <Badge className="bg-red-100 text-red-800">看跌</Badge>
                       )}
                     </td>
                     <td className="p-3 font-mono">${fvg.gapLow.toFixed(2)}</td>
@@ -513,7 +515,7 @@ export default function FVGPage() {
         {!scanning && scanResults.length > 0 && (
           <div className="bg-white rounded-xl border p-6">
           <h2 className="text-xl font-bold mb-4">
-            🔍 全標的 FVG 掃描（共 {scanResults.length} 檔有有效缺口）
+            全標的 FVG 掃描（共 {scanResults.length} 檔有有效缺口）
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -521,8 +523,8 @@ export default function FVGPage() {
                 <tr className="border-b bg-gray-50">
                   <th className="text-left p-3">標的</th>
                   <th className="text-left p-3">現價</th>
-                  <th className="text-left p-3">🟢 看漲 FVG</th>
-                  <th className="text-left p-3">🔴 看跌 FVG</th>
+                  <th className="text-left p-3">看漲 FVG</th>
+                  <th className="text-left p-3">看跌 FVG</th>
                   <th className="text-left p-3">最近缺口</th>
                 </tr>
               </thead>
@@ -569,7 +571,7 @@ export default function FVGPage() {
                         )}
                       </td>
                       <td className="p-3 text-xs text-gray-500">
-                        {nearest.type === "bullish" ? "🟢" : "🔴"} $
+                        {nearest.type === "bullish" ? "看漲" : "看跌"} $
                         {nearest.gapLow.toFixed(1)}-${nearest.gapHigh.toFixed(1)}
                         {" "}({nearest.date})
                       </td>

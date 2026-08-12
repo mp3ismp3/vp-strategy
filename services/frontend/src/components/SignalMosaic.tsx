@@ -25,7 +25,6 @@ export function SignalMosaic({
       </div>
       <div className="absolute inset-0 flex items-center justify-center bg-white/35 backdrop-blur-[2px]">
         <div className="max-w-sm rounded-xl border bg-white/95 p-5 text-center shadow-lg">
-          <div className="mb-2 text-2xl">🔒</div>
           <p className="font-semibold text-gray-900">{message}</p>
           <p className="mt-1 text-sm text-gray-500">
             免費登入即可查看方向、價位與觸發細節。
