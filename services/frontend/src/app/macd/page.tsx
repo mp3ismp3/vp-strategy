@@ -610,9 +610,9 @@ export default function MACDPage() {
   const weeklyOnlyResults = scanResults.filter((r) => !r.isDual && r.weeklyDivs.length > 0);
 
   return (
-    <div className="analysis-page">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="analysis-header">
+      <div className="mb-6">
         <div>
           <h1 className="text-3xl font-bold">MACD Divergence</h1>
           <p className="text-gray-600 mt-1">

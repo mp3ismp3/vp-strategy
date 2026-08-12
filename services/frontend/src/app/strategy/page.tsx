@@ -65,9 +65,9 @@ export default function StrategyPage() {
   );
 
   return (
-    <div className="analysis-page">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="analysis-header">
+      <div className="mb-8">
         <div>
           <h1 className="text-3xl font-bold">Strategy Lab</h1>
           <p className="text-gray-600 mt-1">
