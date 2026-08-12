@@ -32,6 +32,7 @@ export function Navbar() {
     { href: "/accumulation", label: "Accumulation" },
     { href: "/strategy", label: "Strategy" },
     { href: "/indicator", label: "Indicator" },
+    { href: "/crypto-liquidity", label: "Crypto Liquidity" },
     { href: "/fusion", label: "Fusion" },
     { href: "/pricing", label: "Pricing" },
   ];

@@ -56,6 +56,7 @@ browser origin. Do not publish cookies or use them as long-lived API tokens.
 | GET | `/api/data/chart-data?include=data` | Free+ | Visible ticker payloads; otherwise summaries |
 | GET | `/api/data/accum-state` | Free+ | Accumulation state; action levels removed for Free |
 | GET | `/api/data/fusion` | Premium | Fused analysis signals |
+| GET | `/api/data/crypto-liquidity` | Session | Stablecoin, market cap and volume liquidity overview |
 | POST | `/api/telegram/bind` | Premium session + trusted Origin | Create a 10-minute binding token |
 
 Response bodies are JSON. Data-source outages return `503` and
