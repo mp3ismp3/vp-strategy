@@ -185,7 +185,7 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
 - `src/lib/api-response.ts`、`src/app/api/health/route.ts`：共享含 request ID 的 infrastructure error envelope 與不揭露 dependency/config 的匿名 liveness endpoint。Data source failure 回 `503 + Retry-After`；client 與 server log 都不複製可能含敏感資訊的 exception message。
 - `openapi.yaml`、`docs/API.md`：描述 Web BFF 可支援的 consumer contract、operational route inventory 與 gateway 邊界。現有 API 使用 browser session，不是 API key/OAuth client-credentials 的公開 machine-to-machine API。
-- `src/lib/crypto-liquidity.ts`、`src/app/api/data/crypto-liquidity/route.ts`、`src/app/crypto-liquidity/page.tsx`：Crypto Liquidity downstream view。Server-side provider fetch 正規化 DeFiLlama stablecoin chart 與 CoinGecko global market chart；ETF provider 未設定時保留 `unavailable`，不得以零值代替缺資料。頁面只展示背景流動性，不回寫 scanner/accumulation state。
+- `src/lib/crypto-liquidity.ts`、`src/app/api/data/crypto-liquidity/route.ts`、`src/app/crypto-liquidity/page.tsx`：Crypto Liquidity downstream view。Server-side provider fetch 正規化 DeFiLlama stablecoin asset history，以及 CoinPaprika 免費、免 API Key 的 BTC daily historical ticks（最近一年 market cap／24h volume）。BTC market cap 不得標示為全 Crypto market cap。Provider 採 graceful degradation，任一來源成功即可回部分 payload，全部失敗才回 `503`；provider／ETF 未設定或不可用時保留 `unavailable`，不得以零值代替缺資料。頁面只展示背景流動性，不回寫 scanner/accumulation state。
 - `public/ptrade.svg`：前端共用品牌 icon，由首頁、登入頁、Navbar 與 root metadata 的瀏覽器 icon 引用。
 
 `src/app/api/data/scan-results`、`chart-data`、`accum-state` 以 server-side service role 讀取 CI 上傳至 Supabase 的 production rows，再依有效方案裁切；不得退回 client-side anon query 或依賴未部署的 frontend JSON。

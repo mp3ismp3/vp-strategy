@@ -2,7 +2,7 @@ export type DataPoint = { date: string; value: number };
 
 export type CryptoLiquidityPayload = {
   asOf: string;
-  sources: { stablecoin: string; market: string; etf: string | null };
+  sources: { stablecoin: string | null; market: string | null; etf: string | null };
   stablecoin: { current: number | null; changePct: number | null; changePct1d: number | null; changePct7d: number | null; changePct30d: number | null; changePct90d: number | null; history: DataPoint[] };
   etf: { status: "unavailable" | "available"; btcNetFlow: number | null; ethNetFlow: number | null; history: DataPoint[] };
   market: { totalMarketCap: number | null; totalVolume: number | null; marketCapChangePct: number | null; volumeRatio30d: number | null; history: DataPoint[] };
@@ -14,17 +14,21 @@ function dateFromSeconds(value: number): string {
   return new Date(value * 1000).toISOString().slice(0, 10);
 }
 
-function dateFromMilliseconds(value: number): string {
-  return new Date(value).toISOString().slice(0, 10);
-}
-
 export function normalizeStablecoinChart(input: unknown): DataPoint[] {
-  if (!Array.isArray(input)) return [];
-  return input.flatMap((row) => {
+  const rows = Array.isArray(input)
+    ? input
+    : input && typeof input === "object" && Array.isArray((input as { tokens?: unknown }).tokens)
+      ? (input as { tokens: unknown[] }).tokens
+      : [];
+  return rows.flatMap((row) => {
     if (!row || typeof row !== "object") return [];
-    const item = row as { date?: unknown; totalCirculating?: { peggedUSD?: unknown } };
+    const item = row as {
+      date?: unknown;
+      circulating?: { peggedUSD?: unknown };
+      totalCirculating?: { peggedUSD?: unknown };
+    };
     const date = Number(item.date);
-    const value = Number(item.totalCirculating?.peggedUSD);
+    const value = Number(item.circulating?.peggedUSD ?? item.totalCirculating?.peggedUSD);
     return Number.isFinite(date) && Number.isFinite(value) ? [{ date: dateFromSeconds(date), value }] : [];
   });
 }
@@ -43,18 +47,22 @@ export function joinSeriesByDate(left: DataPoint[], right: DataPoint[]): Array<{
   });
 }
 
-export function normalizeCoinGeckoGlobal(input: unknown): { marketCap: DataPoint[]; volume: DataPoint[] } {
-  if (!input || typeof input !== "object") return { marketCap: [], volume: [] };
-  const source = input as { market_cap?: unknown; total_volume?: unknown };
-  const normalize = (series: unknown): DataPoint[] => Array.isArray(series)
-    ? series.flatMap((row) => {
-        if (!Array.isArray(row) || row.length < 2) return [];
-        const timestamp = Number(row[0]);
-        const value = Number(row[1]);
-        return Number.isFinite(timestamp) && Number.isFinite(value) ? [{ date: dateFromMilliseconds(timestamp), value }] : [];
-      })
-    : [];
-  return { marketCap: normalize(source.market_cap), volume: normalize(source.total_volume) };
+export function normalizeCoinPaprikaBitcoin(input: unknown): { marketCap: DataPoint[]; volume: DataPoint[] } {
+  if (!Array.isArray(input)) return { marketCap: [], volume: [] };
+  const marketCap: DataPoint[] = [];
+  const volume: DataPoint[] = [];
+  for (const row of input) {
+    if (!row || typeof row !== "object") continue;
+    const item = row as { timestamp?: unknown; market_cap?: unknown; volume_24h?: unknown };
+    const timestamp = typeof item.timestamp === "string" ? Date.parse(item.timestamp) : Number.NaN;
+    if (!Number.isFinite(timestamp)) continue;
+    const date = new Date(timestamp).toISOString().slice(0, 10);
+    const marketCapValue = Number(item.market_cap);
+    const volumeValue = Number(item.volume_24h);
+    if (Number.isFinite(marketCapValue)) marketCap.push({ date, value: marketCapValue });
+    if (Number.isFinite(volumeValue)) volume.push({ date, value: volumeValue });
+  }
+  return { marketCap, volume };
 }
 
 function pctChange(series: DataPoint[]): number | null {
@@ -81,7 +89,7 @@ export function buildLiquiditySnapshot(stablecoin: DataPoint[], market: { market
   const biasScore = score + marketScore + (etf && etf.btcNetFlow + etf.ethNetFlow > 0 ? 1 : 0);
   const biasReasons = [
     stableChange30d == null ? "Stablecoin supply 30D history unavailable" : stableChange30d > 0 ? "Stablecoin supply expanding" : "Stablecoin supply contracting",
-    marketChange == null ? "Market cap history unavailable" : marketChange > 0 ? "Market cap expanding" : "Market cap contracting",
+    marketChange == null ? "Bitcoin market cap history unavailable" : marketChange > 0 ? "Bitcoin market cap expanding" : "Bitcoin market cap contracting",
   ];
   if (etf) biasReasons.push(etf.btcNetFlow + etf.ethNetFlow > 0 ? "ETF flows positive" : "ETF flows negative");
   const liquidityBias = stablecoin.length === 0 && market.marketCap.length === 0
@@ -91,7 +99,11 @@ export function buildLiquiditySnapshot(stablecoin: DataPoint[], market: { market
   const averageVolume = previousVolume.length >= 7 ? previousVolume.reduce((sum, row) => sum + row.value, 0) / previousVolume.length : 0;
   return {
     asOf: new Date().toISOString(),
-    sources: { stablecoin: "DeFiLlama", market: "CoinGecko", etf: etf ? "configured provider" : null },
+    sources: {
+      stablecoin: stablecoin.length ? "DeFiLlama" : null,
+      market: market.marketCap.length || market.volume.length ? "CoinPaprika" : null,
+      etf: etf ? "configured provider" : null,
+    },
     stablecoin: { current: stablecoin.at(-1)?.value ?? null, changePct: stableChange, changePct1d: stableChange1d, changePct7d: stableChange7d, changePct30d: stableChange30d, changePct90d: stableChange90d, history: stablecoin },
     etf: etf ? { status: "available", btcNetFlow: etf.btcNetFlow, ethNetFlow: etf.ethNetFlow, history: [] } : { status: "unavailable", btcNetFlow: null, ethNetFlow: null, history: [] },
     market: { totalMarketCap: market.marketCap.at(-1)?.value ?? null, totalVolume: market.volume.at(-1)?.value ?? null, marketCapChangePct: marketChange, volumeRatio30d: averageVolume ? Number((market.volume.at(-1)!.value / averageVolume).toFixed(2)) : null, history: market.marketCap },

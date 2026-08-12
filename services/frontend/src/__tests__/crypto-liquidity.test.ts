@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLiquiditySnapshot, combineSeries, joinSeriesByDate, normalizeCoinGeckoGlobal, normalizeStablecoinChart } from "@/lib/crypto-liquidity";
+import { buildLiquiditySnapshot, combineSeries, joinSeriesByDate, normalizeCoinPaprikaBitcoin, normalizeStablecoinChart } from "@/lib/crypto-liquidity";
 
 describe("crypto liquidity normalization", () => {
   it("normalizes DefiLlama stablecoin chart and calculates changes", () => {
@@ -16,14 +16,27 @@ describe("crypto liquidity normalization", () => {
     expect(snapshot.stablecoin.changePct7d).toBe(2);
   });
 
-  it("normalizes CoinGecko global chart arrays and preserves missing ETF data", () => {
-    const market = normalizeCoinGeckoGlobal({
-      market_cap: [[1704067200000, 1000], [1704153600000, 1100]],
-      total_volume: [[1704067200000, 50], [1704153600000, 60]],
-    });
+  it("normalizes the current DefiLlama stablecoin asset payload", () => {
+    expect(normalizeStablecoinChart({
+      tokens: [
+        { date: 1704067200, circulating: { peggedUSD: 100 } },
+        { date: 1704153600, circulating: { peggedUSD: 102 } },
+      ],
+    })).toEqual([
+      { date: "2024-01-01", value: 100 },
+      { date: "2024-01-02", value: 102 },
+    ]);
+  });
+
+  it("normalizes CoinPaprika Bitcoin history and preserves missing ETF data", () => {
+    const market = normalizeCoinPaprikaBitcoin([
+      { timestamp: "2024-01-01T00:00:00Z", market_cap: 1000, volume_24h: 50 },
+      { timestamp: "2024-01-02T00:00:00Z", market_cap: 1100, volume_24h: 60 },
+    ]);
     const snapshot = buildLiquiditySnapshot([], market, null);
     expect(snapshot.market.totalMarketCap).toBe(1100);
     expect(snapshot.market.totalVolume).toBe(60);
+    expect(snapshot.sources.market).toBe("CoinPaprika");
     expect(snapshot.etf.status).toBe("unavailable");
   });
 
