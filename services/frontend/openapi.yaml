@@ -134,6 +134,22 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "503": { $ref: "#/components/responses/Unavailable" }
+  /api/data/crypto-liquidity:
+    get:
+      tags: [Analysis]
+      summary: Return crypto liquidity overview
+      operationId: getCryptoLiquidity
+      security: [{ nextAuthSession: [] }]
+      description: Stablecoin, global market cap and market volume data. ETF fields are unavailable until an ETF provider is configured.
+      responses:
+        "200":
+          description: Crypto liquidity snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CryptoLiquiditySnapshot" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
   /api/telegram/bind:
     post:
       tags: [Telegram]
@@ -170,6 +186,55 @@ components:
         status: { type: string, const: ok }
         service: { type: string, const: vp-strategy-frontend }
         timestamp: { type: string, format: date-time }
+    CryptoLiquidityPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date: { type: string, format: date }
+        value: { type: number }
+    CryptoLiquiditySnapshot:
+      type: object
+      required: [asOf, sources, stablecoin, etf, market, liquidityBias, biasReasons, accessPlan]
+      properties:
+        asOf: { type: string, format: date-time }
+        accessPlan: { $ref: "#/components/schemas/Plan" }
+        sources:
+          type: object
+          required: [stablecoin, market, etf]
+          properties:
+            stablecoin: { type: string, example: DeFiLlama }
+            market: { type: string, example: CoinGecko }
+            etf: { type: [string, "null"] }
+        stablecoin:
+          type: object
+          required: [current, changePct1d, changePct7d, changePct30d, changePct90d, history]
+          properties:
+            current: { type: [number, "null"] }
+            changePct: { type: [number, "null"], description: Full available history change, retained for compatibility }
+            changePct1d: { type: [number, "null"] }
+            changePct7d: { type: [number, "null"] }
+            changePct30d: { type: [number, "null"] }
+            changePct90d: { type: [number, "null"] }
+            history: { type: array, items: { $ref: "#/components/schemas/CryptoLiquidityPoint" } }
+        etf:
+          type: object
+          required: [status, btcNetFlow, ethNetFlow]
+          properties:
+            status: { type: string, enum: [available, unavailable] }
+            btcNetFlow: { type: [number, "null"] }
+            ethNetFlow: { type: [number, "null"] }
+            history: { type: array, items: { $ref: "#/components/schemas/CryptoLiquidityPoint" } }
+        market:
+          type: object
+          required: [totalMarketCap, totalVolume, marketCapChangePct, volumeRatio30d, history]
+          properties:
+            totalMarketCap: { type: [number, "null"] }
+            totalVolume: { type: [number, "null"] }
+            marketCapChangePct: { type: [number, "null"], description: 30-day change }
+            volumeRatio30d: { type: [number, "null"], description: Current volume divided by previous observations, requiring at least 7 observations }
+            history: { type: array, items: { $ref: "#/components/schemas/CryptoLiquidityPoint" } }
+        liquidityBias: { type: string, enum: [strong_inflow, moderate_inflow, neutral, moderate_outflow, strong_outflow, insufficient_data] }
+        biasReasons: { type: array, items: { type: string } }
     ErrorEnvelope:
       type: object
       required: [error]

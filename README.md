@@ -201,6 +201,8 @@ Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集�
 
 Web API 定位為隨產品 UI 一同演進的 backend-for-frontend（BFF），不是提供 API key 的公開市場資料 API。`GET /api/health` 可匿名用於 liveness；data routes 使用 NextAuth browser session 並在 server 驗證方案。資料來源故障統一回 `503` 與 `Retry-After`，不把內部 exception 傳給 client。可呼叫路由、權限、錯誤與 gateway contract 見 `docs/API.md`，機器可讀規格見 `services/frontend/openapi.yaml`。
 
+Crypto Liquidity 頁面（`/crypto-liquidity`）提供登入後的 stablecoin supply、crypto total market cap 與 market volume 概覽；資料由 server-side API 讀取 DeFiLlama 與 CoinGecko，顯示 source/as-of 與缺資料狀態。BTC/ETH ETF flow 先保留 provider contract，尚未設定來源時顯示 unavailable，不會把缺資料當成零流入。這些是流動性背景指標，不是交易建議。
+
 Production gateway 必須設定 `TRUSTED_PROXY_MODE`：Vercel 使用 `vercel`；自架環境只有在最外層 proxy 會覆寫 forwarding headers 時才能使用 `x-forwarded-for`。Redis 故障時一般/data tier 保持 fail-open，但 auth/strict tier 在 production 回 `503` fail-closed。全站回應包含 CSP、HSTS、nosniff、referrer 與 permissions security headers。
 
 Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。首頁 Hero 以 `SMART STRATEGY` 作為展示名稱，採響應式左右分欄宣傳排版，左側使用一般使用者可理解的市場分析文案，右側只顯示無文字的原生動態交易趨勢圖；四大策略卡片不顯示裝飾性 emoji。品牌 icon 使用 `services/frontend/public/ptrade.svg`，登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
