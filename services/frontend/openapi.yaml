@@ -140,7 +140,7 @@ paths:
       summary: Return crypto liquidity overview
       operationId: getCryptoLiquidity
       security: [{ nextAuthSession: [] }]
-      description: Stablecoin, global market cap and market volume data. ETF fields are unavailable until an ETF provider is configured.
+      description: Combined USDT + USDC supply from DeFiLlama with BTC market cap and spot-volume history from CoinPaprika. Provider outages return partial data with a null source; ETF fields are unavailable until an ETF provider is configured.
       responses:
         "200":
           description: Crypto liquidity snapshot
@@ -202,8 +202,8 @@ components:
           type: object
           required: [stablecoin, market, etf]
           properties:
-            stablecoin: { type: string, example: DeFiLlama }
-            market: { type: string, example: CoinGecko }
+            stablecoin: { type: [string, "null"], example: DeFiLlama }
+            market: { type: [string, "null"], example: CoinPaprika }
             etf: { type: [string, "null"] }
         stablecoin:
           type: object
