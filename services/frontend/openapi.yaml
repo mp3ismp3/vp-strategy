@@ -1,0 +1,221 @@
+openapi: 3.1.0
+info:
+  title: VP Strategy Web BFF
+  version: 1.0.0
+  description: |
+    Browser-session API used by the bundled VP Strategy frontend. This is not
+    a public machine-to-machine market-data API. See docs/API.md for gateway,
+    billing, webhook, and compatibility boundaries.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+tags:
+  - name: Health
+  - name: Account
+  - name: Analysis
+  - name: Telegram
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Check process liveness
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Process is accepting requests
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/user/plan:
+    get:
+      tags: [Account]
+      summary: Return the effective plan or an anonymous Free snapshot
+      operationId: getUserPlan
+      security: []
+      responses:
+        "200":
+          description: Effective plan
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/data/scan-results:
+    get:
+      tags: [Analysis]
+      summary: Return plan-filtered multi-timeframe VP scan results
+      operationId: getScanResults
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200":
+          description: Visible scan results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results: { type: array, items: { type: object, additionalProperties: true } }
+                  scan_time: {}
+                  market_ctx: {}
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/data/chart-data:
+    get:
+      tags: [Analysis]
+      summary: Return visible chart data or summaries
+      operationId: getChartData
+      security: [{ nextAuthSession: [] }]
+      parameters:
+        - in: query
+          name: ticker
+          schema: { type: string, pattern: "^[A-Za-z0-9.-]+$" }
+          description: Optional ticker. The server normalizes it to uppercase.
+        - in: query
+          name: include
+          schema: { type: string, enum: [data] }
+          description: Set to data to return full visible payloads when ticker is omitted.
+      responses:
+        "200":
+          description: Chart data allowed by the effective plan
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/data/accum-state:
+    get:
+      tags: [Analysis]
+      summary: Return plan-filtered accumulation state
+      operationId: getAccumulationState
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200":
+          description: Visible accumulation state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [states, accessPlan]
+                properties:
+                  states: { type: array, items: { type: object, additionalProperties: true } }
+                  accessPlan: { $ref: "#/components/schemas/Plan" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/data/fusion:
+    get:
+      tags: [Analysis]
+      summary: Return Premium fusion signals
+      operationId: getFusionSignals
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200":
+          description: Fusion signals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signals]
+                properties:
+                  signals: { type: array, items: { type: object, additionalProperties: true } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/telegram/bind:
+    post:
+      tags: [Telegram]
+      summary: Create a short-lived Premium Telegram binding token
+      operationId: createTelegramBindToken
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200":
+          description: Ten-minute binding token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { type: string, minLength: 32, maxLength: 32 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+components:
+  securitySchemes:
+    nextAuthSession:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: Browser-managed NextAuth cookie; HTTPS deployments may use a __Secure- prefixed name.
+  schemas:
+    Plan: { type: string, enum: [free, pro, premium] }
+    Health:
+      type: object
+      required: [status, service, timestamp]
+      properties:
+        status: { type: string, const: ok }
+        service: { type: string, const: vp-strategy-frontend }
+        timestamp: { type: string, format: date-time }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            requestId: { type: string, format: uuid }
+    LegacyError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+  responses:
+    Unauthorized:
+      description: A valid browser session is required
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/LegacyError" }
+    Forbidden:
+      description: The session lacks the required plan or trusted Origin
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/LegacyError" }
+    NotFound:
+      description: Requested analysis data is not available
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/LegacyError" }
+    RateLimited:
+      description: Request quota exceeded
+      headers:
+        Retry-After: { schema: { type: integer, minimum: 1 } }
+        X-RateLimit-Limit: { schema: { type: integer } }
+        X-RateLimit-Remaining: { schema: { type: integer } }
+        X-RateLimit-Reset: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { type: object, additionalProperties: true }
+    Unavailable:
+      description: A protected dependency is temporarily unavailable
+      headers:
+        Retry-After: { schema: { type: integer, const: 30 } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }

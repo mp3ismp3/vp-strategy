@@ -9,6 +9,7 @@ import {
   getBlacklistAuditLog,
 } from "@/lib/rate-limit";
 import { isValidIP } from "@/lib/ip-validation";
+import { isJsonRequest, isTrustedMutationRequest } from "@/lib/http-security";
 
 /**
  * GET /api/admin/rate-limit
@@ -51,6 +52,9 @@ export async function GET(request: NextRequest) {
  * Body: { action: "add" | "remove", ip: string }
  */
 export async function POST(request: NextRequest) {
+  if (!isTrustedMutationRequest(request) || !isJsonRequest(request)) {
+    return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
+  }
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,

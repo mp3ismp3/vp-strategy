@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Trigger } from "@/lib/triggers";
 import { getServerPlan } from "@/lib/server-entitlement";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { serviceUnavailable } from "@/lib/api-response";
 
 // Confidence matrix (replicated from fusion_report.py)
 const CONFIDENCE_MATRIX: Record<string, { stars: number; label: string; action: string }> = {
@@ -76,17 +77,24 @@ export async function GET() {
     const supabase = getSupabaseAdmin();
 
     // Fetch scan data
-    const { data: scanRow } = await supabase
+    const { data: scanRow, error: scanError } = await supabase
       .from("scan_data")
       .select("vp_data, market_ctx")
       .eq("id", "latest")
-      .single();
+      .maybeSingle();
 
     // Fetch accum data
-    const { data: accumRows } = await supabase
+    const { data: accumRows, error: accumError } = await supabase
       .from("accum_data")
       .select("ticker, state");
 
+    if (scanError || accumError) {
+      return serviceUnavailable(
+        "DATA_SOURCE_UNAVAILABLE",
+        "Fusion data is temporarily unavailable",
+        scanError || accumError
+      );
+    }
     if (!scanRow || !accumRows) {
       return NextResponse.json({ signals: [], error: "No data" }, { status: 404 });
     }
@@ -146,7 +154,6 @@ export async function GET() {
 
     return NextResponse.json({ signals });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ signals: [], error: message }, { status: 500 });
+    return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Fusion data is temporarily unavailable", error);
   }
 }

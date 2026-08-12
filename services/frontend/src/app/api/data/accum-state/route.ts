@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sanitizeAccumulationForPlan } from "@/lib/data-entitlement";
 import { getServerPlan } from "@/lib/server-entitlement";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { serviceUnavailable } from "@/lib/api-response";
 
 interface AccumulationInfo {
   decay_score?: number;
@@ -24,7 +25,10 @@ export async function GET() {
     const { data: rows, error } = await getSupabaseAdmin()
       .from("accum_data")
       .select("ticker, state");
-    if (error || !rows) {
+    if (error) {
+      return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Accumulation data is temporarily unavailable", error);
+    }
+    if (!rows) {
       return NextResponse.json({ states: [], error: "Accumulation data not found" }, { status: 404 });
     }
 
@@ -47,8 +51,6 @@ export async function GET() {
 
     return NextResponse.json({ states, accessPlan: plan });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error reading accum state:", message);
-    return NextResponse.json({ states: [], error: message }, { status: 500 });
+    return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Accumulation data is temporarily unavailable", error);
   }
 }

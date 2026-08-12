@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { FREE_TICKERS } from "@/lib/preview-access";
 import { getServerPlan } from "@/lib/server-entitlement";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { serviceUnavailable } from "@/lib/api-response";
 
 interface ChartInfo {
   daily?: { position?: string };
@@ -32,15 +33,19 @@ export async function GET(req: NextRequest) {
         .from("chart_data")
         .select("data")
         .eq("ticker", normalizedTicker)
-        .single();
-      if (error || !row?.data) {
+        .maybeSingle();
+      if (error) {
+        return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Chart data is temporarily unavailable", error);
+      }
+      if (!row?.data) {
         return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
       }
       return NextResponse.json(row.data);
     }
 
     const { data: rows, error } = await supabase.from("chart_data").select("ticker, data");
-    if (error || !rows) return NextResponse.json({ error: "Chart data not found" }, { status: 404 });
+    if (error) return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Chart data is temporarily unavailable", error);
+    if (!rows) return NextResponse.json({ error: "Chart data not found" }, { status: 404 });
     const data = Object.fromEntries(
       rows.map((row) => [row.ticker, row.data as ChartInfo])
     ) as Record<string, ChartInfo>;
@@ -58,7 +63,6 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json(summary);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Chart data is temporarily unavailable", error);
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { filterScanItemsForPlan } from "@/lib/preview-access";
 import { getServerPlan } from "@/lib/server-entitlement";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { serviceUnavailable } from "@/lib/api-response";
 
 interface VolumeProfileFrame {
   poc?: number;
@@ -34,8 +35,11 @@ export async function GET() {
       .from("scan_data")
       .select("vp_data, market_ctx, scan_time")
       .eq("id", "latest")
-      .single();
-    if (error || !row) {
+      .maybeSingle();
+    if (error) {
+      return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Scan data is temporarily unavailable", error);
+    }
+    if (!row) {
       return NextResponse.json({ results: [], error: "Scan data not found" }, { status: 404 });
     }
     const data = row as ScanResults;
@@ -91,8 +95,6 @@ export async function GET() {
       market_ctx: data.market_ctx,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error reading scan results:", message);
-    return NextResponse.json({ results: [], error: message }, { status: 500 });
+    return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Scan data is temporarily unavailable", error);
   }
 }

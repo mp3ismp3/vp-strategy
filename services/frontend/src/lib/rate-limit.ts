@@ -89,7 +89,7 @@ export const authUserLimiters: Record<RateLimitTier, Ratelimit> = {
 // 路由前綴對應限制等級
 // 注意：/api/stripe/webhook 和 /api/telegram/webhook 不在此列表中，
 // 因為它們在 middleware 中被 WEBHOOK_WHITELIST 直接放行（有自己的 signature 驗證），
-// 不會走到 tier 判定邏輯。見 middleware.ts 的 isWebhookWhitelisted()。
+// 不會走到 tier 判定邏輯。見 proxy.ts 的 isWebhookWhitelisted()。
 
 const routeTierEntries: [string, RateLimitTier][] = [
   ["/api/admin", "strict"],
