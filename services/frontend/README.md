@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VP Strategy Frontend
 
-## Getting Started
+Next.js 16 web application and backend-for-frontend for VP Strategy. It reads
+production analysis rows from Supabase with a server-only service role, applies
+session and subscription entitlement checks, and exposes payment and Telegram
+integration routes.
 
-First, run the development server:
+The `/api` routes are not a public machine-to-machine market-data API. They use
+browser sessions or provider-specific callback authentication. Start with
+[`../../docs/API.md`](../../docs/API.md) and [`openapi.yaml`](openapi.yaml).
+
+## Requirements
+
+- Node.js version supported by the checked-in Next.js release
+- npm and `package-lock.json`
+- A Supabase project with the repository migrations applied
+- Upstash Redis for production request limiting
+- Google OAuth and/or Supabase email credentials for login
+- Optional Stripe, ECPay, and Telegram test credentials
+
+## Local setup
 
 ```bash
+npm ci
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill the required authentication, Supabase, and Upstash values in `.env.local`.
+Use only test/sandbox payment credentials. Both Checkout feature flags are
+disabled by default and must remain disabled until the matching migration and
+provider validation guides are complete.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open `http://localhost:3000` and sign in through `/login`. Verify liveness with:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+curl --fail-with-body http://localhost:3000/api/health
+```
 
-## Learn More
+Data routes require the browser's NextAuth session. The project intentionally
+does not document copying session cookies into scripts as an API-key substitute.
 
-To learn more about Next.js, take a look at the following resources:
+## Database setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+For a new Supabase project, apply `supabase_migration.sql`, followed by the
+latest `supabase_billing_providers.sql`. Existing projects must review and apply
+the incremental migrations described in the root deployment and billing docs.
+Analysis and billing tables deny `anon` and `authenticated`; only server-side
+service-role code may access them.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Production gateway
 
-## Deploy on Vercel
+Set `NEXT_PUBLIC_APP_URL` and `NEXTAUTH_URL` to the same single HTTPS origin.
+Set `TRUSTED_PROXY_MODE=vercel` on Vercel. Self-hosted reverse proxies may use
+`x-forwarded-for` only when they overwrite untrusted incoming forwarding
+headers. See [`docs/rate-limiting.md`](docs/rate-limiting.md).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The app sends CSP, HSTS, nosniff, referrer, and permissions headers. Payment and
+webhook routes retain route-level signature/MAC, body-size, Origin, entitlement,
+and idempotency checks; the gateway is defense in depth, not authorization.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Checks
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+Tests must mock Supabase, Upstash, payment providers, and Telegram. Do not send
+live notifications, create real payments, or replay production callbacks.
+
+Security reports follow [`../../SECURITY.md`](../../SECURITY.md). Contributions
+follow [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md).

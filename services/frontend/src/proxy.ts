@@ -8,6 +8,8 @@ import {
   isBlacklisted,
   logRateLimitEvent,
 } from "./lib/rate-limit";
+import type { RateLimitTier } from "./lib/rate-limit";
+import { serviceUnavailable } from "./lib/api-response";
 
 // ─── Auth-protected routes (same as before) ─────────────────
 const AUTH_PROTECTED = ["/fusion", "/account"];
@@ -46,14 +48,23 @@ export function isWebhookWhitelisted(pathname: string): boolean {
 // 注意：此函數僅適用於 Vercel 託管環境。
 // Vercel Edge Network 會覆寫 x-real-ip，攻擊者無法偽造。
 // 若部署到其他平台（如自建 Nginx），需改用不同的 IP 解析策略。
-function getClientIp(request: NextRequest): string {
-  const vercelIp = request.headers.get("x-real-ip");
-  if (vercelIp) return vercelIp;
+type ProxyEnv = { TRUSTED_PROXY_MODE?: string; [key: string]: string | undefined };
 
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
+export function getClientIp(request: NextRequest, env: ProxyEnv = process.env): string {
+  if (env.TRUSTED_PROXY_MODE === "vercel") {
+    return request.headers.get("x-real-ip") || "unknown-client";
+  }
+  if (env.TRUSTED_PROXY_MODE === "x-forwarded-for") {
+    return request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "unknown-client";
+  }
+  return "untrusted-proxy";
+}
 
-  return "127.0.0.1";
+export function shouldFailClosedOnRateLimitError(
+  tier: RateLimitTier,
+  nodeEnv = process.env.NODE_ENV
+): boolean {
+  return nodeEnv === "production" && (tier === "auth" || tier === "strict");
 }
 
 // ─── Helper: create 429 response ────────────────────────────
@@ -108,6 +119,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
+    const tier = getTierForRoute(pathname);
     const ip = getClientIp(request);
 
     // Phase 3: IP 黑名單檢查
@@ -119,12 +131,16 @@ export async function proxy(request: NextRequest) {
           { status: 403 }
         );
       }
-    } catch {
-      // Redis 故障時 fail-open，不阻擋請求
+    } catch (error) {
+      if (shouldFailClosedOnRateLimitError(tier)) {
+        return serviceUnavailable(
+          "RATE_LIMIT_UNAVAILABLE",
+          "Request protection is temporarily unavailable",
+          error
+        );
+      }
+      // General/read-only routes remain available during a Redis outage.
     }
-
-    // Phase 2: 決定此路由的 tier
-    const tier = getTierForRoute(pathname);
 
     // Phase 3: 判斷是否為登入用戶
     let userId: string | undefined;
@@ -164,8 +180,15 @@ export async function proxy(request: NextRequest) {
       response.headers.set("X-RateLimit-Remaining", remaining.toString());
       response.headers.set("X-RateLimit-Reset", reset.toString());
       return response;
-    } catch {
-      // Redis 故障時 fail-open：放行請求但不加 headers
+    } catch (error) {
+      if (shouldFailClosedOnRateLimitError(tier)) {
+        return serviceUnavailable(
+          "RATE_LIMIT_UNAVAILABLE",
+          "Request protection is temporarily unavailable",
+          error
+        );
+      }
+      // Read-only/general API routes remain available during a Redis outage.
       return NextResponse.next();
     }
   }

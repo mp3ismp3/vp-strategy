@@ -199,6 +199,10 @@ Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
+Web API 定位為隨產品 UI 一同演進的 backend-for-frontend（BFF），不是提供 API key 的公開市場資料 API。`GET /api/health` 可匿名用於 liveness；data routes 使用 NextAuth browser session 並在 server 驗證方案。資料來源故障統一回 `503` 與 `Retry-After`，不把內部 exception 傳給 client。可呼叫路由、權限、錯誤與 gateway contract 見 `docs/API.md`，機器可讀規格見 `services/frontend/openapi.yaml`。
+
+Production gateway 必須設定 `TRUSTED_PROXY_MODE`：Vercel 使用 `vercel`；自架環境只有在最外層 proxy 會覆寫 forwarding headers 時才能使用 `x-forwarded-for`。Redis 故障時一般/data tier 保持 fail-open，但 auth/strict tier 在 production 回 `503` fail-closed。全站回應包含 CSP、HSTS、nosniff、referrer 與 permissions security headers。
+
 Frontend 以 `npm run lint` 作為零 error／零 warning gate；Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。品牌 icon 使用 `services/frontend/public/ptrade.svg`，首頁、登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
 
 Stripe Checkout 已退出新訂閱 UI 且 production 必須保持 `STRIPE_CHECKOUT_ENABLED=false`；既有 Stripe Customer Portal 與 webhook 仍保留，避免既有訂閱失去取消或狀態同步能力。原有 server-only Price allowlist、Test/Live 隔離、Session 冪等與禁止直接切換方案的安全邊界維持不變。
@@ -210,6 +214,8 @@ Telegram webhook 必須設定 `TELEGRAM_WEBHOOK_SECRET`；route 會在解析 pay
 Pro 與 Premium 不支援直接升降級：Stripe 與 ECPay 共用 `billing_checkout_intents`，由 transaction RPC 鎖定 user row 並以 partial unique index 保證每位使用者同時只能有一個跨 provider Checkout；存在有效、pending、past-due 訂閱或其他付款頁時回傳 `409`，30 分鐘後才可釋放逾期 reservation。`users` 只保存由 `billing_subscriptions` 聚合出的最佳有效 entitlement，Stripe 延遲事件不得撤銷仍有效的 ECPay 權益，反之亦然。綠界取消會先建立 durable outbox，再呼叫 provider；本地同步失敗可由 `/api/admin/ecpay-cancel-retry` 以 CAS claim 重試並透過 provider query 復原。`GET /api/admin/ecpay-reconcile` 使用綠界 `QueryCreditCardPeriodInfo` 核對金額與執行狀態；provider 拒絕查詢時會先回報經單行化與長度限制的 `RtnCode/RtnMsg`，不再誤判為 identity mismatch，也不輸出完整 provider payload。`.github/workflows/ecpay_reconcile.yml` 每日呼叫該 API，API 失敗、findings 或 unresolved events 會使 workflow 失敗，並以 `BILLING_ALERT_TELEGRAM_CHAT_ID` 指定的獨立 Telegram 管理群通知可追查的 issue、subscription/user/event ID 與安全化 detail，GitHub failure email 作為備援。failed/stuck events 也會透過 `BILLING_ALERT_WEBHOOK_URL` 告警。正式 Checkout 仍必須保持關閉，直到 migration、排程、告警、人工補帳與 sandbox/live E2E 全部驗收。
 
 所有 cookie-authenticated billing mutation 在 production 會精確比對 `NEXT_PUBLIC_APP_URL` Origin；production URL 必須是單一 HTTPS origin。Stripe、ECPay 與 Telegram webhook 使用流式 body size cap；billing event 僅保存 allowlist 摘要，管理員可透過 `/api/admin/billing-retention` 清除 30–365 天以前已處理事件（預設 90 天）。
+
+Repository 以 MIT License 開源；貢獻、安全通報與社群行為分別見 `CONTRIBUTING.md`、`SECURITY.md` 與 `CODE_OF_CONDUCT.md`。安全弱點不得透過 public issue 附上 exploit、secret 或 production payload。
 
 ### 回測/優化
 

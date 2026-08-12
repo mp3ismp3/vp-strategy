@@ -1,182 +1,67 @@
-# Rate Limiting 設定說明
+# API gateway and rate limiting
 
-本專案使用 **Upstash Redis + Edge Middleware** 實作 API rate limiting，保護 Vercel 免費額度不被濫用。
+Next.js 16 `src/proxy.ts` runs before matched API routes and the protected
+`/fusion` and `/account` pages. It provides Redis-backed quotas, IP blocking,
+rate-limit headers, and page redirects. Authorization is still enforced inside
+each route handler.
 
-## 架構
+## Request flow
 
-```
-Client Request
-     ↓
-Vercel Edge Middleware (src/middleware.ts)
-     ↓
-┌─ IP Blacklist Check (Redis SET)
-│       ↓ blocked → 403
-│       ↓ pass
-├─ Determine Route Tier (routeTierMap)
-│       ↓
-├─ Check JWT Token
-│       ↓ logged in → use userId key + higher limits
-│       ↓ anonymous → use IP key + standard limits
-│       ↓
-├─ Upstash Ratelimit.limit(identifier)
-│       ↓ exceeded → 429 + log event
-│       ↓ pass → add rate limit headers + forward
-└─ → API Route Handler
+```text
+request
+  -> webhook/callback bypass? -> route signature or MAC validation
+  -> trusted client-IP extraction
+  -> Redis blacklist
+  -> route tier + anonymous IP or authenticated user key
+  -> quota exceeded: 429
+  -> Redis error on auth/strict in production: 503
+  -> route handler authentication, entitlement and validation
 ```
 
-## Rate Limit Tiers
+## Tiers
 
-| Tier | 匿名用戶 (IP) | 登入用戶 (userId) | 適用路由 |
-|------|-------------|-----------------|----------|
-| `api` | 30 req / 60s | 60 req / 60s | 其他所有 API |
-| `auth` | 5 req / 60s | 10 req / 60s | `/api/auth/*` |
-| `data` | 20 req / 60s | 40 req / 60s | `/api/data/*` |
-| `strict` | 3 req / 60s | 5 req / 60s | `/api/stripe/checkout`, `/api/stripe/portal`, `/api/user/plan` |
+| Tier | Anonymous | Signed in | Routes |
+|---|---:|---:|---|
+| `api` | 30/60s | 60/60s | Other APIs, including health |
+| `auth` | 5/60s | 10/60s | `/api/auth/*` |
+| `data` | 20/60s | 40/60s | `/api/data/*` |
+| `strict` | 3/60s | 5/60s | `/api/admin/*`, checkout, portal, cancel, bind and plan routes |
 
-> **注意：** Webhook 路由（`/api/stripe/webhook`、`/api/telegram/webhook`）由 middleware 白名單直接放行，不走 rate limit。
+Stripe, Telegram, and ECPay callback routes in `WEBHOOK_WHITELIST` bypass Redis
+quotas so provider delivery is not dropped. Each bypassed handler must validate
+its own signature, secret, or CheckMacValue and enforce a streaming body cap.
 
-## 設置步驟
+## Required configuration
 
-### 1. 建立 Upstash Redis
-
-1. 到 [upstash.com](https://upstash.com) 註冊（免費）
-2. 建立一個 Redis database（選離 Vercel 部署區域最近的）
-3. 複製 REST URL 和 Token
-
-### 2. 設定環境變數
-
-在 Vercel Dashboard → Settings → Environment Variables 加入：
-
-```
-UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
-UPSTASH_REDIS_REST_TOKEN=AXxx...
-ADMIN_EMAILS=your-email@gmail.com
+```dotenv
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+TRUSTED_PROXY_MODE=vercel
+ADMIN_EMAILS=admin@example.com
 ```
 
-本機開發也要加到 `.env.local`。
+Use `TRUSTED_PROXY_MODE=vercel` only behind Vercel's normalized `x-real-ip`.
+Use `x-forwarded-for` only behind a reverse proxy that removes client-supplied
+forwarding headers and writes the canonical chain. With no mode, forwarded
+headers are ignored and all clients use a shared conservative fallback key.
 
-### 3. 部署
+## Failure policy
 
-```bash
-git add .
-git commit -m "feat: add rate limiting with Upstash Redis"
-git push
-```
+Redis failure is fail-closed with `503` and `Retry-After: 30` for production
+`auth` and `strict` routes. General and read-only data routes fail open so an
+observability outage does not take down authenticated reads; their route-level
+authorization remains active. Operate production with Redis available and
+alert on `RATE_LIMIT_UNAVAILABLE` server logs.
 
-Vercel 會自動部署，Edge Middleware 會立即生效。
+Quota failures return `429` with `Retry-After`, `X-RateLimit-Limit`,
+`X-RateLimit-Remaining`, and `X-RateLimit-Reset`. Successful limited requests
+receive the three `X-RateLimit-*` headers. `src/lib/fetch-with-retry.ts` can be
+used by browser clients for bounded retry behavior.
 
-## Response Headers
+## Administration
 
-每個 API 回應都會附帶 rate limit 資訊：
-
-```
-X-RateLimit-Limit: 30        # 此 tier 的總額度
-X-RateLimit-Remaining: 27    # 剩餘次數
-X-RateLimit-Reset: 1720000000 # 額度重置的 Unix timestamp
-```
-
-被限制時（429）額外附帶：
-```
-Retry-After: 45              # 建議等待秒數
-```
-
-## 前端使用
-
-用 `fetchWithRetry` 取代 `fetch`，自動處理 429：
-
-```typescript
-import { fetchWithRetry } from '@/lib/fetch-with-retry';
-
-// 自動重試 + 指數退避
-const res = await fetchWithRetry('/api/data/scan-results', {
-  maxRetries: 2,
-  onRateLimited: (seconds, attempt) => {
-    console.warn(`Rate limited, retrying in ${seconds}s (attempt ${attempt})`);
-    // 或顯示 toast 提示用戶
-  },
-});
-```
-
-## 管理 API
-
-### 查看監控數據
-
-```
-GET /api/admin/rate-limit
-Authorization: 必須用 ADMIN_EMAILS 中的帳號登入
-```
-
-回傳：
-```json
-{
-  "recentBlocked": [...],
-  "blacklist": ["1.2.3.4"],
-  "summary": {
-    "totalBlocked": 15,
-    "uniqueIPs": 3,
-    "topOffenders": [{ "ip": "1.2.3.4", "count": 12 }]
-  }
-}
-```
-
-### 管理黑名單
-
-```
-POST /api/admin/rate-limit
-Content-Type: application/json
-
-{ "action": "add", "ip": "1.2.3.4" }
-{ "action": "remove", "ip": "1.2.3.4" }
-```
-
-## 安全策略
-
-| 狀況 | 行為 |
-|------|------|
-| Redis 連線失敗 | **Fail-open**：放行請求，不阻擋（避免整站掛掉） |
-| JWT 解析失敗 | 降級為 IP-based 限制 |
-| 黑名單 IP | 直接 403，不消耗 rate limit quota |
-| Webhook 路由 | 即使被 rate limit 也不影響 Stripe/Telegram callback |
-
-## 調整限制
-
-修改 `src/lib/rate-limit.ts` 中的 `rateLimiters` 和 `authUserLimiters`：
-
-```typescript
-// 例如把 data tier 放寬到 50 次/分鐘
-data: new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(50, "60 s"),
-  prefix: "rl:data",
-  analytics: true,
-}),
-```
-
-修改路由對應的 tier，編輯 `routeTierEntries` 陣列：
-
-```typescript
-const routeTierEntries: [string, RateLimitTier][] = [
-  ["/api/auth", "auth"],
-  ["/api/new-route", "strict"],  // 新增路由對應
-  ...
-];
-```
-
-## 費用
-
-- **Upstash 免費 tier**：10,000 commands/day
-- 每個 API 請求消耗 ~2 commands（limit + 黑名單檢查）
-- 免費額度可支撐 ~5,000 API 請求/天
-- 超過可升級 Pay-as-you-go（$0.2 / 100K commands）
-
-## 檔案結構
-
-```
-src/
-├── middleware.ts              # Edge Middleware 入口（rate limit + auth）
-├── lib/
-│   ├── rate-limit.ts          # Rate limiter 設定 + 黑名單 + logging
-│   └── fetch-with-retry.ts    # 前端 429 處理 utility
-└── app/api/admin/
-    └── rate-limit/route.ts    # 監控 + 黑名單管理 API
-```
+`GET /api/admin/rate-limit` returns recent blocks, blacklist entries, and audit
+history. `POST /api/admin/rate-limit` accepts JSON such as
+`{"action":"add","ip":"203.0.113.10"}`. Both require a signed-in email in
+`ADMIN_EMAILS`; POST is a cookie-authenticated mutation and should only be sent
+from the canonical application origin.

@@ -183,9 +183,13 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；`supabase_migration.sql` 建立新環境 base schema，新環境與既有環境都必須再套用最新版 `supabase_billing_providers.sql` 取得完整 transaction RPC 與 outbox contract。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。Client 方案 snapshot 必須綁定 session email；帳號不匹配或尚未完成查詢時 fail-closed，不得沿用前一個帳號的付費狀態。
 - `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
+- `src/lib/api-response.ts`、`src/app/api/health/route.ts`：共享含 request ID 的 infrastructure error envelope 與不揭露 dependency/config 的匿名 liveness endpoint。Data source failure 回 `503 + Retry-After`；client 與 server log 都不複製可能含敏感資訊的 exception message。
+- `openapi.yaml`、`docs/API.md`：描述 Web BFF 可支援的 consumer contract、operational route inventory 與 gateway 邊界。現有 API 使用 browser session，不是 API key/OAuth client-credentials 的公開 machine-to-machine API。
 - `public/ptrade.svg`：前端共用品牌 icon，由首頁、登入頁、Navbar 與 root metadata 的瀏覽器 icon 引用。
 
 `src/app/api/data/scan-results`、`chart-data`、`accum-state` 以 server-side service role 讀取 CI 上傳至 Supabase 的 production rows，再依有效方案裁切；不得退回 client-side anon query 或依賴未部署的 frontend JSON。
+
+Gateway client IP 必須依 `TRUSTED_PROXY_MODE` 明確選擇 Vercel `x-real-ip` 或受控 reverse proxy 的 `x-forwarded-for`；未設定時不得信任 forwarded headers。Production Redis 故障時 `auth`/`strict` fail-closed，一般與唯讀 `data` route 才可 fail-open，且 route handler 的 auth/entitlement 永遠不可依賴 proxy 取代。全站 security headers 由 `next.config.ts` 統一提供。
 
 Web entitlement boundary：未登入訪客不得讀 production data。登入 Free 可讀 Mega Cap Tech 7 檔即時資料與 Accumulation 前 10 名非行動摘要；Pro 解鎖全部一般分析、levels/triggers 與 Strategy Lab；Premium 另解鎖 Fusion，以及 Telegram 綁定與即時信號。Free/Pro 不可產生或兌換 Telegram 綁定碼。Supabase analysis tables 撤除 anon/authenticated access，client pages 一律透過 server API；UI Paywall 不取代 server authorization。
 
