@@ -104,19 +104,22 @@ def format_scan_summary() -> str:
     bearish = []
 
     for symbol, info in vp_data.items():
+        daily = info.get("daily") or {}
+        weekly = info.get("weekly") or {}
+        monthly = info.get("monthly") or {}
         positions = [
-            info.get("daily", {}).get("position"),
-            info.get("weekly", {}).get("position"),
-            info.get("monthly", {}).get("position"),
+            daily.get("position"),
+            weekly.get("position"),
+            monthly.get("position"),
         ]
         above = positions.count("above_va")
         below = positions.count("below_va")
 
         if above >= 2:
-            pct = info.get("daily", {}).get("position_pct", 0)
+            pct = daily.get("position_pct", 0)
             bullish.append((symbol, info.get("price", 0), pct))
         elif below >= 2:
-            pct = info.get("daily", {}).get("position_pct", 0)
+            pct = daily.get("position_pct", 0)
             bearish.append((symbol, info.get("price", 0), pct))
 
     # Format message
