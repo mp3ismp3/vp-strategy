@@ -48,7 +48,7 @@ export const PLANS: Record<Plan, PlanConfig> = {
       telegramSignals: false,
     },
     highlights: [
-      "VP Scanner — 全部 78 檔",
+      "VP Scanner — 全部分析標的",
       "Accumulation Tracker",
       "完整支撐、壓力與 Triggers",
       "類別篩選",

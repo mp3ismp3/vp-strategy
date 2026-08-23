@@ -1,5 +1,25 @@
 """Global configuration for the VP Strategy platform."""
 
+# Binance Futures symbols whose 2026-08-23 exchange metadata reports
+# contractType=TRADIFI_PERPETUAL and underlyingType=EQUITY. Contract settlement
+# suffixes are intentionally removed; BRKB is normalized for Yahoo Finance.
+BINANCE_EQUITY_SYMBOLS = [
+    "AAOI", "AAPL", "ADBE", "ALAB", "AMAT", "AMD", "AMZN", "APP", "ARM", "ASML",
+    "ASTS", "AVGO", "AXTI", "BABA", "BBX", "BE", "BITO", "BMNR", "BNC", "BOT",
+    "BRK-B", "BSP", "BX", "CAT", "CBRS", "CIEN", "COHR", "COIN", "COST", "CRCL",
+    "CRDO", "CRM", "CRWD", "CRWV", "CSCO", "DELL", "DIS", "DKNG", "DRAM", "EBAY",
+    "EWJ", "EWT", "EWY", "EWZ", "FLEX", "FLNC", "FWDI", "GDX", "GEV", "GLW",
+    "GME", "GOOGL", "GS", "HD", "HIMS", "HOOD", "HPE", "IBM", "INTC", "INTW",
+    "IREN", "IWM", "JPM", "KLAC", "KO", "KORU", "KSTR", "LITE", "LLY", "LRCX",
+    "LYTE", "META", "MRVL", "MSFT", "MSTR", "MU", "MUU", "MVLL", "NBIS", "NET",
+    "NFLX", "NOK", "NOW", "NVDA", "NVO", "ONDS", "ORCL", "PANW", "PAYP", "PENG",
+    "PLTR", "PYPL", "QCOM", "QNTX", "QQQ", "RDDT", "RIVN", "RKLB", "SHAZ", "SHOP",
+    "SKHY", "SMCI", "SMH", "SNDK", "SNOW", "SNXX", "SOFI", "SONY", "SOXL", "SOXS",
+    "SPCX", "SPY", "SQQQ", "STRC", "STXX", "TBT", "TER", "TMF", "TQQQ", "TSLA",
+    "TSM", "TTWO", "TXN", "TZA", "UBER", "URNM", "USAR", "UVXY", "V", "VRT",
+    "VST", "WDC", "WEN", "WMT", "XBI", "XLE", "ZM",
+]
+
 SYMBOLS = [
     # Mega Cap Tech
     "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
@@ -30,8 +50,42 @@ SYMBOLS = [
     # Misc Tech / AI Adjacent
     "UBER", "XYZ", "SHOP", "COIN", "MSTR",
 ]
+BINANCE_EQUITY_ADDITIONS = [
+    symbol for symbol in BINANCE_EQUITY_SYMBOLS if symbol not in SYMBOLS
+]
+SYMBOLS.extend(BINANCE_EQUITY_ADDITIONS)
 
-SECTOR_ETFS = ["SMH", "XLK", "IGV", "SKYY", "BOTZ"]
+BINANCE_INDUSTRY_CATEGORIES = {
+    "Semiconductor / AI Chips": ["ALAB", "AXTI", "CBRS", "CRDO", "SKHY", "SNDK", "TER", "TXN", "WDC"],
+    "AI / Cloud / Software": ["APP", "NBIS", "PENG", "ZM"],
+    "AI Hardware / Robotics": ["BOT", "ONDS"],
+    "AI Infra / Networking": ["AAOI", "COHR", "GLW", "NOK"],
+    "Financial / Fintech": ["BBX", "BRK-B", "BSP", "BX", "CRCL", "GS", "HOOD", "JPM", "PAYP", "PYPL", "SOFI", "V"],
+    "Digital Assets / Crypto": ["BMNR", "BNC", "FWDI", "IREN", "STRC"],
+    "Consumer / Media": ["BABA", "COST", "DIS", "DKNG", "EBAY", "GME", "HD", "KO", "LYTE", "NFLX", "QNTX", "RDDT", "RIVN", "SONY", "TTWO", "WEN", "WMT"],
+    "Healthcare / Biotech": ["HIMS", "LLY", "NVO"],
+    "Industrial / Aerospace": ["ASTS", "CAT", "FLEX", "RKLB", "SPCX", "USAR"],
+    "Energy / Clean Tech": ["BE", "FLNC"],
+    "ETFs": [
+        "BITO", "DRAM", "EWJ", "EWT", "EWY", "EWZ", "GDX", "INTW", "IWM", "KORU",
+        "KSTR", "MUU", "MVLL", "SHAZ", "SMH", "SNXX", "SOXL", "SOXS", "SQQQ", "STXX",
+        "TBT", "TMF", "TQQQ", "TZA", "URNM", "UVXY", "XBI", "XLE",
+    ],
+}
+
+ETF_BENCHMARKS = {
+    "BITO": "BITO", "DRAM": "SMH", "EWJ": "EWJ", "EWT": "EWT", "EWY": "EWY",
+    "EWZ": "EWZ", "GDX": "GDX", "INTW": "INTW", "IWM": "IWM", "KORU": "KORU",
+    "KSTR": "KSTR", "MUU": "MUU", "MVLL": "MVLL", "SHAZ": "SHAZ", "SMH": "SMH",
+    "SNXX": "SNXX", "SOXL": "SOXL", "SOXS": "SOXS", "SPY": "SPY", "QQQ": "QQQ",
+    "SQQQ": "SQQQ", "STXX": "STXX", "TBT": "TBT", "TMF": "TMF", "TQQQ": "TQQQ",
+    "TZA": "TZA", "URNM": "URNM", "UVXY": "UVXY", "XBI": "XBI", "XLE": "XLE",
+}
+
+SECTOR_ETFS = list(dict.fromkeys([
+    "SMH", "XLK", "IGV", "SKYY", "BOTZ", "XLF", "XLY", "XLV", "XLI", "XLE",
+    *ETF_BENCHMARKS.values(),
+]))
 
 SYMBOL_CATEGORIES = {
     "Mega Cap Tech": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"],
@@ -46,9 +100,17 @@ SYMBOL_CATEGORIES = {
     "AI Healthcare": ["ISRG", "VEEV", "DXCM"],
     "AI Cybersecurity": ["S", "CYBR", "OKTA"],
     "AI Enterprise / Automation": ["MNDY", "DOCN", "TWLO", "TTD"],
+    "Financial / Fintech": [],
+    "Digital Assets / Crypto": ["COIN", "MSTR"],
+    "Consumer / Media": [],
+    "Healthcare / Biotech": [],
+    "Industrial / Aerospace": [],
+    "Energy / Clean Tech": [],
     "ETFs": ["SPY", "QQQ"],
-    "Misc Tech": ["UBER", "XYZ", "SHOP", "COIN", "MSTR"],
+    "Misc Tech": ["UBER", "XYZ", "SHOP"],
 }
+for _category, _symbols in BINANCE_INDUSTRY_CATEGORIES.items():
+    SYMBOL_CATEGORIES[_category].extend(_symbols)
 
 SECTOR_MAP = {
     "NVDA": "SMH", "AVGO": "SMH", "AMD": "SMH", "INTC": "SMH", "QCOM": "SMH",
@@ -73,6 +135,30 @@ SECTOR_MAP = {
     "S": "IGV", "OKTA": "IGV",
     "MNDY": "IGV", "DOCN": "IGV", "TWLO": "IGV", "TTD": "IGV",
 }
+
+# Existing sector-specific mappings remain authoritative. Newly tracked Binance
+# equities use SPY as the neutral relative-strength benchmark.
+for _symbol in BINANCE_EQUITY_SYMBOLS:
+    SECTOR_MAP.setdefault(_symbol, "SPY")
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Semiconductor / AI Chips"]:
+    SECTOR_MAP[_symbol] = "SMH"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["AI / Cloud / Software"]:
+    SECTOR_MAP[_symbol] = "IGV"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["AI Infra / Networking"]:
+    SECTOR_MAP[_symbol] = "XLK"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Financial / Fintech"]:
+    SECTOR_MAP[_symbol] = "XLF"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Digital Assets / Crypto"]:
+    SECTOR_MAP[_symbol] = "SPY"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Consumer / Media"]:
+    SECTOR_MAP[_symbol] = "XLY"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Healthcare / Biotech"]:
+    SECTOR_MAP[_symbol] = "XLV"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Industrial / Aerospace"]:
+    SECTOR_MAP[_symbol] = "XLI"
+for _symbol in BINANCE_INDUSTRY_CATEGORIES["Energy / Clean Tech"]:
+    SECTOR_MAP[_symbol] = "XLE"
+SECTOR_MAP.update(ETF_BENCHMARKS)
 
 DEFAULT_CFG = {
     "vp_lookback": 60,

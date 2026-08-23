@@ -9,6 +9,7 @@ import {
   isIndicatorTickerAllowed,
   limitAccumulationItems,
 } from "@/lib/preview-access";
+import { BINANCE_EQUITY_SYMBOLS, SYMBOL_CATEGORIES, isBinanceEquityTicker } from "@/lib/categories";
 
 describe("indicator preview access", () => {
   const rows = [
@@ -16,6 +17,24 @@ describe("indicator preview access", () => {
     { ticker: "AMD", score: 9 },
     { ticker: "AAPL", score: 8 },
   ];
+
+  it("keeps Binance membership separate from the single industry category", () => {
+    const categoryCounts = new Map<string, number>();
+    for (const symbols of Object.values(SYMBOL_CATEGORIES)) {
+      for (const symbol of symbols) categoryCounts.set(symbol, (categoryCounts.get(symbol) ?? 0) + 1);
+    }
+
+    expect(BINANCE_EQUITY_SYMBOLS).toHaveLength(137);
+    expect(BINANCE_EQUITY_SYMBOLS.every(isBinanceEquityTicker)).toBe(true);
+    expect(BINANCE_EQUITY_SYMBOLS.every((symbol) => categoryCounts.get(symbol) === 1)).toBe(true);
+    expect(SYMBOL_CATEGORIES["Binance 美股合約"]).toBeUndefined();
+    expect(SYMBOL_CATEGORIES["Financial / Fintech"]).toContain("PAYP");
+    expect(SYMBOL_CATEGORIES["AI / Cloud / Software"]).toContain("ZM");
+    expect(SYMBOL_CATEGORIES["Industrial / Aerospace"]).toContain("FLEX");
+    expect(SYMBOL_CATEGORIES["Digital Assets / Crypto"]).toEqual(
+      expect.arrayContaining(["BMNR", "BNC", "FWDI", "IREN", "STRC", "COIN", "MSTR"])
+    );
+  });
 
   it("limits guests to Mega Cap Tech tickers", () => {
     expect(filterIndicatorItems(rows, false).map((row) => row.ticker)).toEqual([
