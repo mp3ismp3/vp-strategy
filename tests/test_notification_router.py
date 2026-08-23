@@ -1,4 +1,7 @@
 import importlib.util
+import json
+import sys
+import types
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,6 +16,47 @@ def _load_entitlement():
 
 
 entitlement = _load_entitlement()
+
+
+def _load_notification_router(monkeypatch):
+    monkeypatch.setitem(sys.modules, "dotenv", types.SimpleNamespace(load_dotenv=lambda: None))
+    monkeypatch.setitem(sys.modules, "telegram", types.SimpleNamespace(Bot=object))
+    monkeypatch.setitem(
+        sys.modules,
+        "supabase",
+        types.SimpleNamespace(create_client=lambda *_args, **_kwargs: None),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "entitlement",
+        types.SimpleNamespace(has_telegram_entitlement=lambda _user: True),
+    )
+    path = Path(__file__).parents[1] / "services" / "telegram-bot" / "notification_router.py"
+    spec = importlib.util.spec_from_file_location("notification_router_for_test", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_scan_summary_tolerates_null_timeframe(monkeypatch, tmp_path):
+    router = _load_notification_router(monkeypatch)
+    router.DATA_DIR = tmp_path
+    (tmp_path / "scan_results.json").write_text(json.dumps({
+        "vp_data": {
+            "NEW": {
+                "price": 12.5,
+                "daily": {"position": "above_va", "position_pct": 5},
+                "weekly": {"position": "above_va"},
+                "monthly": None,
+            }
+        }
+    }))
+
+    summary = router.format_scan_summary()
+
+    assert "Bullish (1 檔)" in summary
+    assert "NEW $12.50" in summary
 
 
 def test_canceling_entitlement_expires_without_a_new_web_session():

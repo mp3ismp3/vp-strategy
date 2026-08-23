@@ -194,6 +194,7 @@ Next.js Web 預覽權限：
 - Pro（NT$320／月）解鎖全部標的、完整 Accumulation levels/triggers 與 Strategy Lab 信號。
 - Premium（NT$620／月）包含 Pro，另解鎖 Fusion 與 Telegram 帳號綁定／即時信號；Free 與 Pro 都不能產生 Telegram 綁定碼。歷史回顧尚未形成獨立付費功能，正式實作 server-side retention gate 前不列入方案承諾。
 - 所有資料裁切與方案驗證都在 server API 執行；前端 Paywall 只負責呈現，不能作為資料安全邊界。
+- Subscriber VP 摘要會容忍新上市或資料不足標的缺少日／週／月 timeframe；缺少的 timeframe 不計入 bullish／bearish 共識，不會中斷整批 Telegram 通知。
 
 Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
