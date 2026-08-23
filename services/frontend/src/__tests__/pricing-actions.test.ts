@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { getPricingPlanAction } from "@/lib/plans";
+import { PLANS, getPricingPlanAction } from "@/lib/plans";
 
 describe("Pricing plan actions", () => {
+  it("describes Pro access without a stale fixed universe count", () => {
+    expect(PLANS.pro.highlights).toContain("VP Scanner — 全部分析標的");
+    expect(PLANS.pro.highlights.join(" ")).not.toMatch(/78\s*檔/);
+  });
+
   it("lets a free user start either paid plan", () => {
     expect(getPricingPlanAction("free", "pro")).toEqual({
       disabled: false,

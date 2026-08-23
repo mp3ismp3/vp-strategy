@@ -6,7 +6,7 @@ import { ScanResult } from "@/types/signal";
 import { VPChart } from "@/components/charts/VPChart";
 import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
-import { SYMBOL_CATEGORIES, ALL_CATEGORIES } from "@/lib/categories";
+import { SYMBOL_CATEGORIES, ALL_CATEGORIES, isBinanceEquityTicker } from "@/lib/categories";
 import type { Plan } from "@/types/user";
 
 function ScannerContent() {
@@ -126,7 +126,7 @@ function ScannerContent() {
       {effectiveUserPlan === "free" && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center">
           <span className="text-sm text-yellow-800">
-            免費方案只顯示 Mega Cap Tech（7 檔）。升級 Pro 解鎖全部 78 檔。
+            免費方案只顯示 Mega Cap Tech（7 檔）。升級 Pro 解鎖全部分析標的。
           </span>
           <a href="/pricing" className="text-sm font-medium bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800">
             升級
@@ -156,7 +156,10 @@ function ScannerContent() {
       {selectedResult && (
         <div className="mb-8 bg-white rounded-xl border p-4">
           <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg font-bold">{selectedResult.ticker}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold">{selectedResult.ticker}</h2>
+              {isBinanceEquityTicker(selectedResult.ticker) && <Badge variant="outline">Binance</Badge>}
+            </div>
             <button
               onClick={() => setSelectedTicker(null)}
               className="text-sm text-gray-500 hover:text-gray-700"
@@ -206,7 +209,10 @@ function ScannerContent() {
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">{r.ticker}</span>
+                    <span className="flex items-center gap-2 font-bold">
+                      {r.ticker}
+                      {isBinanceEquityTicker(r.ticker) && <Badge variant="outline">Binance</Badge>}
+                    </span>
                     <span className="text-sm text-gray-600">
                       ${r.price.toFixed(2)}
                     </span>
@@ -243,7 +249,10 @@ function ScannerContent() {
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">{r.ticker}</span>
+                    <span className="flex items-center gap-2 font-bold">
+                      {r.ticker}
+                      {isBinanceEquityTicker(r.ticker) && <Badge variant="outline">Binance</Badge>}
+                    </span>
                     <span className="text-sm text-gray-600">
                       ${r.price.toFixed(2)}
                     </span>
@@ -280,7 +289,10 @@ function ScannerContent() {
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold">{r.ticker}</span>
+                    <span className="flex items-center gap-2 font-bold">
+                      {r.ticker}
+                      {isBinanceEquityTicker(r.ticker) && <Badge variant="outline">Binance</Badge>}
+                    </span>
                     <span className="text-sm text-gray-600">
                       ${r.price.toFixed(2)}
                     </span>

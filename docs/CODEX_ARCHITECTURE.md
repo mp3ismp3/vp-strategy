@@ -40,7 +40,7 @@ vp-strategy/
 
 ### `config.py`
 
-集中管理掃描標的與經回測調校的預設值：`SYMBOLS`、`SECTOR_MAP`、`DEFAULT_CFG`、`SCORING_WEIGHTS`、`REGIME_THRESHOLDS`。變更預設值、權重或門檻必須跑相關測試及 `python backtest_multi.py`。
+集中管理掃描標的與經回測調校的預設值：`SYMBOLS`、`SECTOR_MAP`、`DEFAULT_CFG`、`SCORING_WEIGHTS`、`REGIME_THRESHOLDS`。`BINANCE_EQUITY_SYMBOLS` 保存已核對的 Binance Equity TradFi underlying ticker universe；結算資產後綴不進入分析 schema，新增標的仍併入共用 `SYMBOLS`，並以互斥產業分類及對應 sector benchmark 供 Scanner、Accumulation、盤前、MACD 與 backtest 共用。變更預設值、權重或門檻必須跑相關測試及 `python backtest_multi.py`。
 
 ### `core/`
 
@@ -182,6 +182,7 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/app/api/admin/stripe-reconcile/route.ts`、`stripe-reconciliation.ts`：限 `ADMIN_EMAILS` 管理員使用的 Stripe/Supabase reconciliation。預設 dry-run；只有單一或零個非終止訂閱才可 apply，多重訂閱必須人工處理。
 - `supabase_billing_hardening.sql`：既有 Supabase 專案的 Stripe production-readiness 增量 migration；`supabase_migration.sql` 建立新環境 base schema，新環境與既有環境都必須再套用最新版 `supabase_billing_providers.sql` 取得完整 transaction RPC 與 outbox contract。
 - `src/lib/plans.ts`、`Paywall.tsx`：方案權限與前端 gate。Client 方案 snapshot 必須綁定 session email；帳號不匹配或尚未完成查詢時 fail-closed，不得沿用前一個帳號的付費狀態。
+- `src/lib/categories.ts`：前端產業分類 mirror `config.py`；每個 ticker 只屬於一個產業分類。Binance Equity TradFi membership 是獨立標記，Scanner 以 badge 顯示，不建立重複的 Binance 分類，也不把 `USDT`／`USD1` 結算後綴帶入頁面或 chart API。
 - `src/lib/rate-limit.ts`、`proxy.ts`：Next.js 16 request proxy，負責 Upstash rate limit 與登入頁面保護。
 - `src/lib/api-response.ts`、`src/app/api/health/route.ts`：共享含 request ID 的 infrastructure error envelope 與不揭露 dependency/config 的匿名 liveness endpoint。Data source failure 回 `503 + Retry-After`；client 與 server log 都不複製可能含敏感資訊的 exception message。
 - `openapi.yaml`、`docs/API.md`：描述 Web BFF 可支援的 consumer contract、operational route inventory 與 gateway 邊界。現有 API 使用 browser session，不是 API key/OAuth client-credentials 的公開 machine-to-machine API。
