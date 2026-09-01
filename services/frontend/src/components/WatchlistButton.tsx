@@ -41,11 +41,13 @@ export function WatchlistButton({ ticker }: { ticker: string }) {
     <div className="flex items-center gap-2">
       <button
         type="button"
+        aria-label={saved ? "移除觀察" : "加入觀察"}
+        title={saved ? "移除觀察" : "加入觀察"}
         onClick={toggle}
         disabled={busy}
-        className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+        className="flex h-9 w-9 items-center justify-center rounded-full border text-xl font-medium hover:bg-gray-50 disabled:opacity-50"
       >
-        {busy ? "處理中" : saved ? "移除觀察" : "加入觀察"}
+        {busy ? "…" : saved ? "−" : "+"}
       </button>
       {message && <span className="text-xs text-red-600">{message}</span>}
     </div>

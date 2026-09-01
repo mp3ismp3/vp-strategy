@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { AccumChart } from "@/components/charts/AccumChart";
 import { VPChart } from "@/components/charts/VPChart";
+import { FVGChart } from "@/components/charts/FVGChart";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { Badge } from "@/components/ui/badge";
 import type { FVGGap } from "@/lib/fvg";
@@ -98,7 +99,7 @@ export default function SymbolDashboardPage() {
         {!analysis.access.fvgDetails ? (
           <div><p>未回補 Bullish {analysis.fvg.bullishOpen} 個，Bearish {analysis.fvg.bearishOpen} 個。</p><p className="mt-2 text-sm text-amber-700">Free 方案提供數量摘要；升級後顯示缺口價位與回補狀態。</p></div>
         ) : !analysis.fvg.gaps?.length ? <p className="text-gray-500">最近區間沒有符合條件的 FVG。</p> : (
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left text-gray-500"><th className="py-2">方向</th><th>日期</th><th>區間</th><th>狀態</th></tr></thead><tbody>{analysis.fvg.gaps.map((gap, index) => <tr key={`${gap.date}-${index}`} className="border-b"><td className={gap.type === "bullish" ? "py-3 text-green-700" : "py-3 text-red-700"}>{gap.type}</td><td>{gap.date}</td><td>${gap.gapLow.toFixed(2)}–${gap.gapHigh.toFixed(2)}</td><td>{gap.filled ? "已回補" : `未回補（${gap.fillPct.toFixed(0)}%）`}</td></tr>)}</tbody></table></div>
+          <div className="space-y-5"><FVGChart ticker={ticker} gaps={analysis.fvg.gaps} /><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left text-gray-500"><th className="py-2">方向</th><th>日期</th><th>區間</th><th>狀態</th></tr></thead><tbody>{analysis.fvg.gaps.map((gap, index) => <tr key={`${gap.date}-${index}`} className="border-b"><td className={gap.type === "bullish" ? "py-3 text-green-700" : "py-3 text-red-700"}>{gap.type === "bullish" ? "多方" : "空方"}</td><td>{gap.date}</td><td>${gap.gapLow.toFixed(2)}–${gap.gapHigh.toFixed(2)}</td><td>{gap.filled ? "已回補" : `未回補（${gap.fillPct.toFixed(0)}%）`}</td></tr>)}</tbody></table></div></div>
         )}
       </section>
     </main>

@@ -23,6 +23,18 @@ describe("personal watchlist UI", () => {
     const detail = source("src/app/dashboard/[ticker]/page.tsx");
     expect(detail).toContain("VPChart");
     expect(detail).toContain("AccumChart");
+    expect(detail).toContain("FVGChart");
     expect(detail).toContain("Fair Value Gap");
+  });
+
+  it("uses compact watchlist controls and localized VP labels", () => {
+    const button = source("src/components/WatchlistButton.tsx");
+    const dashboard = source("src/app/dashboard/page.tsx");
+    expect(button).toContain('aria-label={saved ? "移除觀察" : "加入觀察"}');
+    expect(button).toContain('saved ? "−" : "+"');
+    expect(dashboard).toContain("getVpPositionLabel");
+    expect(dashboard).toContain("日線");
+    expect(dashboard).toContain("週線");
+    expect(dashboard).toContain("月線");
   });
 });
