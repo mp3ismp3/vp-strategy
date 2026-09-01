@@ -158,7 +158,10 @@ describe("ECPay API routes", () => {
       RtnCode: 1, RtnMsg: "OK", CheckMacValue: "SIGNED",
     }));
     const { POST } = await import("@/app/api/ecpay/cancel/route");
-    const response = await POST();
+    const response = await POST(new Request("https://example.com/api/ecpay/cancel", {
+      method: "POST",
+      headers: { origin: "https://example.com" },
+    }));
 
     expect(response.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith("create_ecpay_cancel_intent", {
@@ -187,7 +190,10 @@ describe("ECPay API routes", () => {
     mocks.verifyEcpayCallback.mockReturnValue(false);
     vi.mocked(fetch).mockImplementation(async () => new Response("RtnCode=1&RtnMsg=OK"));
     const { POST } = await import("@/app/api/ecpay/cancel/route");
-    const response = await POST();
+    const response = await POST(new Request("https://example.com/api/ecpay/cancel", {
+      method: "POST",
+      headers: { origin: "https://example.com" },
+    }));
 
     expect(response.status).toBe(502);
     expect(rpc).toHaveBeenCalledWith("fail_ecpay_cancel_intent", expect.objectContaining({

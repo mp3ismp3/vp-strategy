@@ -6,7 +6,7 @@ import { processEcpayCancellation } from "@/lib/ecpay-cancel";
 import { isTrustedMutationRequest } from "@/lib/http-security";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-export async function POST(request?: Request) {
+export async function POST(request: Request) {
   if (!isTrustedMutationRequest(request)) {
     return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
   }

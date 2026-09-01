@@ -9,7 +9,7 @@ import {
 } from "@/lib/stripe-config";
 import { getCanonicalAppUrl, isTrustedMutationRequest } from "@/lib/http-security";
 
-export async function POST(request?: Request) {
+export async function POST(request: Request) {
   if (!isTrustedMutationRequest(request)) {
     return NextResponse.json({ error: "Untrusted request origin" }, { status: 403 });
   }
