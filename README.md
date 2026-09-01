@@ -202,6 +202,8 @@ Next.js Web 預覽權限：
 
 Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
+Frontend 現已提供繁體中文 `zh-TW`（預設）與 English `en` 雙語基礎，Navbar、Dashboard、觀察清單與標的詳細頁可用右上角語言切換；偏好以 `NEXT_LOCALE` cookie 保存。翻譯字典位於 `services/frontend/messages/`，API 與分析 JSON 的 machine values 維持不變。其他分析頁將依相同 dictionary 契約逐階段遷移。
+
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account`、`/dashboard` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
 Web API 定位為隨產品 UI 一同演進的 backend-for-frontend（BFF），不是提供 API key 的公開市場資料 API。`GET /api/health` 可匿名用於 liveness；data routes 使用 NextAuth browser session 並在 server 驗證方案。資料來源故障統一回 `503` 與 `Retry-After`，不把內部 exception 傳給 client。可呼叫路由、權限、錯誤與 gateway contract 見 `docs/API.md`，機器可讀規格見 `services/frontend/openapi.yaml`。

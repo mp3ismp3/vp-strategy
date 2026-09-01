@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { getVpPositionLabel } from "@/lib/vp-labels";
+import { useTranslations } from "next-intl";
 
 const VP_PERIODS = [
-  ["daily", "日線"],
-  ["weekly", "週線"],
-  ["monthly", "月線"],
+  "daily",
+  "weekly",
+  "monthly",
 ] as const;
 
 interface AnalysisSummary {
@@ -46,6 +47,9 @@ interface DashboardPayload {
 }
 
 export default function DashboardPage() {
+  const t = useTranslations("dashboard");
+  const common = useTranslations("common");
+  const vp = useTranslations("vp");
   const { data: session, status } = useSession();
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [selected, setSelected] = useState("");
@@ -56,37 +60,37 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/data/dashboard");
-      if (!response.ok) throw new Error("目前無法載入 Dashboard");
+      if (!response.ok) throw new Error(t("loadFailed"));
       setData(await response.json());
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "目前無法載入 Dashboard");
+      setMessage(error instanceof Error ? error.message : t("loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!session) return;
     fetch("/api/data/dashboard")
       .then((response) => response.ok ? response.json() : Promise.reject())
       .then(setData)
-      .catch(() => setMessage("目前無法載入 Dashboard"))
+      .catch(() => setMessage(t("loadFailed")))
       .finally(() => setLoading(false));
-  }, [session]);
+  }, [session, t]);
 
   if (status === "loading") {
-    return <div className="flex min-h-[50vh] items-center justify-center">載入中</div>;
+    return <div className="flex min-h-[50vh] items-center justify-center">{common("loading")}</div>;
   }
   if (!session) {
     return (
       <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
-        <h1 className="text-2xl font-bold">登入後建立個人觀察清單</h1>
-        <Link href="/login" className="rounded-md bg-black px-6 py-3 text-white">登入</Link>
+        <h1 className="text-2xl font-bold">{t("unauthenticatedTitle")}</h1>
+        <Link href="/login" className="rounded-md bg-black px-6 py-3 text-white">{common("login")}</Link>
       </div>
     );
   }
   if (loading) {
-    return <div className="flex min-h-[50vh] items-center justify-center">載入中</div>;
+    return <div className="flex min-h-[50vh] items-center justify-center">{common("loading")}</div>;
   }
 
   const saved = new Set(data?.items.map((item) => item.ticker) || []);
@@ -102,7 +106,7 @@ export default function DashboardPage() {
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      setMessage(payload.error === "Watchlist limit reached" ? `你的方案最多可追蹤 ${data?.limit} 檔` : "新增失敗");
+      setMessage(payload.error === "Watchlist limit reached" ? t("limitReached", { limit: data?.limit ?? 0 }) : t("addFailed"));
       return;
     }
     setSelected("");
@@ -112,7 +116,7 @@ export default function DashboardPage() {
   async function removeTicker(ticker: string) {
     const response = await fetch(`/api/user/watchlist/${encodeURIComponent(ticker)}`, { method: "DELETE" });
     if (response.ok) await loadDashboard();
-    else setMessage("移除失敗，請稍後再試");
+    else setMessage(t("removeFailed"));
   }
 
   async function moveTicker(index: number, direction: -1 | 1) {
@@ -127,15 +131,15 @@ export default function DashboardPage() {
       body: JSON.stringify({ tickers }),
     });
     if (response.ok) await loadDashboard();
-    else setMessage("排序失敗，請稍後再試");
+    else setMessage(t("orderFailed"));
   }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">我的觀察清單</h1>
-          <p className="mt-1 text-gray-600">集中查看 VP、Accumulation 與 FVG 狀態</p>
+          <h1 className="text-3xl font-bold">{t("title")}</h1>
+          <p className="mt-1 text-gray-600">{t("subtitle")}</p>
         </div>
         <Badge variant="outline" className="capitalize">{data?.plan || "free"} · {data?.items.length || 0} / {data?.limit || 5}</Badge>
       </div>
@@ -143,19 +147,19 @@ export default function DashboardPage() {
       <section className="mb-6 rounded-xl border bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <select value={selected} onChange={(event) => setSelected(event.target.value)} className="min-w-64 rounded-md border px-3 py-2">
-            <option value="">選擇平台支援標的</option>
+            <option value="">{t("chooseTicker")}</option>
             {choices.map((ticker) => <option key={ticker} value={ticker}>{ticker}</option>)}
           </select>
-          <button aria-label="加入觀察" title="加入觀察" onClick={addTicker} disabled={!selected || (data?.items.length || 0) >= (data?.limit || 0)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-xl text-white disabled:opacity-40">
+           <button aria-label={t("add")} title={t("add")} onClick={addTicker} disabled={!selected || (data?.items.length || 0) >= (data?.limit || 0)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-xl text-white disabled:opacity-40">
             +
           </button>
-          {data?.plan === "free" && <Link href="/pricing" className="self-center text-sm font-medium underline">升級以追蹤更多標的</Link>}
+          {data?.plan === "free" && <Link href="/pricing" className="self-center text-sm font-medium underline">{t("upgradeMore")}</Link>}
         </div>
         {message && <p className="mt-3 text-sm text-red-600">{message}</p>}
       </section>
 
       {!data?.items.length ? (
-        <div className="rounded-xl border border-dashed py-20 text-center text-gray-500">尚未加入標的，請從上方選擇。</div>
+        <div className="rounded-xl border border-dashed py-20 text-center text-gray-500">{t("empty")}</div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data.items.map((item, index) => {
@@ -165,36 +169,36 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="text-xl font-bold">{item.ticker}</h2>
-                    <p className="text-sm text-gray-500">{analysis?.price == null ? "價格暫缺" : `$${analysis.price.toFixed(2)}`}</p>
+                    <p className="text-sm text-gray-500">{analysis?.price == null ? t("priceMissing") : `$${analysis.price.toFixed(2)}`}</p>
                   </div>
-                  {item.locked ? <Badge variant="outline">已鎖定</Badge> : <Badge className="capitalize">{analysis?.vp.consensus || "no data"}</Badge>}
+                  {item.locked ? <Badge variant="outline">{t("locked")}</Badge> : <Badge className="capitalize">{analysis ? vp(analysis.vp.consensus) : common("noData")}</Badge>}
                 </div>
                 {item.locked ? (
-                  <p className="my-6 text-sm text-amber-700">目前方案無法查看此標的；降級後資料會保留，不會自動刪除。</p>
+                  <p className="my-6 text-sm text-amber-700">{t("lockedDescription")}</p>
                 ) : analysis ? (
                   <div className="my-5 space-y-3 text-sm">
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      {VP_PERIODS.map(([period, label]) => (
+                      {VP_PERIODS.map((period) => (
                         <div key={period} className="rounded-md bg-gray-50 p-2">
-                          <div className="text-xs text-gray-500">{label}</div>
-                          <div className="truncate font-medium" title={analysis.vp[period]?.position}>{getVpPositionLabel(analysis.vp[period]?.position)}</div>
+                          <div className="text-xs text-gray-500">{t(period)}</div>
+                          <div className="truncate font-medium" title={analysis.vp[period]?.position}>{getVpPositionLabel(analysis.vp[period]?.position, vp)}</div>
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-gray-500">價值區是主要成交量集中的價格範圍；高於／低於價值區代表現價已在 VAH 上方／VAL 下方。</p>
-                    <div className="flex justify-between"><span>Accumulation</span><span>{analysis.accumulation ? `Phase ${analysis.accumulation.phase} · ${analysis.accumulation.decay_score.toFixed(1)}` : "未追蹤"}</span></div>
-                    <div className="flex justify-between"><span>未回補 FVG</span><span className="text-green-700">Bull {analysis.fvg.bullishOpen}</span><span className="text-red-700">Bear {analysis.fvg.bearishOpen}</span></div>
-                    {analysis.accumulation?.failing && <p className="font-medium text-red-700">Accumulation failure warning</p>}
+                    <p className="text-xs text-gray-500">{t("valueAreaHelp")}</p>
+                    <div className="flex justify-between"><span>{t("accumulation")}</span><span>{analysis.accumulation ? `Phase ${analysis.accumulation.phase} · ${analysis.accumulation.decay_score.toFixed(1)}` : t("notTracked")}</span></div>
+                    <div className="flex justify-between"><span>{t("unfilledFvg")}</span><span className="text-green-700">{t("bull")} {analysis.fvg.bullishOpen}</span><span className="text-red-700">{t("bear")} {analysis.fvg.bearishOpen}</span></div>
+                    {analysis.accumulation?.failing && <p className="font-medium text-red-700">{t("failureWarning")}</p>}
                   </div>
-                ) : <p className="my-6 text-sm text-gray-500">本次批次尚無分析資料。</p>}
+                ) : <p className="my-6 text-sm text-gray-500">{t("noAnalysis")}</p>}
                 <div className="flex items-center justify-between border-t pt-4">
                   <div className="flex gap-1">
-                    <button aria-label="向前排序" onClick={() => moveTicker(index, -1)} disabled={index === 0} className="rounded border px-2 py-1 disabled:opacity-30">上移</button>
-                    <button aria-label="向後排序" onClick={() => moveTicker(index, 1)} disabled={index === data.items.length - 1} className="rounded border px-2 py-1 disabled:opacity-30">下移</button>
+                    <button aria-label={t("moveUp")} onClick={() => moveTicker(index, -1)} disabled={index === 0} className="rounded border px-2 py-1 disabled:opacity-30">{t("moveUp")}</button>
+                    <button aria-label={t("moveDown")} onClick={() => moveTicker(index, 1)} disabled={index === data.items.length - 1} className="rounded border px-2 py-1 disabled:opacity-30">{t("moveDown")}</button>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={() => removeTicker(item.ticker)} className="text-sm text-red-600">移除</button>
-                    {!item.locked && <Link href={`/dashboard/${item.ticker}`} className="text-sm font-semibold underline">完整分析</Link>}
+                    <button onClick={() => removeTicker(item.ticker)} className="text-sm text-red-600">{t("remove")}</button>
+                    {!item.locked && <Link href={`/dashboard/${item.ticker}`} className="text-sm font-semibold underline">{t("fullAnalysis")}</Link>}
                   </div>
                 </div>
               </article>

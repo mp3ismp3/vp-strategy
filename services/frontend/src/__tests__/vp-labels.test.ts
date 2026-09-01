@@ -14,4 +14,12 @@ describe("VP position labels", () => {
     expect(getVpPositionLabel(undefined)).toBe("無資料");
     expect(getVpPositionLabel("future_state")).toBe("future_state");
   });
+
+  it("translates the missing-data fallback", () => {
+    expect(getVpPositionLabel(undefined, (key) => `translated:${key}`)).toBe("translated:noData");
+  });
+
+  it("accepts the active locale translator", () => {
+    expect(getVpPositionLabel("above_va", (key) => `translated:${key}`)).toBe("translated:above");
+  });
 });
