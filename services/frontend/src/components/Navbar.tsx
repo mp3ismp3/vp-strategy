@@ -28,6 +28,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
+    { href: "/dashboard", label: "我的觀察" },
     { href: "/scanner", label: "Scanner" },
     { href: "/accumulation", label: "Accumulation" },
     { href: "/strategy", label: "Strategy" },

@@ -268,7 +268,10 @@ describe("Stripe route safety", () => {
     mocks.portalCreate.mockResolvedValue({ url: "https://billing.stripe.test/session" });
     const { POST } = await import("@/app/api/stripe/portal/route");
 
-    const response = await POST();
+    const response = await POST(new Request("https://example.com/api/stripe/portal", {
+      method: "POST",
+      headers: { origin: "https://example.com" },
+    }));
 
     expect(response.status).toBe(200);
     expect(mocks.portalCreate).toHaveBeenCalledWith({

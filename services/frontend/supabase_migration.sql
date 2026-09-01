@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS public.users (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Product-specific schemas are applied as versioned incremental migrations.
+-- Apply supabase_watchlist.sql after this base migration.
+
 -- ============================================
 -- 2. Subscription Events 表（審計用）
 -- ============================================

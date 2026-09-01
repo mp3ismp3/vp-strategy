@@ -63,10 +63,27 @@ describe("portable gateway trust boundary", () => {
 
 describe("production API source boundaries", () => {
   it("does not return caught exception messages from data routes", () => {
-    for (const route of ["scan-results", "chart-data", "accum-state", "fusion"]) {
+    for (const route of ["scan-results", "chart-data", "accum-state", "fusion", "dashboard"]) {
       const source = readFileSync(`src/app/api/data/${route}/route.ts`, "utf8");
       expect(source).not.toMatch(/NextResponse\.json\([^\n]*error:\s*message/);
       expect(source).toContain("serviceUnavailable(");
+    }
+
+    const symbolRoute = readFileSync("src/app/api/data/symbol/[ticker]/route.ts", "utf8");
+    expect(symbolRoute).toContain("serviceUnavailable(");
+  });
+
+  it("documents every personal watchlist consumer route", () => {
+    const docs = readFileSync("../../docs/API.md", "utf8");
+    const openapi = readFileSync("openapi.yaml", "utf8");
+    for (const route of [
+      "/api/user/watchlist",
+      "/api/user/watchlist/{ticker}",
+      "/api/data/dashboard",
+      "/api/data/symbol/{ticker}",
+    ]) {
+      expect(docs).toContain(route);
+      expect(openapi).toContain(`${route}:`);
     }
   });
 
@@ -93,5 +110,20 @@ describe("production API source boundaries", () => {
     const source = readFileSync("src/app/api/admin/rate-limit/route.ts", "utf8");
     expect(source).toContain("isTrustedMutationRequest(request)");
     expect(source).toContain("isJsonRequest(request)");
+  });
+
+  it("protects cookie-authenticated watchlist mutations from CSRF", () => {
+    const collectionRoute = readFileSync("src/app/api/user/watchlist/route.ts", "utf8");
+    const itemRoute = readFileSync("src/app/api/user/watchlist/[ticker]/route.ts", "utf8");
+    expect(collectionRoute.match(/isTrustedMutationRequest\(request\)/g)).toHaveLength(2);
+    expect(collectionRoute.match(/isJsonRequest\(request\)/g)).toHaveLength(2);
+    expect(itemRoute).toContain("isTrustedMutationRequest(request)");
+  });
+
+  it("uses the stable infrastructure error envelope for watchlist routes", () => {
+    const collectionRoute = readFileSync("src/app/api/user/watchlist/route.ts", "utf8");
+    const itemRoute = readFileSync("src/app/api/user/watchlist/[ticker]/route.ts", "utf8");
+    expect(collectionRoute.match(/serviceUnavailable\(/g)).toHaveLength(3);
+    expect(itemRoute).toContain("serviceUnavailable(");
   });
 });

@@ -6,6 +6,7 @@ import { ScanResult } from "@/types/signal";
 import { VPChart } from "@/components/charts/VPChart";
 import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
+import { WatchlistButton } from "@/components/WatchlistButton";
 import { SYMBOL_CATEGORIES, ALL_CATEGORIES, isBinanceEquityTicker } from "@/lib/categories";
 import type { Plan } from "@/types/user";
 
@@ -156,9 +157,10 @@ function ScannerContent() {
       {selectedResult && (
         <div className="mb-8 bg-white rounded-xl border p-4">
           <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold">{selectedResult.ticker}</h2>
               {isBinanceEquityTicker(selectedResult.ticker) && <Badge variant="outline">Binance</Badge>}
+              <WatchlistButton ticker={selectedResult.ticker} />
             </div>
             <button
               onClick={() => setSelectedTicker(null)}

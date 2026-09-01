@@ -12,6 +12,7 @@ servers:
 tags:
   - name: Health
   - name: Account
+  - name: Watchlist
   - name: Analysis
   - name: Telegram
 paths:
@@ -44,6 +45,85 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /api/user/watchlist:
+    get:
+      tags: [Watchlist]
+      summary: Return the signed-in user's ordered watchlist
+      operationId: getWatchlist
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200": { description: Watchlist and effective plan limit }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+    post:
+      tags: [Watchlist]
+      summary: Add an allowed ticker to the signed-in user's watchlist
+      operationId: addWatchlistItem
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200": { description: Ticker already exists }
+        "201": { description: Ticker added }
+        "400": { description: Invalid request }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { description: Plan limit reached }
+        "415": { description: Content-Type must be application/json }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+    patch:
+      tags: [Watchlist]
+      summary: Replace the signed-in user's watchlist order
+      operationId: reorderWatchlist
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200": { description: Watchlist reordered }
+        "400": { description: Invalid or incomplete ticker order }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "415": { description: Content-Type must be application/json }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/user/watchlist/{ticker}:
+    delete:
+      tags: [Watchlist]
+      summary: Remove one ticker from the signed-in user's watchlist
+      operationId: deleteWatchlistItem
+      security: [{ nextAuthSession: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Ticker"
+      responses:
+        "200": { description: Ticker removed or already absent }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/data/dashboard:
+    get:
+      tags: [Analysis, Watchlist]
+      summary: Return plan-filtered analysis for the signed-in user's watchlist
+      operationId: getDashboard
+      security: [{ nextAuthSession: [] }]
+      responses:
+        "200": { description: Watchlist cards and effective plan limits }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/data/symbol/{ticker}:
+    get:
+      tags: [Analysis, Watchlist]
+      summary: Return detailed analysis for one plan-allowed ticker
+      operationId: getWatchlistSymbolAnalysis
+      security: [{ nextAuthSession: [] }]
+      parameters:
+        - $ref: "#/components/parameters/Ticker"
+      responses:
+        "200": { description: VP, accumulation, and FVG analysis }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
   /api/data/scan-results:
     get:
       tags: [Analysis]
@@ -171,6 +251,12 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
         "503": { $ref: "#/components/responses/Unavailable" }
 components:
+  parameters:
+    Ticker:
+      in: path
+      name: ticker
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9.-]+$" }
   securitySchemes:
     nextAuthSession:
       type: apiKey
