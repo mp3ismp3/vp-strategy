@@ -196,9 +196,13 @@ Next.js Web 預覽權限：
 - 所有資料裁切與方案驗證都在 server API 執行；前端 Paywall 只負責呈現，不能作為資料安全邊界。
 - Subscriber VP 摘要會容忍新上市或資料不足標的缺少日／週／月 timeframe；缺少的 timeframe 不計入 bullish／bearish 共識，不會中斷整批 Telegram 通知。
 
+個人觀察清單位於 `/dashboard`，登入使用者可從平台既有標的加入、移除及調整順序，並由單一標的頁整合查看 VP、Accumulation 與 FVG。Free 最多追蹤 5 檔且限 Mega Cap Tech 7 檔；Pro 最多 30 檔；Premium 最多 100 檔。Free 可看完整 VP、Accumulation phase/score 與 FVG 數量摘要，但不回傳 accumulation 支撐、壓力、trigger 或 FVG 價位細節。降級不會刪除既有清單，超過新方案上限或不在 Free universe 的項目會保留為鎖定狀態。
+
+部署 Dashboard 前，所有環境都以 `services/frontend/supabase_watchlist.sql` 作為唯一 watchlist migration：既有 Supabase 專案直接執行；新環境先執行 `supabase_migration.sql`，再執行 `supabase_watchlist.sql`。後者以單一 transaction 與 table lock 套用，會先拒絕無法安全處理的非法／正規化後重複 ticker，再統一大小寫、空白並重排早期 draft 順序；同時強制 ticker 格式、非負且每位使用者唯一的排序，以及 RPC 1–100 上限。`user_watchlist_items` 只保存 user/ticker 關聯與排序，不複製分析結果；anon/authenticated roles 沒有直接權限，新增與排序由 server-side service role RPC 原子執行。
+
 Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
-Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
+Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account`、`/dashboard` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
 Web API 定位為隨產品 UI 一同演進的 backend-for-frontend（BFF），不是提供 API key 的公開市場資料 API。`GET /api/health` 可匿名用於 liveness；data routes 使用 NextAuth browser session 並在 server 驗證方案。資料來源故障統一回 `503` 與 `Retry-After`，不把內部 exception 傳給 client。可呼叫路由、權限、錯誤與 gateway contract 見 `docs/API.md`，機器可讀規格見 `services/frontend/openapi.yaml`。
 

@@ -51,6 +51,12 @@ browser origin. Do not publish cookies or use them as long-lived API tokens.
 |---|---|---|---|
 | GET | `/api/health` | Anonymous | Liveness response |
 | GET | `/api/user/plan` | Anonymous-safe | Effective plan snapshot; returns Free/inactive without a session |
+| GET | `/api/user/watchlist` | Session | User-owned ordered watchlist and plan limit |
+| POST | `/api/user/watchlist` | Session + trusted Origin | Add an allowed ticker within the plan limit |
+| PATCH | `/api/user/watchlist` | Session + trusted Origin | Reorder the complete user-owned watchlist |
+| DELETE | `/api/user/watchlist/{ticker}` | Session + trusted Origin | Remove one user-owned ticker |
+| GET | `/api/data/dashboard` | Free+ | Watchlist cards with plan-filtered analysis |
+| GET | `/api/data/symbol/{ticker}` | Free+ | Detailed VP, accumulation, and FVG analysis for one allowed ticker |
 | GET | `/api/data/scan-results` | Free+ | Multi-timeframe VP results, server-filtered by plan |
 | GET | `/api/data/chart-data?ticker=NVDA` | Free+ | One ticker's chart payload |
 | GET | `/api/data/chart-data?include=data` | Free+ | Visible ticker payloads; otherwise summaries |

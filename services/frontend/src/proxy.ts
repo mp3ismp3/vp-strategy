@@ -12,7 +12,7 @@ import type { RateLimitTier } from "./lib/rate-limit";
 import { serviceUnavailable } from "./lib/api-response";
 
 // ─── Auth-protected routes (same as before) ─────────────────
-const AUTH_PROTECTED = ["/fusion", "/account"];
+const AUTH_PROTECTED = ["/fusion", "/account", "/dashboard"];
 
 function isAuthProtected(pathname: string): boolean {
   return AUTH_PROTECTED.some(
@@ -212,5 +212,6 @@ export const config = {
     "/api/:path*",
     "/fusion",
     "/account",
+    "/dashboard",
   ],
 };

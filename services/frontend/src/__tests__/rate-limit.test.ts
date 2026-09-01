@@ -57,8 +57,9 @@ describe("getTierForRoute", () => {
     expect(getTierForRoute("/api/telegram/bind")).toBe("strict");
   });
 
-  it("maps /api/user/plan to strict", () => {
+  it("maps user APIs to tiers that support their interaction frequency", () => {
     expect(getTierForRoute("/api/user/plan")).toBe("strict");
+    expect(getTierForRoute("/api/user/watchlist")).toBe("api");
   });
 
   it("maps /api/data/* to data", () => {
@@ -95,6 +96,7 @@ describe("page access matcher", () => {
     expect(config.matcher).not.toContain("/accumulation");
     expect(config.matcher).toContain("/fusion");
     expect(config.matcher).toContain("/account");
+    expect(config.matcher).toContain("/dashboard");
   });
 });
 
