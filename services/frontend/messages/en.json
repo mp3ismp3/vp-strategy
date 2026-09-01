@@ -20,7 +20,9 @@
     "indicator": "Indicator",
     "cryptoLiquidity": "Crypto Liquidity",
     "fusion": "Fusion",
-    "pricing": "Pricing"
+    "tools": "Analysis Tools",
+    "pricing": "Pricing",
+    "menuToggle": "Toggle menu"
   },
   "dashboard": {
     "title": "My Watchlist",
