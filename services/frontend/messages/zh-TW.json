@@ -14,13 +14,15 @@
   },
   "nav": {
     "watchlist": "我的觀察",
-    "scanner": "Scanner",
-    "accumulation": "Accumulation",
-    "strategy": "Strategy",
-    "indicator": "Indicator",
-    "cryptoLiquidity": "Crypto Liquidity",
-    "fusion": "Fusion",
-    "pricing": "Pricing"
+    "scanner": "掃描器",
+    "accumulation": "吸籌追蹤",
+    "strategy": "策略分析",
+    "indicator": "技術指標",
+    "cryptoLiquidity": "加密貨幣流動性",
+    "fusion": "融合分析",
+    "tools": "分析工具",
+    "pricing": "方案價格",
+    "menuToggle": "切換選單"
   },
   "dashboard": {
     "title": "我的觀察清單",

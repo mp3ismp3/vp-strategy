@@ -202,7 +202,7 @@ Next.js Web 預覽權限：
 
 Web UI 由 `services/frontend/` 的 Next.js 應用提供；舊版 Streamlit `ui/` 已移除，避免兩套介面功能不同步。
 
-Frontend 現已提供繁體中文 `zh-TW`（預設）與 English `en` 雙語基礎，Navbar、Dashboard、觀察清單與標的詳細頁可用右上角語言切換；偏好以 `NEXT_LOCALE` cookie 保存。翻譯字典位於 `services/frontend/messages/`，API 與分析 JSON 的 machine values 維持不變。其他分析頁將依相同 dictionary 契約逐階段遷移。
+Frontend 現已提供繁體中文 `zh-TW`（預設）與 English `en` 雙語基礎；Navbar 固定使用英文，並將 Strategy、Indicator、Crypto Liquidity、Fusion 收納至「Analysis Tools」選單，桌面版滑鼠移入或鍵盤 focus 即可展開。Dashboard、觀察清單與標的詳細頁可用右上角語言切換。偏好以 `NEXT_LOCALE` cookie 保存。翻譯字典位於 `services/frontend/messages/`，API 與分析 JSON 的 machine values 維持不變。其他分析頁將依相同 dictionary 契約逐階段遷移。
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account`、`/dashboard` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 

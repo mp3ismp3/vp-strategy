@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { Plan } from "@/types/user";
-import { useTranslations } from "next-intl";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface NavbarUser {
@@ -25,21 +24,20 @@ interface NavbarUser {
 }
 
 export function Navbar() {
-  const t = useTranslations("nav");
-  const common = useTranslations("common");
   const { data: session } = useSession();
   const user = session?.user as NavbarUser | undefined;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
-    { href: "/dashboard", label: t("watchlist") },
-    { href: "/scanner", label: t("scanner") },
-    { href: "/accumulation", label: t("accumulation") },
-    { href: "/strategy", label: t("strategy") },
-    { href: "/indicator", label: t("indicator") },
-    { href: "/crypto-liquidity", label: t("cryptoLiquidity") },
-    { href: "/fusion", label: t("fusion") },
-    { href: "/pricing", label: t("pricing") },
+    { href: "/dashboard", label: "Watchlist" },
+    { href: "/scanner", label: "Scanner" },
+    { href: "/accumulation", label: "Accumulation" },
+  ];
+  const analysisLinks = [
+    { href: "/strategy", label: "Strategy" },
+    { href: "/indicator", label: "Indicator" },
+    { href: "/crypto-liquidity", label: "Crypto Liquidity" },
+    { href: "/fusion", label: "Fusion" },
   ];
 
   return (
@@ -69,6 +67,30 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <div className="group relative">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                className="text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                Analysis Tools <span aria-hidden="true">▾</span>
+              </button>
+              <div className="absolute right-0 top-full z-50 hidden min-w-48 pt-2 group-hover:block group-focus-within:block">
+                <div role="menu" className="rounded-lg border bg-white p-1 shadow-md">
+                  {analysisLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      role="menuitem"
+                      className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <Link href="/pricing" className="text-sm font-medium text-gray-700 hover:text-gray-900">Pricing</Link>
           </div>
 
           {/* Right side */}
@@ -94,14 +116,14 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <Link href="/account">{common("account")}</Link>
+                    <Link href="/account">Account</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/pricing">{common("pricing")}</Link>
+                    <Link href="/pricing">Pricing</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()}>
-                    {common("logout")}
+                    Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -110,7 +132,7 @@ export function Navbar() {
                 href="/login"
                 className="bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800"
               >
-                {common("login")}
+                Log in
               </Link>
             )}
 
@@ -148,6 +170,13 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <div className="px-3 pt-2 text-xs font-semibold uppercase text-gray-400">Analysis Tools</div>
+            {analysisLinks.map((link) => (
+              <Link key={link.href} href={link.href} onClick={() => setMobileOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">
+                {link.label}
+              </Link>
+            ))}
+            <Link href="/pricing" onClick={() => setMobileOpen(false)} className="block rounded-md px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-100">Pricing</Link>
             {session && (
               <>
                 <div className="border-t my-2" />
@@ -156,7 +185,7 @@ export function Navbar() {
                   onClick={() => setMobileOpen(false)}
                   className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
                 >
-                  {common("account")}
+                   Account
                 </Link>
               </>
             )}

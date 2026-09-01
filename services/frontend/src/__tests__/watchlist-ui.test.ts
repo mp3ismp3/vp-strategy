@@ -8,9 +8,33 @@ function source(path: string) {
 
 describe("personal watchlist UI", () => {
   it("adds the dashboard to primary navigation", () => {
-    expect(source("src/components/Navbar.tsx")).toContain('t("watchlist")');
+    expect(source("src/components/Navbar.tsx")).toContain('label: "Watchlist"');
     expect(source("messages/zh-TW.json")).toContain('"watchlist": "我的觀察"');
     expect(source("messages/en.json")).toContain('"watchlist": "My Watchlist"');
+  });
+
+  it("keeps navbar labels in English across locales", () => {
+    const navbar = source("src/components/Navbar.tsx");
+    expect(navbar).toContain('label: "Watchlist"');
+    expect(navbar).toContain("Analysis Tools");
+    expect(navbar).toContain('aria-label="Toggle menu"');
+    expect(navbar).toContain("Account");
+    expect(navbar).toContain("Log out");
+    expect(navbar).toContain("Log in");
+  });
+
+  it("groups secondary analysis links to keep the navbar compact", () => {
+    const navbar = source("src/components/Navbar.tsx");
+    expect(navbar).toContain("Analysis Tools");
+    expect(navbar).toContain("analysisLinks");
+    expect(navbar).toContain('{ href: "/strategy", label: "Strategy" }');
+  });
+
+  it("opens the analysis menu on hover and keyboard focus", () => {
+    const navbar = source("src/components/Navbar.tsx");
+    expect(navbar).toContain("group-hover:block");
+    expect(navbar).toContain("group-focus-within:block");
+    expect(navbar).toContain('aria-haspopup="menu"');
   });
 
   it("provides an authenticated dashboard with add, remove and reorder actions", () => {
