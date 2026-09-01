@@ -4,6 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
+import { getVpPositionLabel } from "@/lib/vp-labels";
+
+const VP_PERIODS = [
+  ["daily", "日線"],
+  ["weekly", "週線"],
+  ["monthly", "月線"],
+] as const;
 
 interface AnalysisSummary {
   ticker: string;
@@ -139,8 +146,8 @@ export default function DashboardPage() {
             <option value="">選擇平台支援標的</option>
             {choices.map((ticker) => <option key={ticker} value={ticker}>{ticker}</option>)}
           </select>
-          <button onClick={addTicker} disabled={!selected || (data?.items.length || 0) >= (data?.limit || 0)} className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-40">
-            加入觀察
+          <button aria-label="加入觀察" title="加入觀察" onClick={addTicker} disabled={!selected || (data?.items.length || 0) >= (data?.limit || 0)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-xl text-white disabled:opacity-40">
+            +
           </button>
           {data?.plan === "free" && <Link href="/pricing" className="self-center text-sm font-medium underline">升級以追蹤更多標的</Link>}
         </div>
@@ -167,13 +174,14 @@ export default function DashboardPage() {
                 ) : analysis ? (
                   <div className="my-5 space-y-3 text-sm">
                     <div className="grid grid-cols-3 gap-2 text-center">
-                      {(["daily", "weekly", "monthly"] as const).map((period) => (
+                      {VP_PERIODS.map(([period, label]) => (
                         <div key={period} className="rounded-md bg-gray-50 p-2">
-                          <div className="text-xs uppercase text-gray-500">{period[0]}</div>
-                          <div className="truncate">{analysis.vp[period]?.position || "無資料"}</div>
+                          <div className="text-xs text-gray-500">{label}</div>
+                          <div className="truncate font-medium" title={analysis.vp[period]?.position}>{getVpPositionLabel(analysis.vp[period]?.position)}</div>
                         </div>
                       ))}
                     </div>
+                    <p className="text-xs text-gray-500">價值區是主要成交量集中的價格範圍；高於／低於價值區代表現價已在 VAH 上方／VAL 下方。</p>
                     <div className="flex justify-between"><span>Accumulation</span><span>{analysis.accumulation ? `Phase ${analysis.accumulation.phase} · ${analysis.accumulation.decay_score.toFixed(1)}` : "未追蹤"}</span></div>
                     <div className="flex justify-between"><span>未回補 FVG</span><span className="text-green-700">Bull {analysis.fvg.bullishOpen}</span><span className="text-red-700">Bear {analysis.fvg.bearishOpen}</span></div>
                     {analysis.accumulation?.failing && <p className="font-medium text-red-700">Accumulation failure warning</p>}
