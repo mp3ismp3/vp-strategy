@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 
 export function WatchlistButton({ ticker }: { ticker: string }) {
+  const t = useTranslations("common");
   const { data: session } = useSession();
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -32,7 +34,7 @@ export function WatchlistButton({ ticker }: { ticker: string }) {
     if (response.ok) setSaved(!saved);
     else {
       const payload = await response.json().catch(() => ({}));
-      setMessage(payload.error === "upgrade_required" ? "升級後可加入此標的" : payload.error || "操作失敗");
+      setMessage(payload.error === "upgrade_required" ? t("upgradeToView") : payload.error || t("actionFailed"));
     }
     setBusy(false);
   }
@@ -41,8 +43,8 @@ export function WatchlistButton({ ticker }: { ticker: string }) {
     <div className="flex items-center gap-2">
       <button
         type="button"
-        aria-label={saved ? "移除觀察" : "加入觀察"}
-        title={saved ? "移除觀察" : "加入觀察"}
+        aria-label={saved ? t("removeWatchlist") : t("addWatchlist")}
+        title={saved ? t("removeWatchlist") : t("addWatchlist")}
         onClick={toggle}
         disabled={busy}
         className="flex h-9 w-9 items-center justify-center rounded-full border text-xl font-medium hover:bg-gray-50 disabled:opacity-50"

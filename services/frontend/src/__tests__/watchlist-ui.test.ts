@@ -8,7 +8,9 @@ function source(path: string) {
 
 describe("personal watchlist UI", () => {
   it("adds the dashboard to primary navigation", () => {
-    expect(source("src/components/Navbar.tsx")).toContain('{ href: "/dashboard", label: "我的觀察" }');
+    expect(source("src/components/Navbar.tsx")).toContain('t("watchlist")');
+    expect(source("messages/zh-TW.json")).toContain('"watchlist": "我的觀察"');
+    expect(source("messages/en.json")).toContain('"watchlist": "My Watchlist"');
   });
 
   it("provides an authenticated dashboard with add, remove and reorder actions", () => {
@@ -16,7 +18,7 @@ describe("personal watchlist UI", () => {
     expect(dashboard).toContain("/api/user/watchlist");
     expect(dashboard).toContain("removeTicker");
     expect(dashboard).toContain("moveTicker");
-    expect(dashboard).toContain("我的觀察清單");
+    expect(dashboard).toContain('useTranslations("dashboard")');
   });
 
   it("provides a ticker detail page for VP, accumulation and FVG", () => {
@@ -24,17 +26,16 @@ describe("personal watchlist UI", () => {
     expect(detail).toContain("VPChart");
     expect(detail).toContain("AccumChart");
     expect(detail).toContain("FVGChart");
-    expect(detail).toContain("Fair Value Gap");
+    expect(detail).toContain('useTranslations("symbol")');
   });
 
   it("uses compact watchlist controls and localized VP labels", () => {
     const button = source("src/components/WatchlistButton.tsx");
     const dashboard = source("src/app/dashboard/page.tsx");
-    expect(button).toContain('aria-label={saved ? "移除觀察" : "加入觀察"}');
+    expect(button).toContain('aria-label={saved ? t("removeWatchlist") : t("addWatchlist")}');
     expect(button).toContain('saved ? "−" : "+"');
     expect(dashboard).toContain("getVpPositionLabel");
-    expect(dashboard).toContain("日線");
-    expect(dashboard).toContain("週線");
-    expect(dashboard).toContain("月線");
+    expect(source("messages/zh-TW.json")).toContain('"daily": "日線"');
+    expect(source("messages/en.json")).toContain('"daily": "Daily"');
   });
 });

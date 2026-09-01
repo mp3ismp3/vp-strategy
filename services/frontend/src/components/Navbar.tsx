@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { Plan } from "@/types/user";
+import { useTranslations } from "next-intl";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface NavbarUser {
   email?: string | null;
@@ -23,19 +25,21 @@ interface NavbarUser {
 }
 
 export function Navbar() {
+  const t = useTranslations("nav");
+  const common = useTranslations("common");
   const { data: session } = useSession();
   const user = session?.user as NavbarUser | undefined;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [
-    { href: "/dashboard", label: "我的觀察" },
-    { href: "/scanner", label: "Scanner" },
-    { href: "/accumulation", label: "Accumulation" },
-    { href: "/strategy", label: "Strategy" },
-    { href: "/indicator", label: "Indicator" },
-    { href: "/crypto-liquidity", label: "Crypto Liquidity" },
-    { href: "/fusion", label: "Fusion" },
-    { href: "/pricing", label: "Pricing" },
+    { href: "/dashboard", label: t("watchlist") },
+    { href: "/scanner", label: t("scanner") },
+    { href: "/accumulation", label: t("accumulation") },
+    { href: "/strategy", label: t("strategy") },
+    { href: "/indicator", label: t("indicator") },
+    { href: "/crypto-liquidity", label: t("cryptoLiquidity") },
+    { href: "/fusion", label: t("fusion") },
+    { href: "/pricing", label: t("pricing") },
   ];
 
   return (
@@ -69,6 +73,7 @@ export function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             {/* User Menu (desktop + mobile) */}
             {session ? (
               <DropdownMenu>
@@ -89,14 +94,14 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
-                    <Link href="/account">帳號設定</Link>
+                    <Link href="/account">{common("account")}</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <Link href="/pricing">升級方案</Link>
+                    <Link href="/pricing">{common("pricing")}</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()}>
-                    登出
+                    {common("logout")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -105,7 +110,7 @@ export function Navbar() {
                 href="/login"
                 className="bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800"
               >
-                登入
+                {common("login")}
               </Link>
             )}
 
@@ -151,7 +156,7 @@ export function Navbar() {
                   onClick={() => setMobileOpen(false)}
                   className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
                 >
-                  帳號設定
+                  {common("account")}
                 </Link>
               </>
             )}
