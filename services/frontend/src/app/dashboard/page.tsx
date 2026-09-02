@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { getVpPositionLabel } from "@/lib/vp-labels";
+import { persistWatchlistOrder, reorderWatchlistItems } from "@/lib/watchlist";
 import { useTranslations } from "next-intl";
 
 const VP_PERIODS = [
@@ -55,6 +56,10 @@ export default function DashboardPage() {
   const [selected, setSelected] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [draggedTicker, setDraggedTicker] = useState<string | null>(null);
+  const [dragOverTicker, setDragOverTicker] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const reorderInFlight = useRef(false);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -97,7 +102,7 @@ export default function DashboardPage() {
   const choices = data?.allowedTickers.filter((ticker) => !saved.has(ticker)) || [];
 
   async function addTicker() {
-    if (!selected) return;
+    if (!selected || reorderInFlight.current) return;
     setMessage("");
     const response = await fetch("/api/user/watchlist", {
       method: "POST",
@@ -114,24 +119,45 @@ export default function DashboardPage() {
   }
 
   async function removeTicker(ticker: string) {
+    if (reorderInFlight.current) return;
     const response = await fetch(`/api/user/watchlist/${encodeURIComponent(ticker)}`, { method: "DELETE" });
     if (response.ok) await loadDashboard();
     else setMessage(t("removeFailed"));
   }
 
-  async function moveTicker(index: number, direction: -1 | 1) {
-    if (!data) return;
-    const target = index + direction;
-    if (target < 0 || target >= data.items.length) return;
-    const tickers = data.items.map((item) => item.ticker);
-    [tickers[index], tickers[target]] = [tickers[target], tickers[index]];
-    const response = await fetch("/api/user/watchlist", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickers }),
-    });
-    if (response.ok) await loadDashboard();
-    else setMessage(t("orderFailed"));
+  async function reorderTicker(ticker: string, targetIndex: number) {
+    if (!data || reorderInFlight.current) return;
+    const reorderedItems = reorderWatchlistItems(data.items, ticker, targetIndex);
+    if (reorderedItems === data.items) return;
+    const previousData = data;
+    const persistence = persistWatchlistOrder(
+      fetch,
+      reorderedItems.map((item) => item.ticker),
+      reorderInFlight,
+    );
+    setIsReordering(true);
+    setData({ ...data, items: reorderedItems });
+    setMessage("");
+    const result = await persistence;
+    if (result === "failed") {
+      setData(previousData);
+      setMessage(t("orderFailed"));
+    }
+    setIsReordering(false);
+  }
+
+  function startDragging(event: DragEvent<HTMLElement>, ticker: string) {
+    setDraggedTicker(ticker);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", ticker);
+  }
+
+  function dropTicker(event: DragEvent<HTMLElement>, targetIndex: number) {
+    event.preventDefault();
+    const ticker = draggedTicker || event.dataTransfer.getData("text/plain");
+    setDraggedTicker(null);
+    setDragOverTicker(null);
+    if (ticker) void reorderTicker(ticker, targetIndex);
   }
 
   return (
@@ -146,11 +172,11 @@ export default function DashboardPage() {
 
       <section className="mb-6 rounded-xl border bg-white p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
-          <select value={selected} onChange={(event) => setSelected(event.target.value)} className="min-w-64 rounded-md border px-3 py-2">
+          <select value={selected} onChange={(event) => setSelected(event.target.value)} disabled={isReordering} className="min-w-64 rounded-md border px-3 py-2 disabled:opacity-50">
             <option value="">{t("chooseTicker")}</option>
             {choices.map((ticker) => <option key={ticker} value={ticker}>{ticker}</option>)}
           </select>
-           <button aria-label={t("add")} title={t("add")} onClick={addTicker} disabled={!selected || (data?.items.length || 0) >= (data?.limit || 0)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-xl text-white disabled:opacity-40">
+           <button aria-label={t("add")} title={t("add")} onClick={addTicker} disabled={isReordering || !selected || (data?.items.length || 0) >= (data?.limit || 0)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-xl text-white disabled:opacity-40">
             +
           </button>
           {data?.plan === "free" && <Link href="/pricing" className="self-center text-sm font-medium underline">{t("upgradeMore")}</Link>}
@@ -165,10 +191,33 @@ export default function DashboardPage() {
           {data.items.map((item, index) => {
             const analysis = item.analysis;
             return (
-              <article key={item.ticker} className="rounded-xl border bg-white p-5 shadow-sm">
+              <article
+                key={item.ticker}
+                draggable={!isReordering}
+                aria-label={`${item.ticker} · ${t("dragToReorder")}`}
+                title={t("dragToReorder")}
+                onDragStart={(event) => startDragging(event, item.ticker)}
+                onDragEnd={() => {
+                  setDraggedTicker(null);
+                  setDragOverTicker(null);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                  setDragOverTicker(item.ticker);
+                }}
+                onDragLeave={() => setDragOverTicker((ticker) => ticker === item.ticker ? null : ticker)}
+                onDrop={(event) => dropTicker(event, index)}
+                className={`cursor-grab rounded-xl border bg-white p-5 shadow-sm transition active:cursor-grabbing ${draggedTicker === item.ticker ? "opacity-60" : ""} ${dragOverTicker === item.ticker && draggedTicker !== item.ticker ? "border-blue-500 ring-2 ring-blue-100" : ""}`}
+              >
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-xl font-bold">{item.ticker}</h2>
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden="true" className="select-none text-lg leading-none text-gray-400">
+                        ⋮⋮
+                      </span>
+                      <h2 className="text-xl font-bold">{item.ticker}</h2>
+                    </div>
                     <p className="text-sm text-gray-500">{analysis?.price == null ? t("priceMissing") : `$${analysis.price.toFixed(2)}`}</p>
                   </div>
                   {item.locked ? <Badge variant="outline">{t("locked")}</Badge> : <Badge className="capitalize">{analysis ? vp(analysis.vp.consensus) : common("noData")}</Badge>}
@@ -191,13 +240,9 @@ export default function DashboardPage() {
                     {analysis.accumulation?.failing && <p className="font-medium text-red-700">{t("failureWarning")}</p>}
                   </div>
                 ) : <p className="my-6 text-sm text-gray-500">{t("noAnalysis")}</p>}
-                <div className="flex items-center justify-between border-t pt-4">
-                  <div className="flex gap-1">
-                    <button aria-label={t("moveUp")} onClick={() => moveTicker(index, -1)} disabled={index === 0} className="rounded border px-2 py-1 disabled:opacity-30">{t("moveUp")}</button>
-                    <button aria-label={t("moveDown")} onClick={() => moveTicker(index, 1)} disabled={index === data.items.length - 1} className="rounded border px-2 py-1 disabled:opacity-30">{t("moveDown")}</button>
-                  </div>
+                <div className="flex items-center justify-end border-t pt-4">
                   <div className="flex gap-3">
-                    <button onClick={() => removeTicker(item.ticker)} className="text-sm text-red-600">{t("remove")}</button>
+                    <button onClick={() => removeTicker(item.ticker)} disabled={isReordering} className="text-sm text-red-600 disabled:opacity-40">{t("remove")}</button>
                     {!item.locked && <Link href={`/dashboard/${item.ticker}`} className="text-sm font-semibold underline">{t("fullAnalysis")}</Link>}
                   </div>
                 </div>

@@ -43,3 +43,43 @@ export function isTickerAllowedForPlan(ticker: string, plan: Plan): boolean {
 export function getAllowedWatchlistTickers(plan: Plan): string[] {
   return [...(plan === "free" ? FREE_TICKERS : SUPPORTED_TICKERS)].sort();
 }
+
+export function reorderWatchlistItems<T extends { ticker: string; sort_order: number }>(
+  items: T[],
+  ticker: string,
+  targetIndex: number,
+): T[] {
+  const sourceIndex = items.findIndex((item) => item.ticker === ticker);
+  if (sourceIndex < 0 || sourceIndex === targetIndex || targetIndex < 0 || targetIndex >= items.length) {
+    return items;
+  }
+
+  const reordered = [...items];
+  const [movedItem] = reordered.splice(sourceIndex, 1);
+  reordered.splice(targetIndex, 0, movedItem);
+  return reordered.map((item, sortOrder) => ({ ...item, sort_order: sortOrder }));
+}
+
+type WatchlistFetcher = (input: string, init: RequestInit) => Promise<{ ok: boolean }>;
+type ReorderLock = { current: boolean };
+
+export async function persistWatchlistOrder(
+  fetcher: WatchlistFetcher,
+  tickers: string[],
+  lock: ReorderLock,
+): Promise<"saved" | "failed" | "busy"> {
+  if (lock.current) return "busy";
+  lock.current = true;
+  try {
+    const response = await fetcher("/api/user/watchlist", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tickers }),
+    });
+    return response.ok ? "saved" : "failed";
+  } catch {
+    return "failed";
+  } finally {
+    lock.current = false;
+  }
+}

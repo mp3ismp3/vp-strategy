@@ -196,7 +196,7 @@ Next.js Web 預覽權限：
 - 所有資料裁切與方案驗證都在 server API 執行；前端 Paywall 只負責呈現，不能作為資料安全邊界。
 - Subscriber VP 摘要會容忍新上市或資料不足標的缺少日／週／月 timeframe；缺少的 timeframe 不計入 bullish／bearish 共識，不會中斷整批 Telegram 通知。
 
-個人觀察清單位於 `/dashboard`，登入使用者可用「＋」從平台既有標的加入觀察、移除及調整順序，並由單一標的頁整合查看 VP、Accumulation 與 FVG。Dashboard 將 D/W/M 顯示為日線／週線／月線，並把 `above_va`、`inside_va`、`below_va` 顯示為高於價值區、價值區內、低於價值區。Pro/Premium 的標的詳情以 K 線色塊圖顯示未回補 FVG；Free 最多追蹤 5 檔且限 Mega Cap Tech 7 檔，可看完整 VP、Accumulation phase/score 與 FVG 數量摘要，但不回傳 accumulation 支撐、壓力、trigger 或 FVG 價位細節。Pro 最多 30 檔；Premium 最多 100 檔。降級不會刪除既有清單，超過新方案上限或不在 Free universe 的項目會保留為鎖定狀態。
+個人觀察清單位於 `/dashboard`，登入使用者可用「＋」從平台既有標的加入觀察、移除，並直接拖曳整張卡片調整順序；卡片標題旁的 `⋮⋮` 是拖曳提示。單一標的頁整合查看 VP、Accumulation 與 FVG。Dashboard 將 D/W/M 顯示為日線／週線／月線，並把 `above_va`、`inside_va`、`below_va` 顯示為高於價值區、價值區內、低於價值區。Pro/Premium 的標的詳情以 K 線色塊圖顯示未回補 FVG；Free 最多追蹤 5 檔且限 Mega Cap Tech 7 檔，可看完整 VP、Accumulation phase/score 與 FVG 數量摘要，但不回傳 accumulation 支撐、壓力、trigger 或 FVG 價位細節。Pro 最多 30 檔；Premium 最多 100 檔。降級不會刪除既有清單，超過新方案上限或不在 Free universe 的項目會保留為鎖定狀態。
 
 部署 Dashboard 前，所有環境都以 `services/frontend/supabase_watchlist.sql` 作為唯一 watchlist migration：既有 Supabase 專案直接執行；新環境先執行 `supabase_migration.sql`，再執行 `supabase_watchlist.sql`。後者以單一 transaction 與 table lock 套用，會先拒絕無法安全處理的非法／正規化後重複 ticker，再統一大小寫、空白並重排早期 draft 順序；同時強制 ticker 格式、非負且每位使用者唯一的排序，以及 RPC 1–100 上限。`user_watchlist_items` 只保存 user/ticker 關聯與排序，不複製分析結果；anon/authenticated roles 沒有直接權限，新增與排序由 server-side service role RPC 原子執行。
 
