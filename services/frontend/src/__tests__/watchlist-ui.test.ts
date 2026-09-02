@@ -37,11 +37,25 @@ describe("personal watchlist UI", () => {
     expect(navbar).toContain('aria-haspopup="menu"');
   });
 
-  it("provides an authenticated dashboard with add, remove and reorder actions", () => {
+  it("provides an authenticated dashboard with add, remove and drag-to-reorder actions", () => {
     const dashboard = source("src/app/dashboard/page.tsx");
     expect(dashboard).toContain("/api/user/watchlist");
     expect(dashboard).toContain("removeTicker");
-    expect(dashboard).toContain("moveTicker");
+    expect(dashboard).toContain("draggable");
+    expect(dashboard).toContain("onDragStart");
+    expect(dashboard).toContain("onDragOver");
+    expect(dashboard).toContain("onDrop");
+    expect(dashboard).toMatch(/<article[\s\S]*?draggable[\s\S]*?onDragStart/);
+    expect(dashboard).not.toContain('role="button"');
+    expect(dashboard).not.toContain("onKeyDown");
+    expect(dashboard).not.toContain('t("moveUp")');
+    expect(dashboard).not.toContain('t("moveDown")');
+    expect(dashboard).toContain("previousData");
+    expect(dashboard).toContain("reorderInFlight.current");
+    expect(dashboard).toContain("disabled={isReordering}");
+    expect(dashboard).toContain("persistWatchlistOrder");
+    expect(source("messages/zh-TW.json")).toContain('"dragToReorder": "拖曳以調整順序"');
+    expect(source("messages/en.json")).toContain('"dragToReorder": "Drag to reorder"');
     expect(dashboard).toContain('useTranslations("dashboard")');
   });
 
