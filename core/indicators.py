@@ -30,13 +30,18 @@ def calc_vp(df, lookback, va_pct, n_bins=100, return_histogram=False):
     highs = d["High"].values
     lows = d["Low"].values
     volumes = d["Volume"].values
-    total_vol = volumes.sum()
+    valid_prices = np.isfinite(highs) & np.isfinite(lows) & (highs >= lows)
+    valid_volume = valid_prices & np.isfinite(volumes) & (volumes > 0)
+    total_vol = volumes[valid_volume].sum()
 
     if total_vol == 0:
         return None
 
-    price_low = float(lows.min())
-    price_high = float(highs.max())
+    if not valid_prices.any():
+        return None
+
+    price_low = float(lows[valid_prices].min())
+    price_high = float(highs[valid_prices].max())
     price_range = price_high - price_low
 
     if price_range <= 0:
@@ -45,25 +50,32 @@ def calc_vp(df, lookback, va_pct, n_bins=100, return_histogram=False):
     # Create price bins
     bin_size = price_range / n_bins
     bin_volumes = np.zeros(n_bins)
+    bin_edges = np.linspace(price_low, price_high, n_bins + 1)
 
-    # Distribute each bar's volume evenly across its high-low range
+    # Distribute volume by the exact overlap between the bar and each price bin.
+    # This preserves volume and avoids overweighting bins that a bar only clips.
     for i in range(len(d)):
         bar_low = lows[i]
         bar_high = highs[i]
         bar_vol = volumes[i]
-        if bar_high <= bar_low or bar_vol <= 0:
+        if not np.isfinite(bar_low) or not np.isfinite(bar_high) or not np.isfinite(bar_vol):
+            continue
+        if bar_high < bar_low or bar_vol <= 0:
             continue
 
-        # Find which bins this bar spans
-        start_bin = int((bar_low - price_low) / bin_size)
-        end_bin = int((bar_high - price_low) / bin_size)
-        start_bin = max(0, min(start_bin, n_bins - 1))
-        end_bin = max(0, min(end_bin, n_bins - 1))
+        if bar_high == bar_low:
+            price_bin = int(np.searchsorted(bin_edges, bar_low, side="right")) - 1
+            price_bin = max(0, min(price_bin, n_bins - 1))
+            bin_volumes[price_bin] += bar_vol
+            continue
 
-        # Distribute volume evenly across spanned bins
-        n_spanned = end_bin - start_bin + 1
-        vol_per_bin = bar_vol / n_spanned
-        bin_volumes[start_bin:end_bin + 1] += vol_per_bin
+        overlaps = np.maximum(
+            0.0,
+            np.minimum(bar_high, bin_edges[1:]) - np.maximum(bar_low, bin_edges[:-1]),
+        )
+        overlap_total = overlaps.sum()
+        if overlap_total > 0:
+            bin_volumes += bar_vol * overlaps / overlap_total
 
     # POC = price level of the bin with maximum volume
     poc_bin = int(np.argmax(bin_volumes))

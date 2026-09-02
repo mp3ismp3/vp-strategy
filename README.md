@@ -56,11 +56,13 @@
 ### Volume Profile 計算方式
 
 1. 將回看期間的價格範圍切成 100 格 bin
-2. 每根 K 棒的成交量平均分配到其 High-Low 所跨越的 bin
-3. **POC**（Point of Control）= 量最大的 bin = 市場最接受的價格
+2. 每根 K 棒的成交量依其 High-Low 與各 price bin 的實際重疊寬度按比例分配；零振幅 K 棒的成交量全數落入對應 bin
+3. **POC**（Point of Control）= 量最大的 bin = 市場最接受的價格。Yahoo OHLCV 不提供逐筆成交價，因此系統優先使用 1H K 棒並維持成交量守恆；這是免費資料下的近似 Volume-at-Price，不等同交易所 tick profile。
 4. **Value Area** = 從 POC 往兩側擴展，直到包含 68% 總成交量
 5. **VAH** = Value Area 上緣（賣方壓力起始點）
 6. **VAL** = Value Area 下緣（買方支撐起始點）
+
+Web 日線圖會下載 2 年資料作為交易日缺口緩衝、顯示最近 252 個交易日，右側保留較寬且高對比的 60 日 Volume Profile，並提供 3M／6M／1Y／All 快速切換。
 
 ### 多時間框架分析
 
