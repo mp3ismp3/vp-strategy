@@ -85,4 +85,14 @@ describe("server-side data entitlement", () => {
       expect(source).not.toContain('from("accum_data")');
     }
   });
+
+  it("gives the right-side volume profile enough contrast and chart width", () => {
+    const source = readFileSync("src/components/charts/VPChart.tsx", "utf8");
+    expect(source).toContain("domain: [0, 0.68]");
+    expect(source).toContain("domain: [0.7, 1]");
+    expect(source).toContain('line: { color: "rgba(90,90,90,0.7)", width: 1 }');
+    expect(source).toContain("rangeselector:");
+    expect(source).toContain("displayModeBar: true");
+    expect(source).toContain('daily: "日線 (1年價格 / 60日 VP)"');
+  });
 });

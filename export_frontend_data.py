@@ -23,6 +23,8 @@ from core.vp_multitf import compute_vp_multitf, resample_to_weekly, resample_to_
 DRY_RUN = "--dry-run" in sys.argv
 DATA_DIR = Path(__file__).parent / "data"
 OUTPUT_FILE = DATA_DIR / "frontend_charts.json"
+DAILY_FETCH_PERIOD = "2y"
+DAILY_CHART_BARS = 252
 
 
 def _df_to_ohlc(df: pd.DataFrame, n_bars: int) -> list[dict]:
@@ -63,7 +65,7 @@ def main():
 
     provider = YahooProvider(max_workers=5, jitter=(0.1, 0.3))
     print("  Downloading daily data...")
-    data = provider.batch_daily(SYMBOLS, period="1y")
+    data = provider.batch_daily(SYMBOLS, period=DAILY_FETCH_PERIOD)
     print(f"  Downloaded {len(data)}/{len(SYMBOLS)}")
 
     print("  Downloading 1H data...")
@@ -90,7 +92,7 @@ def main():
             chart_data = {
                 "price": vp["price"] if vp["price"] == vp["price"] else float(df["Close"].dropna().iloc[-1]),
                 "daily": {
-                    "ohlc": _df_to_ohlc(df, 252),
+                    "ohlc": _df_to_ohlc(df, DAILY_CHART_BARS),
                     "poc": vp["daily"]["poc"],
                     "vah": vp["daily"]["vah"],
                     "val": vp["daily"]["val"],

@@ -107,9 +107,10 @@ export function VPChart({ ticker }: VPChartProps) {
         marker: {
           color: histogram.prices.map((p) =>
             p >= tf.val && p <= tf.vah
-              ? "rgba(255,165,0,0.6)"
-              : "rgba(150,150,150,0.3)"
+              ? "rgba(245,158,11,0.85)"
+              : "rgba(107,114,128,0.5)"
           ),
+          line: { color: "rgba(90,90,90,0.7)", width: 1 },
         },
         showlegend: false,
         xaxis: "x2",
@@ -119,7 +120,7 @@ export function VPChart({ ticker }: VPChartProps) {
       }
     : null;
 
-  // Layout with subplots: 80% candlestick, 20% histogram
+  // Keep the price chart readable while giving VP enough width to compare bins.
   const layout: Partial<Layout> = {
     height: 450,
     margin: { l: 60, r: 80, t: 30, b: 40 },
@@ -127,15 +128,24 @@ export function VPChart({ ticker }: VPChartProps) {
     paper_bgcolor: "white",
     plot_bgcolor: "white",
     xaxis: {
-      domain: [0, 0.78],
+      domain: [0, 0.68],
       rangeslider: { visible: false },
-      type: "category",
+      rangeselector: {
+        buttons: [
+          { count: 3, label: "3M", step: "month", stepmode: "backward" },
+          { count: 6, label: "6M", step: "month", stepmode: "backward" },
+          { count: 1, label: "1Y", step: "year", stepmode: "backward" },
+          { step: "all", label: "All" },
+        ],
+      },
+      type: "date",
       tickangle: -45,
       nticks: 10,
     },
     xaxis2: {
-      domain: [0.8, 1],
+      domain: [0.7, 1],
       showticklabels: false,
+      title: { text: "Volume Profile", font: { size: 11 } },
     },
     yaxis: {
       title: { text: "Price ($)" },
@@ -151,7 +161,7 @@ export function VPChart({ ticker }: VPChartProps) {
         xref: "paper",
         yref: "y",
         x0: 0,
-        x1: 0.78,
+        x1: 0.68,
         y0: tf.val,
         y1: tf.vah,
         fillcolor: "rgba(255,165,0,0.05)",
@@ -234,7 +244,7 @@ export function VPChart({ ticker }: VPChartProps) {
   const traces = [candlestickTrace];
   if (histTrace) traces.push(histTrace);
 
-  const tfLabels = { daily: "日線 (60天)", weekly: "周線 (52週)", monthly: "月線 (12月)" };
+  const tfLabels = { daily: "日線 (1年價格 / 60日 VP)", weekly: "周線 (52週)", monthly: "月線 (12月)" };
 
   return (
     <div>
@@ -258,7 +268,7 @@ export function VPChart({ ticker }: VPChartProps) {
       <Plot
         data={traces}
         layout={layout}
-        config={{ displayModeBar: false, responsive: true }}
+        config={{ displayModeBar: true, responsive: true, displaylogo: false }}
         style={{ width: "100%" }}
       />
     </div>

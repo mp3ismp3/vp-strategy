@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 from datetime import datetime
 from core.indicators import calc_vp, calc_atr, calc_vwap, calc_delta, calc_vol_ratio, find_swing_points
 
@@ -31,6 +32,29 @@ class TestCalcVP:
         r = calc_vp(df, 60, 0.68)
         assert r["vah"] <= df.tail(60)["High"].max()
         assert r["val"] >= df.tail(60)["Low"].min()
+
+    def test_distributes_volume_by_price_bin_overlap(self):
+        df = pd.DataFrame({
+            "High": [1.25, 2.0, 2.0, 2.0, 2.0],
+            "Low": [0.5, 0.0, 0.0, 0.0, 0.0],
+            "Volume": [90.0, 0.0, 0.0, 0.0, 0.0],
+        })
+
+        result = calc_vp(df, 5, 0.68, n_bins=2, return_histogram=True)
+
+        assert result["histogram"]["volumes"] == pytest.approx([60.0, 30.0])
+
+    def test_histogram_preserves_zero_range_bar_volume(self):
+        df = pd.DataFrame({
+            "High": [1.5, 2.0, 2.0, 2.0, 2.0],
+            "Low": [1.5, 0.0, 0.0, 0.0, 0.0],
+            "Volume": [100.0, 0.0, 0.0, 0.0, 0.0],
+        })
+
+        result = calc_vp(df, 5, 0.68, n_bins=2, return_histogram=True)
+
+        assert sum(result["histogram"]["volumes"]) == pytest.approx(100.0)
+        assert result["histogram"]["volumes"] == pytest.approx([0.0, 100.0])
 
 
 class TestCalcATR:
