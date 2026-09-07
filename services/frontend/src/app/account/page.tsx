@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { refreshSessionAfterPayment } from "@/lib/session-plan-sync";
 import type { Plan, SubscriptionStatus } from "@/types/user";
 
 interface AccountUser {
@@ -22,22 +23,65 @@ interface PlanInfo {
   subscriptionStatus: SubscriptionStatus;
 }
 
+interface AccountPlanInfo {
+  email: string;
+  info: PlanInfo;
+}
+
 export default function AccountPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const user = session?.user as AccountUser | undefined;
   const [bindingTelegram, setBindingTelegram] = useState(false);
   const [bindToken, setBindToken] = useState("");
-  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
+  const [accountPlanInfo, setAccountPlanInfo] = useState<AccountPlanInfo | null>(null);
+  const planInfo = accountPlanInfo && accountPlanInfo.email === session?.user?.email
+    ? accountPlanInfo.info
+    : null;
 
-  // Fetch real-time plan info
   useEffect(() => {
-    if (session) {
-      fetch("/api/user/plan")
-        .then((res) => res.json())
-        .then((data) => setPlanInfo(data))
+    const email = session?.user?.email;
+    if (!email) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const fetchPlan = async (): Promise<PlanInfo> => {
+      const response = await fetch("/api/user/plan", {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error("Unable to refresh plan");
+      return response.json();
+    };
+    const paymentSucceeded = new URLSearchParams(window.location.search).get("payment") === "success";
+
+    if (paymentSucceeded) {
+      refreshSessionAfterPayment({
+        fetchPlan,
+        isCancelled: () => cancelled,
+        onPlan: (plan) => {
+          if (!cancelled) setAccountPlanInfo({ email, info: plan });
+        },
+        updateSession: update,
+      })
+        .then((plan) => {
+          if (!cancelled && plan.plan !== "free") {
+            window.history.replaceState(null, "", "/account");
+          }
+        })
+        .catch(() => {});
+    } else {
+      fetchPlan()
+        .then((plan) => {
+          if (!cancelled) setAccountPlanInfo({ email, info: plan });
+        })
         .catch(() => {});
     }
-  }, [session]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [session?.user?.email, update]);
 
   const subscriptionStatus = planInfo?.subscriptionStatus ?? user?.subscriptionStatus ?? "inactive";
   const displayedSubscriptionStatus = subscriptionStatus === "trialing" ? "active" : subscriptionStatus;
@@ -58,7 +102,10 @@ export default function AccountPage() {
       const res = await fetch("/api/ecpay/cancel", { method: "POST" });
       const data = await res.json();
       if (res.ok) {
-        setPlanInfo((current) => current ? { ...current, cancelAtPeriodEnd: true } : current);
+        setAccountPlanInfo((current) => {
+          if (!current || current.email !== user?.email) return current;
+          return { ...current, info: { ...current.info, cancelAtPeriodEnd: true } };
+        });
         window.alert("已停止後續扣款，方案權限保留到本期結束。");
       }
       else window.alert(data.error || "目前無法取消訂閱");
