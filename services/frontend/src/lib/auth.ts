@@ -4,6 +4,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { getSupabaseAdmin } from "./supabase";
 import { hasActiveEntitlement } from "./billing";
 
+export const SESSION_PLAN_REFRESH_MS = 5 * 60 * 1000;
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -63,17 +65,31 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.userId = user.id;
       }
 
-      // Fetch plan from DB on every token refresh
+      // The token snapshot is informational UI state only. Production API
+      // authorization always revalidates entitlement through getServerPlan().
+      const refreshedAt = typeof token.planRefreshedAt === "number"
+        ? token.planRefreshedAt
+        : 0;
+      const snapshotIsFresh = Date.now() - refreshedAt < SESSION_PLAN_REFRESH_MS;
+      if (!user && trigger !== "update" && snapshotIsFresh) return token;
+
+      if (!token.email) {
+        token.plan = "free";
+        token.subscriptionStatus = "inactive";
+        token.planRefreshedAt = Date.now();
+        return token;
+      }
+
       const supabase = getSupabaseAdmin();
       const { data } = await supabase
         .from("users")
         .select("plan, subscription_status, current_period_end, cancel_at_period_end")
-        .eq("email", token.email!)
+        .eq("email", token.email)
         .single();
 
       if (data) {
@@ -89,6 +105,7 @@ export const authOptions: NextAuthOptions = {
         token.plan = "free";
         token.subscriptionStatus = "inactive";
       }
+      token.planRefreshedAt = Date.now();
 
       return token;
     },

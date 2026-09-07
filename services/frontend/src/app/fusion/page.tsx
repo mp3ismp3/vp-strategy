@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Paywall } from "@/components/Paywall";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { stripDecorativeSymbols } from "@/lib/analysis-display";
 import { formatTrigger, type Trigger } from "@/lib/triggers";
@@ -29,21 +29,60 @@ interface FusionSignal {
 function FusionContent() {
   const [signals, setSignals] = useState<FusionSignal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessError, setAccessError] = useState<"unauthorized" | "forbidden" | "unavailable" | null>(null);
 
   useEffect(() => {
     fetch("/api/data/fusion")
-      .then((res) => res.json())
+      .then(async (response) => {
+        if (response.status === 401) throw new Error("unauthorized");
+        if (response.status === 403) throw new Error("forbidden");
+        if (!response.ok) throw new Error("unavailable");
+        return response.json();
+      })
       .then((data) => {
         setSignals(data.signals || []);
-        setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((error: Error) => {
+        if (error.message === "unauthorized" || error.message === "forbidden") {
+          setAccessError(error.message);
+        } else {
+          setAccessError("unavailable");
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
+
+  if (accessError) {
+    const unauthorized = accessError === "unauthorized";
+    const forbidden = accessError === "forbidden";
+    return (
+      <div className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center gap-4 px-4 text-center">
+        <h2 className="text-2xl font-bold">
+          {unauthorized ? "請先登入" : forbidden ? "需要 Premium 方案" : "暫時無法載入 Fusion"}
+        </h2>
+        <p className="text-gray-600">
+          {unauthorized
+            ? "登入後即可查看方案權限。"
+            : forbidden
+              ? "升級 Premium 以解鎖 Fusion 多策略綜合分析。"
+              : "資料服務暫時無法使用，請稍後再試。"}
+        </p>
+        {(unauthorized || forbidden) && (
+          <Link
+            href={unauthorized ? "/login?callbackUrl=/fusion" : "/pricing"}
+            className="rounded-md bg-black px-6 py-3 font-medium text-white hover:bg-gray-800"
+          >
+            {unauthorized ? "登入" : "查看方案"}
+          </Link>
+        )}
       </div>
     );
   }
@@ -188,9 +227,5 @@ function FusionContent() {
 }
 
 export default function FusionPage() {
-  return (
-    <Paywall requiredPlan="premium">
-      <FusionContent />
-    </Paywall>
-  );
+  return <FusionContent />;
 }

@@ -93,6 +93,7 @@ export async function GET() {
       results,
       scan_time: data.scan_time,
       market_ctx: data.market_ctx,
+      accessPlan: plan,
     });
   } catch (error: unknown) {
     return serviceUnavailable("DATA_SOURCE_UNAVAILABLE", "Scan data is temporarily unavailable", error);

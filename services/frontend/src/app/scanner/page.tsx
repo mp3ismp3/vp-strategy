@@ -13,6 +13,7 @@ import type { Plan } from "@/types/user";
 function ScannerContent() {
   const { data: session, status } = useSession();
   const [results, setResults] = useState<ScanResult[]>([]);
+  const [resultsEmail, setResultsEmail] = useState("");
   const [scanTime, setScanTime] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -22,40 +23,39 @@ function ScannerContent() {
     plan: Plan;
   } | null>(null);
 
-  // Fetch real-time plan
   useEffect(() => {
-    let cancelled = false;
-    if (session?.user?.email) {
-      const email = session.user.email;
-      fetch("/api/user/plan")
-        .then((res) => res.json())
-        .then((data) => {
-          if (!cancelled) {
-            setPlanSnapshot({ email, plan: data.plan || "free" });
-          }
-        })
-        .catch(() => {});
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [session]);
-
-  useEffect(() => {
-    if (!session?.user?.email) {
+    const email = session?.user?.email;
+    if (!email) {
       return;
     }
+    let cancelled = false;
     fetch("/api/data/scan-results")
       .then(async (response) => response.ok ? response.json() : Promise.reject())
       .then((data) => {
+        if (cancelled) return;
         setResults(data.results || []);
         setScanTime(data.scan_time || "");
+        setPlanSnapshot({ email, plan: data.accessPlan || "free" });
+        setResultsEmail(email);
       })
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (cancelled) return;
+        setResults([]);
+        setScanTime("");
+        setPlanSnapshot({ email, plan: "free" });
+        setResultsEmail(email);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [session?.user?.email]);
 
-  if (status === "loading" || (session && loading)) {
+  const hasCurrentResults = resultsEmail === session?.user?.email;
+
+  if (status === "loading" || (session && (loading || !hasCurrentResults))) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
@@ -88,9 +88,10 @@ function ScannerContent() {
     session?.user?.email && planSnapshot?.email === session.user.email
       ? planSnapshot.plan
       : "free";
+  const visibleResults = hasCurrentResults ? results : [];
   const planFilteredResults = effectiveUserPlan === "free"
-    ? results.filter((r) => FREE_SYMBOLS.includes(r.ticker))
-    : results;
+    ? visibleResults.filter((r) => FREE_SYMBOLS.includes(r.ticker))
+    : visibleResults;
 
   const filteredResults = selectedCategory === "all"
     ? planFilteredResults
@@ -102,7 +103,7 @@ function ScannerContent() {
     (r) => r.consensus !== "bullish" && r.consensus !== "bearish"
   );
 
-  const selectedResult = results.find((r) => r.ticker === selectedTicker);
+  const selectedResult = visibleResults.find((r) => r.ticker === selectedTicker);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -119,7 +120,7 @@ function ScannerContent() {
           )}
         </div>
         <div className="text-sm text-gray-500">
-          {results.length} symbols
+          {visibleResults.length} symbols
         </div>
       </div>
 
@@ -140,9 +141,9 @@ function ScannerContent() {
           onChange={(e) => setSelectedCategory(e.target.value)}
           className="border rounded-md px-3 py-2 text-sm"
         >
-          <option value="all">全部類別（{results.length} 檔）</option>
+          <option value="all">全部類別（{visibleResults.length} 檔）</option>
           {ALL_CATEGORIES.map((cat) => {
-            const count = results.filter((r) => (SYMBOL_CATEGORIES[cat] || []).includes(r.ticker)).length;
+            const count = visibleResults.filter((r) => (SYMBOL_CATEGORIES[cat] || []).includes(r.ticker)).length;
             return (
               <option key={cat} value={cat}>{cat}（{count}）</option>
             );

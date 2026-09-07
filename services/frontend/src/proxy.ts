@@ -96,6 +96,20 @@ export function createRateLimitResponse(
   );
 }
 
+export async function runRequestProtection<T>(
+  checkBlacklist: () => Promise<boolean>,
+  checkRateLimit: () => Promise<T>
+): Promise<{
+  blacklist: PromiseSettledResult<boolean>;
+  rateLimit: PromiseSettledResult<T>;
+}> {
+  const [blacklist, rateLimit] = await Promise.allSettled([
+    checkBlacklist(),
+    checkRateLimit(),
+  ]);
+  return { blacklist, rateLimit };
+}
+
 // ─── Main Proxy ─────────────────────────────────────────────
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -121,45 +135,29 @@ export async function proxy(request: NextRequest) {
 
     const tier = getTierForRoute(pathname);
     const ip = getClientIp(request);
-
-    // Phase 3: IP 黑名單檢查
-    try {
-      const blocked = await isBlacklisted(ip);
-      if (blocked) {
-        return NextResponse.json(
-          { error: "Forbidden", message: "此 IP 已被封鎖。" },
-          { status: 403 }
-        );
-      }
-    } catch (error) {
-      if (shouldFailClosedOnRateLimitError(tier)) {
-        return serviceUnavailable(
-          "RATE_LIMIT_UNAVAILABLE",
-          "Request protection is temporarily unavailable",
-          error
-        );
-      }
-      // General/read-only routes remain available during a Redis outage.
-    }
-
-    // Phase 3: 判斷是否為登入用戶
     let userId: string | undefined;
-    let limiter = rateLimiters[tier]; // 預設用 IP-based limiter
+    let limiter = rateLimiters[tier];
     let identifier = ip;
 
     if (token?.userId) {
-      // 登入用戶：用 userId 當 key，享受更高額度
       userId = token.userId as string;
       limiter = authUserLimiters[tier];
       identifier = userId;
     }
 
-    // 執行 rate limit 檢查
     try {
-      const { success, limit, remaining, reset } =
-        await limiter.limit(identifier);
-
-      if (!success) {
+      const protection = await runRequestProtection(
+        () => isBlacklisted(ip),
+        () => limiter.limit(identifier)
+      );
+      if (protection.blacklist.status === "fulfilled" && protection.blacklist.value) {
+        return NextResponse.json(
+          { error: "Forbidden", message: "此 IP 已被封鎖。" },
+          { status: 403 }
+        );
+      }
+      if (protection.rateLimit.status === "fulfilled" && !protection.rateLimit.value.success) {
+        const { limit, reset } = protection.rateLimit.value;
         // Phase 3: 記錄被擋的請求（await 確保 Edge Runtime 結束前寫入完成）
         await logRateLimitEvent({
           ip,
@@ -173,6 +171,13 @@ export async function proxy(request: NextRequest) {
 
         return createRateLimitResponse(limit, reset);
       }
+      if (protection.blacklist.status === "rejected") {
+        throw protection.blacklist.reason;
+      }
+      if (protection.rateLimit.status === "rejected") {
+        throw protection.rateLimit.reason;
+      }
+      const { limit, remaining, reset } = protection.rateLimit.value;
 
       // 正常通過：加上 rate limit headers
       const response = NextResponse.next();
