@@ -208,7 +208,7 @@ Frontend 現已提供繁體中文 `zh-TW`（預設）與 English `en` 雙語基�
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account`、`/dashboard` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
-分析頁切換採 route-level loading skeleton 提供即時回饋。Scanner 與 Fusion 直接以各自 production data API 的 server-side entitlement 結果決定可見內容，不會先額外查詢方案而形成 request waterfall。NextAuth JWT 內的方案只作為 Navbar 等非安全性 UI snapshot；一般 session refresh 在五分鐘 freshness window 內不查詢 Supabase，snapshot 過期後才刷新。所有 production data、Watchlist 與 Premium 功能仍由 route handler 即時查核資料庫方案，不信任 client 或 JWT snapshot。API gateway 會並行執行 IP blacklist 與 rate-limit 檢查，並維持 production `auth`／`strict` fail-closed、一般／`data` fail-open 的既有故障政策。
+分析頁切換採 route-level loading skeleton 提供即時回饋。Scanner 與 Fusion 直接以各自 production data API 的 server-side entitlement 結果決定可見內容，不會先額外查詢方案而形成 request waterfall。NextAuth JWT 內的方案只作為 Navbar 等非安全性 UI snapshot；一般 session refresh 在五分鐘 freshness window 內不查詢 Supabase，snapshot 過期後才刷新。ECPay 付款成功返回 Account 時會短暫重試權威方案查詢，確認付費 entitlement 後立即刷新 session，讓 Navbar 與 Pricing 不必等待 freshness window。所有 production data、Watchlist 與 Premium 功能仍由 route handler 即時查核資料庫方案，不信任 client 或 JWT snapshot。API gateway 會並行執行 IP blacklist 與 rate-limit 檢查，並維持 production `auth`／`strict` fail-closed、一般／`data` fail-open 的既有故障政策。
 
 Web API 定位為隨產品 UI 一同演進的 backend-for-frontend（BFF），不是提供 API key 的公開市場資料 API。`GET /api/health` 可匿名用於 liveness；data routes 使用 NextAuth browser session 並在 server 驗證方案。資料來源故障統一回 `503` 與 `Retry-After`，不把內部 exception 傳給 client。可呼叫路由、權限、錯誤與 gateway contract 見 `docs/API.md`，機器可讀規格見 `services/frontend/openapi.yaml`。
 
