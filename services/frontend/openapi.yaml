@@ -137,11 +137,12 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [results]
+                required: [results, accessPlan]
                 properties:
                   results: { type: array, items: { type: object, additionalProperties: true } }
                   scan_time: {}
                   market_ctx: {}
+                  accessPlan: { $ref: "#/components/schemas/Plan" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }

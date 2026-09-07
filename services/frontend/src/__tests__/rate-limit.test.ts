@@ -89,7 +89,56 @@ describe("getTierForRoute", () => {
 
 // ─── createRateLimitResponse ────────────────────────────────
 
-import { config, createRateLimitResponse } from "@/proxy";
+import { config, createRateLimitResponse, runRequestProtection } from "@/proxy";
+
+describe("request protection latency", () => {
+  it("starts blacklist and rate-limit checks concurrently", async () => {
+    let releaseBlacklist!: (value: boolean) => void;
+    let releaseRateLimit!: (value: { success: boolean }) => void;
+    const checkBlacklist = vi.fn(() => new Promise<boolean>((resolve) => {
+      releaseBlacklist = resolve;
+    }));
+    const checkRateLimit = vi.fn(() => new Promise<{ success: boolean }>((resolve) => {
+      releaseRateLimit = resolve;
+    }));
+
+    const resultPromise = runRequestProtection(checkBlacklist, checkRateLimit);
+
+    expect(checkBlacklist).toHaveBeenCalledTimes(1);
+    expect(checkRateLimit).toHaveBeenCalledTimes(1);
+    releaseBlacklist(false);
+    releaseRateLimit({ success: true });
+
+    await expect(resultPromise).resolves.toEqual({
+      blacklist: { status: "fulfilled", value: false },
+      rateLimit: { status: "fulfilled", value: { success: true } },
+    });
+  });
+
+  it("preserves a known rate-limit result when blacklist lookup rejects", async () => {
+    const error = new Error("blacklist unavailable");
+
+    await expect(runRequestProtection(
+      () => Promise.reject(error),
+      () => Promise.resolve({ success: false })
+    )).resolves.toEqual({
+      blacklist: { status: "rejected", reason: error },
+      rateLimit: { status: "fulfilled", value: { success: false } },
+    });
+  });
+
+  it("preserves a known blacklist result when rate limiting rejects", async () => {
+    const error = new Error("rate limit unavailable");
+
+    await expect(runRequestProtection(
+      () => Promise.resolve(true),
+      () => Promise.reject(error)
+    )).resolves.toEqual({
+      blacklist: { status: "fulfilled", value: true },
+      rateLimit: { status: "rejected", reason: error },
+    });
+  });
+});
 
 describe("page access matcher", () => {
   it("keeps accumulation public for the guest top-ten preview", () => {

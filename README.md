@@ -208,6 +208,8 @@ Frontend 現已提供繁體中文 `zh-TW`（預設）與 English `en` 雙語基�
 
 Next.js 16 的 request protection 使用 `services/frontend/src/proxy.ts`，集中處理 API rate limit、webhook bypass 與 `/fusion`、`/account`、`/dashboard` 登入保護。Production data API 以 service role 讀取 CI 上傳到 Supabase 的 scan/chart/accum tables，再於 server 依方案裁切；client 與 anon/authenticated roles 不可直接讀取 production analysis 或敏感訂閱資料。
 
+分析頁切換採 route-level loading skeleton 提供即時回饋。Scanner 與 Fusion 直接以各自 production data API 的 server-side entitlement 結果決定可見內容，不會先額外查詢方案而形成 request waterfall。NextAuth JWT 內的方案只作為 Navbar 等非安全性 UI snapshot；一般 session refresh 在五分鐘 freshness window 內不查詢 Supabase，snapshot 過期後才刷新。所有 production data、Watchlist 與 Premium 功能仍由 route handler 即時查核資料庫方案，不信任 client 或 JWT snapshot。API gateway 會並行執行 IP blacklist 與 rate-limit 檢查，並維持 production `auth`／`strict` fail-closed、一般／`data` fail-open 的既有故障政策。
+
 Web API 定位為隨產品 UI 一同演進的 backend-for-frontend（BFF），不是提供 API key 的公開市場資料 API。`GET /api/health` 可匿名用於 liveness；data routes 使用 NextAuth browser session 並在 server 驗證方案。資料來源故障統一回 `503` 與 `Retry-After`，不把內部 exception 傳給 client。可呼叫路由、權限、錯誤與 gateway contract 見 `docs/API.md`，機器可讀規格見 `services/frontend/openapi.yaml`。
 
 Crypto Liquidity 頁面（`/crypto-liquidity`）提供登入後的 stablecoin supply、BTC market cap 與 BTC spot volume 概覽；stablecoin 歷史由 server-side API 讀取 DeFiLlama 現行 asset endpoint，BTC 一年 daily history 使用 CoinPaprika 免費、免 API Key endpoint。BTC market cap 不代表全 Crypto 市值，UI 與 Bias reasons 會明確標示此限制。單一 provider 暫時失敗時，頁面仍回傳可用的部分資料並將缺項標示為 unavailable，只有所有 upstream 都不可用時才回 `503`。BTC/ETH ETF flow 先保留 provider contract，尚未設定來源時顯示 `Coming soon`，不會把缺資料當成零流入。這些是流動性背景指標，不是交易建議。

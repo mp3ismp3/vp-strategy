@@ -57,7 +57,7 @@ browser origin. Do not publish cookies or use them as long-lived API tokens.
 | DELETE | `/api/user/watchlist/{ticker}` | Session + trusted Origin | Remove one user-owned ticker |
 | GET | `/api/data/dashboard` | Free+ | Watchlist cards with plan-filtered analysis |
 | GET | `/api/data/symbol/{ticker}` | Free+ | Detailed VP, accumulation, and FVG analysis for one allowed ticker |
-| GET | `/api/data/scan-results` | Free+ | Multi-timeframe VP results, server-filtered by plan |
+| GET | `/api/data/scan-results` | Free+ | Multi-timeframe VP results and effective `accessPlan`, server-filtered by plan |
 | GET | `/api/data/chart-data?ticker=NVDA` | Free+ | One ticker's chart payload |
 | GET | `/api/data/chart-data?include=data` | Free+ | Visible ticker payloads; otherwise summaries |
 | GET | `/api/data/accum-state` | Free+ | Accumulation state; action levels removed for Free |
