@@ -1,5 +1,6 @@
 """Tests for MACD divergence detection and scan report formatting."""
 
+import pytest
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone, timedelta
@@ -530,3 +531,45 @@ class TestFormatMACDReport:
         }
         msg = format_macd_report(results, datetime.now(ET))
         assert "共 1 檔有背離訊號" in msg
+
+
+@pytest.mark.parametrize("values,indices", [
+    ([-1, -3, -1, 0, 1, 3, 1], [1]),
+    ([-1, -3, -1, 0, 0, 1, 3, 1], [1]),
+    ([-1, -2, -3], []),
+    ([-3, -2, -1], []),
+    ([-1, -3, -3], []),
+    ([-1, -3, -3, -4], []),
+    ([-1, -3, -3, -2], [1]),
+    ([1, -2, 1], [1]),
+    ([1, -1, -2, 1], [2]),
+    ([-1, -3, -1], [1]),
+    ([0, 0, 0], []),
+    ([], []),
+    ([-1, -2], []),
+])
+def test_confirmed_macd_turns(values, indices):
+    assert [p["index"] for p in macd_turning_points(values, "low")] == indices
+    assert [p["index"] for p in macd_turning_points([-v for v in values], "high")] == indices
+
+
+def test_zero_crossing_preserves_positive_peak():
+    assert macd_turning_points([-1, -3, -1, 0, 1, 3, 1], "high") == [
+        {"index": 5, "value": 3.0}
+    ]
+
+
+def test_divergence_waits_for_macd_reversal():
+    df = _make_df(101)
+    df["Low"] = 99.0
+    df["High"] = 101.0
+    df.iloc[60, df.columns.get_loc("Low")] = 95.0
+    df.iloc[96, df.columns.get_loc("Low")] = 94.0
+    values = np.interp(np.arange(101), [0, 55, 60, 65, 90, 99, 100],
+                       [1, -1, -5, 1, -1, -3, -2])
+    with patch("core.indicators.calc_macd", return_value=pd.DataFrame({"macd": values[:100]})):
+        assert detect_macd_divergence(df.iloc[:100], swing_lookback=3) == []
+    with patch("core.indicators.calc_macd", return_value=pd.DataFrame({"macd": values})):
+        signals = detect_macd_divergence(df, swing_lookback=3)
+        assert len(signals) == 1
+        assert signals[0]["type"] == "bullish"

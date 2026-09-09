@@ -12,6 +12,7 @@ This script does NOT modify scan_results.json or accum_state.json.
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -65,6 +66,7 @@ def main():
 
     provider = YahooProvider(max_workers=5, jitter=(0.1, 0.3))
     print("  Downloading daily data...")
+    captured_at = datetime.now(timezone.utc).isoformat()
     data = provider.batch_daily(SYMBOLS, period=DAILY_FETCH_PERIOD)
     print(f"  Downloaded {len(data)}/{len(SYMBOLS)}")
 
@@ -92,6 +94,7 @@ def main():
             chart_data = {
                 "price": vp["price"] if vp["price"] == vp["price"] else float(df["Close"].dropna().iloc[-1]),
                 "daily": {
+                    "captured_at": captured_at,
                     "ohlc": _df_to_ohlc(df, DAILY_CHART_BARS),
                     "poc": vp["daily"]["poc"],
                     "vah": vp["daily"]["vah"],

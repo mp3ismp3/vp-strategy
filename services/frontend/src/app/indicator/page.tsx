@@ -12,8 +12,8 @@ type IndicatorTab = "macd" | "fvg" | "liquidity";
 const tabs: { key: IndicatorTab; label: string; description: string }[] = [
   {
     key: "macd",
-    label: "MACD Divergence",
-    description: "日線 + 周線背離偵測",
+    label: "突破與回踩",
+    description: "RVOL 量價追蹤",
   },
   {
     key: "fvg",

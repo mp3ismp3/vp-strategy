@@ -173,6 +173,11 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 
 ### Next.js `services/frontend/`
 
+- `src/lib/macd.ts`：MACD 頁與 Indicator 內嵌頁共用的純計算函數；MACD 已確認轉折規則與 Python `core/indicators.py` 對齊，週線按交易日期的週一至週日日曆週聚合，使用 UTC 日期運算避免瀏覽器時區改變分組。測試位於 `src/__tests__/macd.test.ts`。
+- `src/lib/rvol.ts`：僅接受已完成、依日期排列的日 K；逐日回放 20 日高點突破／10 根回踩追蹤，固定突破前 ATR 容許範圍，分開保存最新日與事件日 RVOL、失效／到期狀態，不依賴策略或持久化 state。
+- `src/lib/market-bars.ts` 與 Python `core/market_bars.py`：以擷取時紐約 16:00 收盤界線判斷美股／ETF 日 K 與週 K 完成度；週 K 等週五收盤，提早收盤保守延後。前端缺少擷取時間時排除最後日 K。`export_frontend_data.py` 在下載前記錄選用 `daily.captured_at`，既有 upload/API 透傳，不改 scanner JSON schema；Python `macd_scan.py` 正式掃描傳入批次下載前時間。
+- `src/lib/rvol-chart.ts`：日 K、日量、各日前 20 根均量共用日期軸，疊加固定突破位、突破與事件日期；原 `/macd` 與 Indicator 預設分頁以 RVOL 為主畫面，MACD 圖表僅於展開輔助區後掛載；付費才疊加突破與事件標記，兩區訊號明細各自使用既有 SignalMosaic。頁面顯示各日期 RVOL 與資料完成度，到期顯示切換只影響呈現、不改偵測結果。
+
 - `src/app/**/page.tsx`：scanner、accumulation、fusion、strategy、indicator、liquidity、FVG、MACD、account/pricing，以及個人 `/dashboard` 與 `/dashboard/[ticker]` 標的整合頁面。
 - `src/app/api/data/*`：唯一的 Web production analysis data 邊界。訪客回 `401`；Free 由 server 裁切為 7 檔與 Accumulation 非行動摘要；Pro 取得完整一般分析；Fusion 僅 Premium。Client 不得直接以 anon key 讀 analysis tables。
 - `src/app/api/user/watchlist/*`：以 NextAuth session 對應 `users.id`，透過 service role 讀寫使用者自己的 `user_watchlist_items`；新增與排序 RPC 會鎖定 user row，原子執行數量上限與順序更新。Free/Pro/Premium 上限分別為 5/30/100，Free 僅允許 Mega Cap Tech 7 檔。

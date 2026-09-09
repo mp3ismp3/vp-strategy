@@ -11,17 +11,19 @@ Usage:
 
 import argparse
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from config import SYMBOLS
 from core.data_provider import YahooProvider
 from core.indicators import calc_macd, detect_macd_divergence, resample_to_weekly
+from core.market_bars import completed_bars
 from notifications.telegram import send_telegram
 
-ET = timezone(timedelta(hours=-4))
+ET = ZoneInfo("America/New_York")
 
 
-def _scan_symbol(df, swing_lookback=5, max_bars_ago=10):
+def _scan_symbol(df, swing_lookback=5, max_bars_ago=10, captured_at=None):
     """Scan a single symbol for daily and weekly MACD divergence.
 
     Args:
@@ -33,6 +35,8 @@ def _scan_symbol(df, swing_lookback=5, max_bars_ago=10):
         dict with keys: daily_divs, weekly_divs, is_dual, dual_type
         or None if insufficient data.
     """
+    if captured_at is not None:
+        df = completed_bars(df, captured_at)
     if df is None or len(df) < 60:
         return None
 
@@ -43,6 +47,8 @@ def _scan_symbol(df, swing_lookback=5, max_bars_ago=10):
 
     # Weekly divergence
     weekly_df = resample_to_weekly(df)
+    if captured_at is not None:
+        weekly_df = completed_bars(weekly_df, captured_at, weekly=True)
     weekly_divs = []
     if weekly_df is not None and len(weekly_df) >= 35:
         weekly_divs = detect_macd_divergence(
@@ -204,7 +210,7 @@ def main():
     results = {}
     for symbol in symbols:
         df = data.get(symbol)
-        result = _scan_symbol(df)
+        result = _scan_symbol(df, captured_at=now)
         if result:
             results[symbol] = result
 
