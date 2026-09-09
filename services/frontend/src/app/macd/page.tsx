@@ -6,6 +6,13 @@ import type { Annotations, Data, Layout } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
+import { analyzeRvol, type RvolAnalysis } from "@/lib/rvol";
+import { completedDailyBars, completedWeeklyBars } from "@/lib/market-bars";
+import { buildRvolChart } from "@/lib/rvol-chart";
+import {
+  calcMACD, detectDivergence,
+  type OHLCBar, type MACDPoint, type DivergenceSignal,
+} from "@/lib/macd";
 import {
   filterIndicatorItems,
   getIndicatorCategories,
@@ -13,304 +20,6 @@ import {
 } from "@/lib/preview-access";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface OHLCBar {
-  time: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-interface MACDPoint {
-  time: string;
-  macd: number;
-  signal: number;
-  histogram: number;
-}
-
-interface SwingPoint {
-  index: number;
-  price: number;
-}
-
-interface DivergenceSignal {
-  type: "bullish" | "bearish";
-  timeframe: "daily" | "weekly";
-  barsAgo: number;
-  priceSwingPrev: number;
-  priceSwingCurr: number;
-  macdSwingPrev: number;
-  macdSwingCurr: number;
-  time: string;
-}
-
-// ─── Algorithms ──────────────────────────────────────────────────────────────
-
-function calcEMA(data: number[], period: number): number[] {
-  const result: number[] = [];
-  const k = 2 / (period + 1);
-  result[0] = data[0];
-  for (let i = 1; i < data.length; i++) {
-    result[i] = data[i] * k + result[i - 1] * (1 - k);
-  }
-  return result;
-}
-
-function calcMACD(
-  closes: number[],
-  fast = 12,
-  slow = 26,
-  sig = 9
-): MACDPoint[] | null {
-  if (closes.length < slow + sig) return null;
-
-  const emaFast = calcEMA(closes, fast);
-  const emaSlow = calcEMA(closes, slow);
-  const macdLine = emaFast.map((v, i) => v - emaSlow[i]);
-  const signalLine = calcEMA(macdLine, sig);
-  const histogram = macdLine.map((v, i) => v - signalLine[i]);
-
-  return closes.map((_, i) => ({
-    time: "",
-    macd: macdLine[i],
-    signal: signalLine[i],
-    histogram: histogram[i],
-  }));
-}
-
-function findSwingHighs(values: number[], lookback: number): SwingPoint[] {
-  const points: SwingPoint[] = [];
-  for (let i = lookback; i < values.length - lookback; i++) {
-    let isHigh = true;
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j === i) continue;
-      if (values[j] >= values[i]) { isHigh = false; break; }
-    }
-    if (isHigh) points.push({ index: i, price: values[i] });
-  }
-  return points;
-}
-
-function findSwingLows(values: number[], lookback: number): SwingPoint[] {
-  const points: SwingPoint[] = [];
-  for (let i = lookback; i < values.length - lookback; i++) {
-    let isLow = true;
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j === i) continue;
-      if (values[j] <= values[i]) { isLow = false; break; }
-    }
-    if (isLow) points.push({ index: i, price: values[i] });
-  }
-  return points;
-}
-
-function macdTurningPoints(macdValues: number[], mode: "low" | "high"): SwingPoint[] {
-  const n = macdValues.length;
-  if (n < 3) return [];
-
-  // Find zero-crossing boundaries
-  const crossings: number[] = [0];
-  for (let i = 1; i < n; i++) {
-    if (macdValues[i] * macdValues[i - 1] < 0) {
-      crossings.push(i);
-    }
-  }
-  crossings.push(n);
-
-  const points: SwingPoint[] = [];
-
-  for (let segIdx = 0; segIdx < crossings.length - 1; segIdx++) {
-    const segStart = crossings[segIdx];
-    const segEnd = crossings[segIdx + 1];
-    const seg = macdValues.slice(segStart, segEnd);
-
-    if (seg.length < 2) continue;
-
-    const segMean = seg.reduce((a, b) => a + b, 0) / seg.length;
-
-    if (mode === "low" && segMean >= 0) continue;
-    if (mode === "high" && segMean <= 0) continue;
-
-    // Find turning points via derivative sign changes
-    const segPoints: SwingPoint[] = [];
-    const diff: number[] = [];
-    for (let i = 1; i < seg.length; i++) {
-      diff.push(seg[i] - seg[i - 1]);
-    }
-
-    for (let i = 1; i < diff.length; i++) {
-      if (mode === "low" && diff[i - 1] < 0 && diff[i] >= 0) {
-        segPoints.push({ index: segStart + i, price: seg[i] });
-      } else if (mode === "high" && diff[i - 1] > 0 && diff[i] <= 0) {
-        segPoints.push({ index: segStart + i, price: seg[i] });
-      }
-    }
-
-    if (segPoints.length > 1) {
-      // Filter insignificant points (< 15% of segment range)
-      const segMin = Math.min(...seg);
-      const segMax = Math.max(...seg);
-      const segRange = segMax - segMin;
-      if (segRange > 0) {
-        const minSignificance = segRange * 0.15;
-        const filtered: SwingPoint[] = [segPoints[0]];
-        for (let i = 1; i < segPoints.length; i++) {
-          const last = filtered[filtered.length - 1];
-          if (Math.abs(segPoints[i].price - last.price) >= minSignificance) {
-            filtered.push(segPoints[i]);
-          } else if (mode === "low" && segPoints[i].price < last.price) {
-            filtered[filtered.length - 1] = segPoints[i];
-          } else if (mode === "high" && segPoints[i].price > last.price) {
-            filtered[filtered.length - 1] = segPoints[i];
-          }
-        }
-        points.push(...filtered);
-      } else {
-        points.push(...segPoints);
-      }
-    } else if (segPoints.length === 1) {
-      points.push(...segPoints);
-    } else {
-      // Fallback: absolute extremum of segment
-      if (mode === "low") {
-        const minVal = Math.min(...seg);
-        const minIdx = seg.indexOf(minVal);
-        points.push({ index: segStart + minIdx, price: minVal });
-      } else {
-        const maxVal = Math.max(...seg);
-        const maxIdx = seg.indexOf(maxVal);
-        points.push({ index: segStart + maxIdx, price: maxVal });
-      }
-    }
-  }
-
-  return points;
-}
-
-function detectDivergence(
-  ohlc: OHLCBar[],
-  macdData: MACDPoint[],
-  lookback: number = 60,
-  swingLookback: number = 5,
-  maxBarsAgo: number = 10
-): DivergenceSignal[] {
-  const signals: DivergenceSignal[] = [];
-  const n = ohlc.length;
-  if (n < lookback) return signals;
-
-  const startIdx = n - lookback;
-  const priceLows = ohlc.map((b) => b.low);
-  const priceHighs = ohlc.map((b) => b.high);
-  const macdValues = macdData.map((m) => m.macd);
-
-  // MACD turning points via zero-crossing (parameter-free)
-  const mLows = macdTurningPoints(macdValues.slice(startIdx), "low");
-  const mHighs = macdTurningPoints(macdValues.slice(startIdx), "high");
-
-  // Price swing lows (still uses lookback for raw price)
-  const pLows = findSwingLows(priceLows.slice(startIdx), swingLookback);
-
-  // Bullish divergence: price lower low, MACD higher low
-  if (pLows.length >= 2 && mLows.length >= 2) {
-    const pLow1 = pLows[pLows.length - 2];
-    const pLow2 = pLows[pLows.length - 1];
-
-    const mLow1 = findClosestSwing(mLows, pLow1.index);
-    const mLow2 = findClosestSwing(mLows, pLow2.index);
-
-    if (mLow1 && mLow2) {
-      const barsAgo = lookback - 1 - pLow2.index;
-      if (pLow2.price < pLow1.price && mLow2.price > mLow1.price && barsAgo <= maxBarsAgo) {
-        const realIdx = startIdx + pLow2.index;
-        signals.push({
-          type: "bullish",
-          timeframe: "daily",
-          barsAgo,
-          priceSwingPrev: pLow1.price,
-          priceSwingCurr: pLow2.price,
-          macdSwingPrev: mLow1.price,
-          macdSwingCurr: mLow2.price,
-          time: ohlc[realIdx]?.time || "",
-        });
-      }
-    }
-  }
-
-  // Price swing highs
-  const pHighs = findSwingHighs(priceHighs.slice(startIdx), swingLookback);
-
-  // Bearish divergence: price higher high, MACD lower high
-  if (pHighs.length >= 2 && mHighs.length >= 2) {
-    const pHigh1 = pHighs[pHighs.length - 2];
-    const pHigh2 = pHighs[pHighs.length - 1];
-
-    const mHigh1 = findClosestSwing(mHighs, pHigh1.index);
-    const mHigh2 = findClosestSwing(mHighs, pHigh2.index);
-
-    if (mHigh1 && mHigh2) {
-      const barsAgo = lookback - 1 - pHigh2.index;
-      if (pHigh2.price > pHigh1.price && mHigh2.price < mHigh1.price && barsAgo <= maxBarsAgo) {
-        const realIdx = startIdx + pHigh2.index;
-        signals.push({
-          type: "bearish",
-          timeframe: "daily",
-          barsAgo,
-          priceSwingPrev: pHigh1.price,
-          priceSwingCurr: pHigh2.price,
-          macdSwingPrev: mHigh1.price,
-          macdSwingCurr: mHigh2.price,
-          time: ohlc[realIdx]?.time || "",
-        });
-      }
-    }
-  }
-
-  return signals;
-}
-
-function findClosestSwing(swings: SwingPoint[], targetIdx: number): SwingPoint | null {
-  let best: SwingPoint | null = null;
-  let bestDist = 6; // tolerance
-  for (const s of swings) {
-    const dist = Math.abs(s.index - targetIdx);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = s;
-    }
-  }
-  return best;
-}
-
-function resampleToWeekly(ohlc: OHLCBar[]): OHLCBar[] {
-  if (ohlc.length === 0) return [];
-  const weeks: OHLCBar[][] = [];
-  let currentWeek: OHLCBar[] = [];
-
-  for (const bar of ohlc) {
-    const d = new Date(bar.time);
-    const dayOfWeek = d.getDay();
-    // Start new week on Monday (or if first bar)
-    if (dayOfWeek === 1 && currentWeek.length > 0) {
-      weeks.push(currentWeek);
-      currentWeek = [];
-    }
-    currentWeek.push(bar);
-  }
-  if (currentWeek.length > 0) weeks.push(currentWeek);
-
-  return weeks.map((week) => ({
-    time: week[week.length - 1].time,
-    open: week[0].open,
-    high: Math.max(...week.map((b) => b.high)),
-    low: Math.min(...week.map((b) => b.low)),
-    close: week[week.length - 1].close,
-    volume: week.reduce((sum, b) => sum + b.volume, 0),
-  }));
-}
 
 // ─── Chart Component ─────────────────────────────────────────────────────────
 
@@ -449,11 +158,16 @@ export default function MACDPage() {
   const { data: session } = useSession();
   const accessPlan = (session?.user as { plan?: "free" | "pro" | "premium" } | undefined)?.plan ?? "free";
   const isPaid = accessPlan === "pro" || accessPlan === "premium";
+  const [showMacd, setShowMacd] = useState(false);
+  const [showExpired, setShowExpired] = useState(false);
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
-  const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
+  const [snapshot, setSnapshot] = useState<{ bars: OHLCBar[]; capturedAt?: string }>({ bars: [] });
+  const ohlc = useMemo(() => completedDailyBars(snapshot.bars, snapshot.capturedAt), [snapshot]);
   const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
+  const [rvolResults, setRvolResults] = useState<{ ticker: string; time: string; analysis: RvolAnalysis }[]>([]);
+  const currentRvol = useMemo(() => analyzeRvol(ohlc), [ohlc]);
 
   const indicatorCategories = useMemo(
     () => getIndicatorCategories(accessPlan),
@@ -470,10 +184,10 @@ export default function MACDPage() {
     fetch(`/api/data/chart-data?ticker=${encodeURIComponent(effectiveTicker)}`)
       .then(async (response) => response.ok ? response.json() : Promise.reject())
       .then((chart) => {
-        if (!cancelled) setOhlc(chart?.daily?.ohlc || []);
+        if (!cancelled) setSnapshot({ bars: chart?.daily?.ohlc || [], capturedAt: chart?.daily?.captured_at });
       })
       .catch(() => {
-        if (!cancelled) setOhlc([]);
+        if (!cancelled) setSnapshot({ bars: [] });
       })
       .finally(() => {
         if (!cancelled) setLoadedTicker(effectiveTicker);
@@ -492,7 +206,7 @@ export default function MACDPage() {
     return result.map((m, i) => ({ ...m, time: ohlc[i].time }));
   }, [ohlc]);
 
-  const weeklyOHLC = useMemo(() => resampleToWeekly(ohlc), [ohlc]);
+  const weeklyOHLC = useMemo(() => completedWeeklyBars(snapshot.bars, snapshot.capturedAt), [snapshot]);
 
   const weeklyMACD = useMemo(() => {
     if (weeklyOHLC.length === 0) return null;
@@ -520,15 +234,19 @@ export default function MACDPage() {
     const response = await fetch("/api/data/chart-data?include=data");
     const chartRows = (response.ok ? await response.json() : {}) as Record<
       string,
-      { daily?: { ohlc?: OHLCBar[] } }
+      { daily?: { ohlc?: OHLCBar[]; captured_at?: string } }
     >;
     const rows = Object.entries(chartRows).map(([ticker, data]) => ({ ticker, data }));
 
     const results: ScanResult[] = [];
+    const volumeResults: typeof rvolResults = [];
 
     if (rows) {
       for (const row of filterIndicatorItems(rows, accessPlan)) {
-        const dailyOhlc: OHLCBar[] = row.data?.daily?.ohlc || [];
+        const rawBars = row.data?.daily?.ohlc || [];
+        const dailyOhlc = completedDailyBars(rawBars, row.data?.daily?.captured_at);
+        const analysis = analyzeRvol(dailyOhlc);
+        if (analysis.setup) volumeResults.push({ ticker: row.ticker, time: dailyOhlc.at(-1)!.time, analysis });
         if (dailyOhlc.length < 60) continue;
 
         const closes = dailyOhlc.map((b: OHLCBar) => b.close);
@@ -538,7 +256,7 @@ export default function MACDPage() {
         const dDivs = detectDivergence(dailyOhlc, dMacdWithTime, 60, 5);
         const dailyDivs = dDivs.map((d) => ({ ...d, timeframe: "daily" as const }));
 
-        const wOhlc = resampleToWeekly(dailyOhlc);
+        const wOhlc = completedWeeklyBars(rawBars, row.data?.daily?.captured_at);
         let weeklyDivs: DivergenceSignal[] = [];
         if (wOhlc.length >= 35) {
           const wCloses = wOhlc.map((b) => b.close);
@@ -595,6 +313,7 @@ export default function MACDPage() {
     });
 
     setScanResults(results);
+    setRvolResults(volumeResults);
     setScanning(false);
   };
 
@@ -603,6 +322,10 @@ export default function MACDPage() {
     const timeoutId = window.setTimeout(() => void handleScan(), 0);
     return () => window.clearTimeout(timeoutId);
   }, [accessPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const rvolChart = useMemo(() => buildRvolChart(ohlc, isPaid ? currentRvol : { ...currentRvol, setup: null }), [ohlc, currentRvol, isPaid]);
+
+  const visibleRvolResults = filterIndicatorItems(rvolResults, accessPlan).filter(row => showExpired || row.analysis.setup?.status !== "expired");
 
   // Categorize scan results
   const dualResults = scanResults.filter((r) => r.isDual);
@@ -614,9 +337,9 @@ export default function MACDPage() {
       {/* Header */}
       <div className="mb-6">
         <div>
-          <h1 className="text-3xl font-bold">MACD Divergence</h1>
+          <h1 className="text-3xl font-bold">突破與回踩觀察</h1>
           <p className="text-gray-600 mt-1">
-            日線 + 周線 MACD 背離偵測 — 找出動能與價格背離的標的
+            收盤後觀察放量突破、縮量回踩與失效狀態
           </p>
         </div>
       </div>
@@ -648,6 +371,65 @@ export default function MACDPage() {
         )}
       </div>
 
+      <section className="bg-white rounded-xl border p-4 mb-6" aria-label="RVOL 量價訊號">
+          <h2 className="text-xl font-bold mb-2">RVOL 量價訊號（日線）</h2>
+          {!loading && ohlc.length > 0 && <Plot data={rvolChart.data} layout={rvolChart.layout} config={{ responsive: true, displayModeBar: true }} style={{ width: "100%" }} />}
+          {loading && <p role="status">載入量價圖表…</p>}
+          {!loading && ohlc.length === 0 && <p>尚無已完成日 K 資料。</p>}
+          <SignalMosaic locked={!isPaid}>
+          <details className="text-sm mb-4">
+            <summary className="cursor-pointer font-medium">判斷規則與 RVOL 分級</summary>
+          <p className="text-sm text-gray-600 mb-3">
+            已完成日 K 成交量 ÷ 該日前 20 個交易日均量。追蹤突破 20 日高點後 10 根日 K；以原突破位與當時波動範圍判斷回踩，收盤跌破即失效。
+          </p>
+          <p className="text-sm text-gray-600 mb-3">
+            &lt;0.7 明顯縮量 · 0.7–&lt;1 普通 · 1–&lt;1.5 有量 · 1.5–2 明顯放量 · &gt;2 異常大量
+          </p>
+          </details>
+          <p className="mb-3 text-sm text-gray-600">
+            {effectiveTicker}：{loading ? "載入中…" : currentRvol.rvol === null ? "成交量資料不足" :
+              `最新已完成日 RVOL ${currentRvol.rvol.toFixed(2)} · ${currentRvol.volumeLabel}（${ohlc.at(-1)?.time}）`}
+          </p>
+          {!loading && currentRvol.setup && <p className="mb-3">
+            形態：{currentRvol.setup.label} · 事件日 {currentRvol.setup.eventDate} / RVOL {currentRvol.setup.eventRvol?.toFixed(2) ?? "資料不足"}
+            · 原突破 {currentRvol.setup.breakoutDate} / RVOL {currentRvol.setup.breakoutRvol?.toFixed(2) ?? "資料不足"}
+            · 距原突破位 {currentRvol.distancePct?.toFixed(2)}%
+          </p>}
+          <p className="text-sm text-gray-600 mb-3">
+            資料擷取：{snapshot.capturedAt ?? "未知（保守排除最後一根）"} · 分析至：{currentRvol.asOf ?? "資料不足"}（已完成日 K）
+            · 均量區間：{currentRvol.baselineStart ?? "—"} ～ {currentRvol.baselineEnd ?? "—"}
+            {snapshot.bars.length > ohlc.length && " · 未確認完成的 K 棒已排除"}
+          </p>
+          <label className="flex items-center gap-2 text-sm mb-3">
+            <input type="checkbox" checked={showExpired} onChange={event => setShowExpired(event.target.checked)} />
+            顯示已到期形態
+          </label>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b text-left">
+                <th className="p-2">標的／日期</th><th className="p-2">訊號</th>
+                <th className="p-2">最新已完成日 RVOL</th><th className="p-2">原突破位／距離</th><th className="p-2">突破日／RVOL</th><th className="p-2">事件日／RVOL</th>
+              </tr></thead>
+              <tbody>{visibleRvolResults.map(({ ticker, time, analysis }) => (
+                <tr key={ticker} className="border-b">
+                  <td className="p-2"><button className="underline" onClick={() => setSelectedTicker(ticker)}>{ticker}</button><span className="block text-gray-500">{time}</span></td>
+                  <td className="p-2">{analysis.setup?.label}</td>
+                  <td className="p-2">{analysis.rvol?.toFixed(2)}</td>
+                  <td className="p-2">${analysis.setup?.level.toFixed(2)} / {analysis.distancePct?.toFixed(2)}%</td>
+                  <td className="p-2">{analysis.setup?.breakoutDate} / {analysis.setup?.breakoutRvol?.toFixed(2) ?? "資料不足"}</td>
+                  <td className="p-2">{analysis.setup?.eventDate} / {analysis.setup?.eventRvol?.toFixed(2) ?? "資料不足"}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          {!scanning && visibleRvolResults.length === 0 && <p className="text-sm text-gray-500 mt-2">目前資料沒有追蹤中的量價形態。</p>}
+          <p className="text-sm text-gray-500 mt-3">回踩縮量需搭配原突破量能閱讀；突破量不足或回踩放量代表量能未支持形態，並不等於必然失敗。</p>
+          </SignalMosaic>
+        </section>
+        <details className="rounded-xl border bg-white p-4 mt-6" onToggle={event => setShowMacd(event.currentTarget.open)}>
+          <summary className="cursor-pointer font-semibold">MACD 輔助分析（選看）</summary>
+          <p className="text-sm text-gray-600 my-3">動能背離提供背景資訊，不是突破／回踩的必要條件。日線轉折需後續 5 根、週線需後續 3 根 K 棒確認。</p>
+          {showMacd && <>
       {/* Charts remain visible in the guest preview. */}
       <div className="space-y-6 mb-8">
         {/* Daily MACD Chart */}
@@ -658,7 +440,7 @@ export default function MACDPage() {
             </div>
           ) : ohlc.length === 0 ? (
             <div className="flex items-center justify-center h-[450px] text-gray-500">
-              無 {effectiveTicker} 圖表數據。請先執行 export_frontend_data.py
+              無 {effectiveTicker} 已完成日 K 資料。
             </div>
           ) : dailyMACD ? (
             <MACDChart
@@ -699,8 +481,7 @@ export default function MACDPage() {
         </div>
       </div>
 
-      {/* Signal details */}
-      <SignalMosaic locked={!isPaid}>
+          <SignalMosaic locked={!isPaid}>
         {(dailyDivergences.length > 0 || weeklyDivergences.length > 0) && (
           <div className="bg-white rounded-xl border p-4 mb-6 flex flex-wrap gap-3">
             {dailyDivergences.map((d, i) => (
@@ -714,7 +495,7 @@ export default function MACDPage() {
               </Badge>
             ))}
             {dailyDivergences.some((d) => weeklyDivergences.some((w) => w.type === d.type)) && (
-              <Badge className="bg-orange-100 text-orange-800 font-bold">
+              <Badge className="bg-gray-100 text-gray-700">
                 日線+周線雙重背離
               </Badge>
             )}
@@ -726,7 +507,7 @@ export default function MACDPage() {
           {dualResults.length > 0 && (
             <div className="bg-white rounded-xl border p-6">
               <h2 className="text-xl font-bold mb-4">雙重背離（日線 + 周線同向）</h2>
-              <p className="text-sm text-gray-500 mb-4">最強訊號：兩個時間框架都確認動能背離</p>
+              <p className="text-sm text-gray-500 mb-4">兩個時間框架同向背離；不代表較高勝率</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -833,6 +614,8 @@ export default function MACDPage() {
           </div>
         )}
       </SignalMosaic>
+          </>}
+        </details>
     </div>
   );
 }

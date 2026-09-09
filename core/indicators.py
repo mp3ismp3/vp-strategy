@@ -558,7 +558,8 @@ def macd_turning_points(macd_values, mode="low"):
     turning points. Within each segment, all significant extrema are detected
     by finding points where the derivative changes sign.
 
-    This is parameter-free and robust because MACD is already smoothed by EMA.
+    Only confirmed slope reversals are returned; flat plateaus wait for reversal.
+    The first/last sample cannot be a turn without both-side evidence.
 
     Args:
         macd_values: 1-D numpy array of MACD line values.
@@ -577,56 +578,30 @@ def macd_turning_points(macd_values, mode="low"):
 
     points = []
 
-    # Find zero-crossing boundaries
+    # Zero is its own segment, so passing through zero cannot merge signs.
     crossings = [0]
     for i in range(1, n):
-        if values[i] * values[i - 1] < 0:
+        if np.sign(values[i]) != np.sign(values[i - 1]):
             crossings.append(i)
     crossings.append(n)
 
-    for seg_idx in range(len(crossings) - 1):
-        seg_start = crossings[seg_idx]
-        seg_end = crossings[seg_idx + 1]
+    for seg_start, seg_end in zip(crossings, crossings[1:]):
         seg = values[seg_start:seg_end]
-
-        if len(seg) < 2:
+        if mode == "low" and seg[0] >= 0:
             continue
-
-        if mode == "low":
-            # Only consider segments where MACD is negative (below zero)
-            if seg.mean() >= 0:
-                continue
-            # Find all local minima within this segment
-            seg_points = _find_segment_extrema(seg, seg_start, mode="min")
-            if seg_points:
-                points.extend(seg_points)
-            else:
-                # Fallback: absolute min of segment
-                local_idx = int(np.argmin(seg))
-                points.append({
-                    "index": seg_start + local_idx,
-                    "value": float(seg[local_idx]),
-                })
-        else:  # mode == "high"
-            # Only consider segments where MACD is positive (above zero)
-            if seg.mean() <= 0:
-                continue
-            # Find all local maxima within this segment
-            seg_points = _find_segment_extrema(seg, seg_start, mode="max")
-            if seg_points:
-                points.extend(seg_points)
-            else:
-                # Fallback: absolute max of segment
-                local_idx = int(np.argmax(seg))
-                points.append({
-                    "index": seg_start + local_idx,
-                    "value": float(seg[local_idx]),
-                })
+        if mode == "high" and seg[0] <= 0:
+            continue
+        # Neighbours confirm turns at a crossing, including one-bar segments.
+        points.extend(_find_segment_extrema(
+            seg, seg_start, mode="min" if mode == "low" else "max",
+            left=values[seg_start - 1] if seg_start > 0 else None,
+            right=values[seg_end] if seg_end < n else None,
+        ))
 
     return points
 
 
-def _find_segment_extrema(seg, seg_start, mode="min"):
+def _find_segment_extrema(seg, seg_start, mode="min", left=None, right=None):
     """Find local extrema within a MACD segment using derivative sign changes.
 
     Since MACD is already smoothed, we just look for direction reversals.
@@ -636,37 +611,29 @@ def _find_segment_extrema(seg, seg_start, mode="min"):
         seg: numpy array of values within one zero-crossing segment.
         seg_start: absolute index offset for this segment.
         mode: "min" or "max".
+        left, right: available adjacent values used to confirm boundary turns.
 
     Returns:
         List of dicts with index/value, or empty list.
     """
     import numpy as np
 
-    if len(seg) < 3:
-        return []
-
+    # Include available boundary neighbours, never invent a terminal turn.
+    values = ([left] if left is not None else []) + list(seg) + ([right] if right is not None else [])
+    offset = 1 if left is not None else 0
+    diff = np.diff(values)
+    nonzero = np.flatnonzero(diff)
     points = []
-    # Compute differences (sign of slope)
-    diff = np.diff(seg)
+    for prev, curr in zip(nonzero, nonzero[1:]):
+        i = int(prev + 1 - offset)
+        if not 0 <= i < len(seg):
+            continue
+        # Ignore a flat plateau until a strictly opposite slope confirms it.
+        if ((mode == "min" and diff[prev] < 0 and diff[curr] > 0) or
+                (mode == "max" and diff[prev] > 0 and diff[curr] < 0)):
+            points.append({"index": seg_start + i, "value": float(seg[i])})
 
-    for i in range(1, len(diff)):
-        if mode == "min":
-            # Slope goes from negative to positive (or zero) → local minimum
-            if diff[i - 1] < 0 and diff[i] >= 0:
-                points.append({
-                    "index": seg_start + i,
-                    "value": float(seg[i]),
-                })
-        else:  # mode == "max"
-            # Slope goes from positive to negative (or zero) → local maximum
-            if diff[i - 1] > 0 and diff[i] <= 0:
-                points.append({
-                    "index": seg_start + i,
-                    "value": float(seg[i]),
-                })
-
-    # If multiple points found, filter out insignificant ones
-    # (keep only those that are at least 20% of segment range from each other)
+    # Preserve the existing 15% within-segment significance filter.
     if len(points) > 1:
         seg_range = float(np.ptp(seg))
         if seg_range > 0:

@@ -216,6 +216,18 @@ Crypto Liquidity 頁面（`/crypto-liquidity`）提供登入後的 stablecoin su
 
 Scanner、Accumulation、Fusion、Strategy、Indicator、Liquidity、FVG 與 MACD 保留各自原有且適合圖表／表格的穩定版面，Crypto Liquidity 使用白底圓角 panel；不再以全域 selector 強制覆寫所有分析頁，避免巢狀 Indicator 與寬表格跑版。分析頁不使用裝飾性 emoji／小 icon，方向與狀態改由文字、Badge 與既有色彩表達。BTC／ETH ETF flow 在可靠來源完成評估前顯示 `Coming soon`，且不計入 Liquidity Bias。
 
+MACD／Indicator 與 `macd_scan.py` 使用 MACD 線（EMA12 − EMA26）判斷背離；穿越零值仍分開辨識正負區間，MACD 轉折必須有兩側反向斜率，走平與末端未反轉不視為確認。價格轉折仍需日線 5 根、週線 3 根後續 K 棒，圖上日期是價格轉折日，不是可即時得知的日期。
+
+日線圖表資料新增選用 `daily.captured_at`，由 `export_frontend_data.py` 在下載日線前記錄 UTC 時間。MACD／RVOL 依資料擷取當時的紐約時間判斷完成度，不依瀏覽器目前時間；同日日 K 在 16:00 ET 後才納入，夏／冬令時間自動換算，提早收盤日也保守等至 16:00。舊資料沒有擷取時間時排除最後一根，不會把舊盤中快照在隔日自動升格為完整日 K。週線按週一至週日日曆週聚合，只納入截至擷取時已過週五收盤的週；週一休市不合併兩週，週五休市會保守延後確認。Python MACD 正式掃描也依批次下載前時間排除未完成日／週 K。此完成度規則針對平台美股與 ETF，並非盤中同時段 RVOL，也未支援 24 小時市場。
+
+Indicator 預設分頁顯示「突破與回踩」，原 `/macd` 路徑保留。主畫面先呈現日 K／成交量圖與 RVOL 追蹤表；MACD 為預設收合的選看輔助區，展開後才載入其圖表，日週同向背離不標為最強訊號。判斷規則與 RVOL 分級收合；已到期形態預設隱藏，可勾選顯示，近期失效形態仍保留。一般量價圖沿用已授權 OHLC 的可見範圍，突破位與事件標記僅對付費方案顯示，RVOL 與 MACD 訊號明細各自沿用 Indicator 方案限制。RVOL = 指定已完成日 K 成交量／該日前 20 根日 K 均量（不含該日）；少於 21 根、無效量或均量零顯示資料不足。分級為 `<0.7` 明顯縮量、`0.7–<1` 普通、`1–<1.5` 有量、`1.5–2` 明顯放量、`>2` 異常大量。頁面標示分析日期、均量起訖、資料擷取時間，圖上成交量與均量均對齊同一個日 K 日期。
+
+價格形態明確稱為「突破 20 日高點」，不是 VP 壓力判斷。收盤突破前 20 日最高價後固定原突破位，RVOL `>=1.5` 為突破放量、`<1` 為突破量不足，其餘量能普通。追蹤後續 10 根日 K：未回踩保留等待狀態；觸及突破位上方容許範圍且收盤守住為回踩；最低價跌破下方容許範圍再收回則獨立標記「跌破後收復」，不標為一般縮量回踩。容許範圍在突破日固定為 `min(原突破價 × 0.5%, 突破前14根平均 True Range × 0.25)`，不隨後續波動擴大。回踩 RVOL `<0.7` 為縮量、`>=1.5` 為放量，其餘量能普通。
+
+收盤跌破原突破位即失效，超過 10 根則觀察期結束；終止狀態保留到原突破後第 20 根，之後不再展示，期間若出現新突破可建立新形態。正常追蹤中不因連創新高改變原突破位。事件日與事件 RVOL 一起保存，最新日 RVOL 另列，避免把過去回踩標籤配上今天量能。圖上標出原突破位、突破日與最新事件，表格顯示距原突破位百分比。這些是向上突破／回踩觀察規則，門檻尚未經真實市場績效驗證，不修改既有策略評分或 VP JSON schema；RVOL 未加入 Telegram。
+
+批次 MACD 掃描使用 America/New_York 的實際夏冬令時，不以固定 UTC−4 判斷收盤。
+
 Production gateway 必須設定 `TRUSTED_PROXY_MODE`：Vercel 使用 `vercel`；自架環境只有在最外層 proxy 會覆寫 forwarding headers 時才能使用 `x-forwarded-for`。Redis 故障時一般/data tier 保持 fail-open，但 auth/strict tier 在 production 回 `503` fail-closed。全站回應包含 CSP、HSTS、nosniff、referrer 與 permissions security headers。
 
 Frontend 以 `npm run lint` 作為零 error／零 warning gate；Next.js 16 Route Handler 的 `Request` 參數維持必填，確保 production type generation 可通過。Supabase ticker requests 會忽略已切換頁面後才返回的舊 response，indicator auto-scan 則在 effect 後排程，避免同步 state cascade，同時保持原本的自動載入行為。首頁 Hero 以 `SMART STRATEGY` 作為展示名稱，採響應式左右分欄宣傳排版，左側使用一般使用者可理解的市場分析文案，右側只顯示無文字的原生動態交易趨勢圖；四大策略卡片不顯示裝飾性 emoji。品牌 icon 使用 `services/frontend/public/ptrade.svg`，登入頁、Navbar 與瀏覽器 icon 共用同一份 SVG 資產。
