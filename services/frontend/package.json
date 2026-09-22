@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "backtest:liquidity": "vitest run --config vitest.liquidity-backtest.config.ts"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.2",

@@ -6,6 +6,7 @@ import type { Annotations, Data, Layout } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
+import { RvolFacts } from "@/components/RvolFacts";
 import { analyzeRvol, type RvolAnalysis } from "@/lib/rvol";
 import { completedDailyBars, completedWeeklyBars } from "@/lib/market-bars";
 import { buildRvolChart } from "@/lib/rvol-chart";
@@ -377,6 +378,7 @@ export default function MACDPage() {
           {loading && <p role="status">載入量價圖表…</p>}
           {!loading && ohlc.length === 0 && <p>尚無已完成日 K 資料。</p>}
           <SignalMosaic locked={!isPaid}>
+          {!loading && <RvolFacts analysis={currentRvol} bars={ohlc} />}
           <details className="text-sm mb-4">
             <summary className="cursor-pointer font-medium">判斷規則與 RVOL 分級</summary>
           <p className="text-sm text-gray-600 mb-3">
@@ -423,7 +425,7 @@ export default function MACDPage() {
             </table>
           </div>
           {!scanning && visibleRvolResults.length === 0 && <p className="text-sm text-gray-500 mt-2">目前資料沒有追蹤中的量價形態。</p>}
-          <p className="text-sm text-gray-500 mt-3">回踩縮量需搭配原突破量能閱讀；突破量不足或回踩放量代表量能未支持形態，並不等於必然失敗。</p>
+          <p className="text-sm text-gray-500 mt-3">表格保留最近事件的日期與當日 RVOL；歷史回踩紀錄不代表最新日再次出現回踩。</p>
           </SignalMosaic>
         </section>
         <details className="rounded-xl border bg-white p-4 mt-6" onToggle={event => setShowMacd(event.currentTarget.open)}>

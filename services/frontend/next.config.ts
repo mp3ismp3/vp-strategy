@@ -29,6 +29,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Next's CLI capture can return empty `tsc --showConfig` output under Node 22.
+    // Use the installed TypeScript compiler API for the same production check.
+    useTypeScriptCli: false,
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

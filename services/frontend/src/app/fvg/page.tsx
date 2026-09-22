@@ -6,6 +6,9 @@ import type { Annotations, Data, Layout, Shape } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
+import { IndicatorFacts } from "@/components/IndicatorFacts";
+import { buildFvgReview } from "@/lib/fvg-review";
+import { completedDailyBars } from "@/lib/market-bars";
 import {
   filterIndicatorItems,
   getIndicatorCategories,
@@ -282,6 +285,7 @@ export default function FVGPage() {
   const isPaid = accessPlan === "pro" || accessPlan === "premium";
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
+  const [capturedAt, setCapturedAt] = useState<string | undefined>();
   const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
@@ -302,10 +306,13 @@ export default function FVGPage() {
     fetch(`/api/data/chart-data?ticker=${encodeURIComponent(effectiveTicker)}`)
       .then(async (response) => response.ok ? response.json() : Promise.reject())
       .then((chart) => {
-        if (!cancelled) setOhlc(chart?.daily?.ohlc || []);
+        if (!cancelled) {
+          setOhlc(completedDailyBars(chart?.daily?.ohlc || [], chart?.daily?.captured_at));
+          setCapturedAt(chart?.daily?.captured_at);
+        }
       })
       .catch(() => {
-        if (!cancelled) setOhlc([]);
+        if (!cancelled) { setOhlc([]); setCapturedAt(undefined); }
       })
       .finally(() => {
         if (!cancelled) setLoadedTicker(effectiveTicker);
@@ -326,6 +333,10 @@ export default function FVGPage() {
     [fvgs, showFilled]
   );
 
+  const factReviews = useMemo(() => visibleFvgs.length
+    ? [...visibleFvgs].reverse().map(record => buildFvgReview(record, ohlc))
+    : [buildFvgReview(null, ohlc)], [visibleFvgs, ohlc]);
+
   const bullishCount = visibleFvgs.filter((f) => f.type === "bullish").length;
   const bearishCount = visibleFvgs.filter((f) => f.type === "bearish").length;
 
@@ -335,7 +346,7 @@ export default function FVGPage() {
     const response = await fetch("/api/data/chart-data?include=data");
     const chartRows = (response.ok ? await response.json() : {}) as Record<
       string,
-      { daily?: { ohlc?: OHLCBar[] } }
+      { daily?: { ohlc?: OHLCBar[]; captured_at?: string } }
     >;
     const rows = Object.entries(chartRows).map(([ticker, data]) => ({ ticker, data }));
 
@@ -343,7 +354,7 @@ export default function FVGPage() {
 
     if (rows) {
       for (const row of filterIndicatorItems(rows, accessPlan)) {
-        const dailyOhlc: OHLCBar[] = row.data?.daily?.ohlc || [];
+        const dailyOhlc = completedDailyBars(row.data?.daily?.ohlc || [], row.data?.daily?.captured_at);
         if (dailyOhlc.length < 30) continue;
 
         const gaps = detectFVG(dailyOhlc, maxAge + 2, 0.5);
@@ -459,6 +470,7 @@ export default function FVGPage() {
 
       {/* Signal details */}
       <SignalMosaic locked={!isPaid}>
+        {!loading && <IndicatorFacts key={effectiveTicker} name="FVG" reviews={factReviews} capturedAt={capturedAt} />}
         {visibleFvgs.length > 0 && (
           <div className="bg-white rounded-xl border p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">

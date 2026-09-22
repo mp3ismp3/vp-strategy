@@ -6,6 +6,12 @@ import type { Annotations, Data, Layout, Shape } from "plotly.js";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { SignalMosaic } from "@/components/SignalMosaic";
+import { IndicatorFacts } from "@/components/IndicatorFacts";
+import { LiquidityGuide } from "@/components/LiquidityGuide";
+import { buildSweepReview } from "@/lib/sweep-review";
+import { analyzeLiquidity, type LiquidityLevel, type SweepEvent } from "@/lib/liquidity";
+import { validateLiquidityStrategy, type LiquidityEventAssessment } from "@/lib/liquidity-validation";
+import { completedDailyBars } from "@/lib/market-bars";
 import {
   getIndicatorCategories,
   isIndicatorTickerAllowed,
@@ -22,434 +28,6 @@ interface OHLCBar {
   low: number;
   close: number;
   volume: number;
-}
-
-interface LiquidityLevel {
-  price: number;
-  type: "high" | "low";
-  source: "EQH" | "EQL" | "PDH" | "PDL" | "PWH" | "PWL" | "Swing";
-  startTime: string;
-  startIndex: number;
-  touches: number; // how many times tested
-  swept: boolean;
-  sweepIndex?: number;
-  sweepTime?: string;
-}
-
-interface SweepEvent {
-  index: number;
-  time: string;
-  direction: "bullish" | "bearish";
-  level: LiquidityLevel;
-  wickExtreme: number;
-  closePrice: number;
-  volumeRatio: number;
-}
-
-// ─── Algo: ATR Calculation ───────────────────────────────────────────────────
-
-function calcATR(ohlc: OHLCBar[], period: number = 14): number {
-  if (ohlc.length < period + 1) return 0;
-  const trs: number[] = [];
-  for (let i = 1; i < ohlc.length; i++) {
-    const tr = Math.max(
-      ohlc[i].high - ohlc[i].low,
-      Math.abs(ohlc[i].high - ohlc[i - 1].close),
-      Math.abs(ohlc[i].low - ohlc[i - 1].close)
-    );
-    trs.push(tr);
-  }
-  const recent = trs.slice(-period);
-  return recent.reduce((a, b) => a + b, 0) / recent.length;
-}
-
-// ─── Algo: Significant Swing Points (ATR-filtered) ───────────────────────────
-
-function detectSignificantSwings(
-  ohlc: OHLCBar[],
-  lookback: number = 10,
-  minAtrMultiple: number = 1.0
-): { highs: { index: number; price: number }[]; lows: { index: number; price: number }[] } {
-  const atr = calcATR(ohlc, 14);
-  const minSwingSize = atr * minAtrMultiple;
-
-  const highs: { index: number; price: number }[] = [];
-  const lows: { index: number; price: number }[] = [];
-
-  for (let i = lookback; i < ohlc.length - lookback; i++) {
-    // Swing High check
-    let isHigh = true;
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j === i) continue;
-      if (ohlc[j].high >= ohlc[i].high) {
-        isHigh = false;
-        break;
-      }
-    }
-    if (isHigh) {
-      // Check significance: swing must be at least 1 ATR above surrounding lows
-      const surroundingLows = ohlc.slice(Math.max(0, i - lookback), i + lookback + 1).map(b => b.low);
-      const minLow = Math.min(...surroundingLows);
-      if (ohlc[i].high - minLow >= minSwingSize) {
-        highs.push({ index: i, price: ohlc[i].high });
-      }
-    }
-
-    // Swing Low check
-    let isLow = true;
-    for (let j = i - lookback; j <= i + lookback; j++) {
-      if (j === i) continue;
-      if (ohlc[j].low <= ohlc[i].low) {
-        isLow = false;
-        break;
-      }
-    }
-    if (isLow) {
-      const surroundingHighs = ohlc.slice(Math.max(0, i - lookback), i + lookback + 1).map(b => b.high);
-      const maxHigh = Math.max(...surroundingHighs);
-      if (maxHigh - ohlc[i].low >= minSwingSize) {
-        lows.push({ index: i, price: ohlc[i].low });
-      }
-    }
-  }
-
-  return { highs, lows };
-}
-
-// ─── Algo: Equal Highs / Equal Lows Detection ───────────────────────────────
-
-function detectEqualLevels(
-  swingHighs: { index: number; price: number }[],
-  swingLows: { index: number; price: number }[],
-  tolerancePct: number = 0.003
-): { eqHighs: { price: number; indices: number[] }[]; eqLows: { price: number; indices: number[] }[] } {
-  const eqHighs: { price: number; indices: number[] }[] = [];
-  const eqLows: { price: number; indices: number[] }[] = [];
-
-  // Find equal highs (two or more swing highs within tolerance)
-  const usedH = new Set<number>();
-  for (let i = 0; i < swingHighs.length; i++) {
-    if (usedH.has(i)) continue;
-    const cluster = [swingHighs[i]];
-    for (let j = i + 1; j < swingHighs.length; j++) {
-      if (usedH.has(j)) continue;
-      const diff = Math.abs(swingHighs[j].price - swingHighs[i].price) / swingHighs[i].price;
-      if (diff <= tolerancePct) {
-        cluster.push(swingHighs[j]);
-        usedH.add(j);
-      }
-    }
-    if (cluster.length >= 2) {
-      usedH.add(i);
-      const avgPrice = cluster.reduce((sum, c) => sum + c.price, 0) / cluster.length;
-      eqHighs.push({ price: avgPrice, indices: cluster.map(c => c.index) });
-    }
-  }
-
-  // Find equal lows
-  const usedL = new Set<number>();
-  for (let i = 0; i < swingLows.length; i++) {
-    if (usedL.has(i)) continue;
-    const cluster = [swingLows[i]];
-    for (let j = i + 1; j < swingLows.length; j++) {
-      if (usedL.has(j)) continue;
-      const diff = Math.abs(swingLows[j].price - swingLows[i].price) / swingLows[i].price;
-      if (diff <= tolerancePct) {
-        cluster.push(swingLows[j]);
-        usedL.add(j);
-      }
-    }
-    if (cluster.length >= 2) {
-      usedL.add(i);
-      const avgPrice = cluster.reduce((sum, c) => sum + c.price, 0) / cluster.length;
-      eqLows.push({ price: avgPrice, indices: cluster.map(c => c.index) });
-    }
-  }
-
-  return { eqHighs, eqLows };
-}
-
-// ─── Algo: PDH/PDL/PWH/PWL Detection ────────────────────────────────────────
-
-function detectSessionLevels(ohlc: OHLCBar[]): {
-  pdh: number | null; pdl: number | null;
-  pwh: number | null; pwl: number | null;
-  pdhIndex: number; pdlIndex: number;
-  pwhIndex: number; pwlIndex: number;
-} {
-  const result = { pdh: null as number | null, pdl: null as number | null, pwh: null as number | null, pwl: null as number | null, pdhIndex: 0, pdlIndex: 0, pwhIndex: 0, pwlIndex: 0 };
-  if (ohlc.length < 10) return result;
-
-  // Group bars by day
-  const days: { bars: OHLCBar[]; startIdx: number }[] = [];
-  let currentDay = "";
-  for (let i = 0; i < ohlc.length; i++) {
-    const day = ohlc[i].time.slice(0, 10);
-    if (day !== currentDay) {
-      days.push({ bars: [ohlc[i]], startIdx: i });
-      currentDay = day;
-    } else {
-      days[days.length - 1].bars.push(ohlc[i]);
-    }
-  }
-
-  // Previous Day High/Low (second to last day)
-  if (days.length >= 2) {
-    const prevDay = days[days.length - 2];
-    const highs = prevDay.bars.map(b => b.high);
-    const lows = prevDay.bars.map(b => b.low);
-    result.pdh = Math.max(...highs);
-    result.pdl = Math.min(...lows);
-    result.pdhIndex = prevDay.startIdx + highs.indexOf(result.pdh);
-    result.pdlIndex = prevDay.startIdx + lows.indexOf(result.pdl);
-  }
-
-  // Group bars by week (Monday = new week)
-  const weeks: { bars: OHLCBar[]; startIdx: number }[] = [];
-  let currentWeekStart = "";
-  for (let i = 0; i < ohlc.length; i++) {
-    const d = new Date(ohlc[i].time);
-    // Get Monday of this week
-    const dayOfWeek = d.getDay();
-    const monday = new Date(d);
-    monday.setDate(d.getDate() - ((dayOfWeek + 6) % 7));
-    const weekKey = monday.toISOString().slice(0, 10);
-
-    if (weekKey !== currentWeekStart) {
-      weeks.push({ bars: [ohlc[i]], startIdx: i });
-      currentWeekStart = weekKey;
-    } else {
-      weeks[weeks.length - 1].bars.push(ohlc[i]);
-    }
-  }
-
-  // Previous Week High/Low
-  if (weeks.length >= 2) {
-    const prevWeek = weeks[weeks.length - 2];
-    const highs = prevWeek.bars.map(b => b.high);
-    const lows = prevWeek.bars.map(b => b.low);
-    result.pwh = Math.max(...highs);
-    result.pwl = Math.min(...lows);
-    result.pwhIndex = prevWeek.startIdx + highs.indexOf(result.pwh);
-    result.pwlIndex = prevWeek.startIdx + lows.indexOf(result.pwl);
-  }
-
-  return result;
-}
-
-// ─── Algo: Build Liquidity Levels ────────────────────────────────────────────
-
-function buildLiquidityLevels(ohlc: OHLCBar[]): LiquidityLevel[] {
-  if (ohlc.length < 30) return [];
-
-  const levels: LiquidityLevel[] = [];
-
-  // 1. Detect significant swings
-  const { highs, lows } = detectSignificantSwings(ohlc, 10, 1.0);
-
-  // 2. Detect Equal Highs / Equal Lows (highest priority)
-  const { eqHighs, eqLows } = detectEqualLevels(highs, lows, 0.003);
-
-  for (const eq of eqHighs) {
-    const firstIdx = Math.min(...eq.indices);
-    levels.push({
-      price: Math.round(eq.price * 100) / 100,
-      type: "high",
-      source: "EQH",
-      startTime: ohlc[firstIdx].time,
-      startIndex: firstIdx,
-      touches: eq.indices.length,
-      swept: false,
-    });
-  }
-
-  for (const eq of eqLows) {
-    const firstIdx = Math.min(...eq.indices);
-    levels.push({
-      price: Math.round(eq.price * 100) / 100,
-      type: "low",
-      source: "EQL",
-      startTime: ohlc[firstIdx].time,
-      startIndex: firstIdx,
-      touches: eq.indices.length,
-      swept: false,
-    });
-  }
-
-  // 3. PDH/PDL/PWH/PWL
-  const session = detectSessionLevels(ohlc);
-
-  if (session.pdh !== null) {
-    levels.push({
-      price: Math.round(session.pdh * 100) / 100,
-      type: "high",
-      source: "PDH",
-      startTime: ohlc[session.pdhIndex].time,
-      startIndex: session.pdhIndex,
-      touches: 1,
-      swept: false,
-    });
-  }
-  if (session.pdl !== null) {
-    levels.push({
-      price: Math.round(session.pdl * 100) / 100,
-      type: "low",
-      source: "PDL",
-      startTime: ohlc[session.pdlIndex].time,
-      startIndex: session.pdlIndex,
-      touches: 1,
-      swept: false,
-    });
-  }
-  if (session.pwh !== null) {
-    levels.push({
-      price: Math.round(session.pwh * 100) / 100,
-      type: "high",
-      source: "PWH",
-      startTime: ohlc[session.pwhIndex].time,
-      startIndex: session.pwhIndex,
-      touches: 1,
-      swept: false,
-    });
-  }
-  if (session.pwl !== null) {
-    levels.push({
-      price: Math.round(session.pwl * 100) / 100,
-      type: "low",
-      source: "PWL",
-      startTime: ohlc[session.pwlIndex].time,
-      startIndex: session.pwlIndex,
-      touches: 1,
-      swept: false,
-    });
-  }
-
-  // 4. Remaining significant swings (not already part of EQH/EQL)
-  const eqHighPrices = new Set(eqHighs.flatMap(e => e.indices));
-  const eqLowPrices = new Set(eqLows.flatMap(e => e.indices));
-
-  for (const h of highs) {
-    if (eqHighPrices.has(h.index)) continue;
-    // Skip if too close to PDH or PWH
-    if (session.pdh && Math.abs(h.price - session.pdh) / session.pdh < 0.003) continue;
-    if (session.pwh && Math.abs(h.price - session.pwh) / session.pwh < 0.003) continue;
-    levels.push({
-      price: Math.round(h.price * 100) / 100,
-      type: "high",
-      source: "Swing",
-      startTime: ohlc[h.index].time,
-      startIndex: h.index,
-      touches: 1,
-      swept: false,
-    });
-  }
-
-  for (const l of lows) {
-    if (eqLowPrices.has(l.index)) continue;
-    if (session.pdl && Math.abs(l.price - session.pdl) / session.pdl < 0.003) continue;
-    if (session.pwl && Math.abs(l.price - session.pwl) / session.pwl < 0.003) continue;
-    levels.push({
-      price: Math.round(l.price * 100) / 100,
-      type: "low",
-      source: "Swing",
-      startTime: ohlc[l.index].time,
-      startIndex: l.index,
-      touches: 1,
-      swept: false,
-    });
-  }
-
-  return levels;
-}
-
-// ─── Algo: Sweep Detection on Liquidity Levels ───────────────────────────────
-
-function detectSweeps(ohlc: OHLCBar[], levels: LiquidityLevel[]): SweepEvent[] {
-  const sweeps: SweepEvent[] = [];
-  if (ohlc.length < 20 || levels.length === 0) return sweeps;
-
-  // Volume median for each bar
-  const volMedian = ohlc.map((_, i) => {
-    if (i < 19) return ohlc[i].volume;
-    const window = ohlc.slice(i - 19, i + 1).map((b) => b.volume);
-    const sorted = [...window].sort((a, b) => a - b);
-    return (sorted[9] + sorted[10]) / 2;
-  });
-
-  for (const level of levels) {
-    // Only check bars after the level was established
-    const startCheck = level.startIndex + 3;
-
-    for (let i = Math.max(startCheck, 10); i < ohlc.length; i++) {
-      const bar = ohlc[i];
-      const barRange = bar.high - bar.low;
-      if (barRange === 0) continue;
-
-      const vRatio = bar.volume / volMedian[i];
-
-      if (level.type === "high") {
-        // Bearish sweep: wick above level, close below
-        if (bar.high > level.price && bar.close < level.price) {
-          const penetration = (bar.high - level.price) / level.price;
-          if (penetration < 0.0005 || penetration > 0.03) continue;
-          if (vRatio < 1.0) continue;
-
-          // Close should be in lower portion (rejection)
-          const closeStrength = (bar.high - bar.close) / barRange;
-          if (closeStrength < 0.3) continue;
-
-          // Avoid duplicates on same level
-          if (level.swept) continue;
-
-          level.swept = true;
-          level.sweepIndex = i;
-          level.sweepTime = bar.time;
-
-          sweeps.push({
-            index: i,
-            time: bar.time,
-            direction: "bearish",
-            level,
-            wickExtreme: bar.high,
-            closePrice: bar.close,
-            volumeRatio: vRatio,
-          });
-          break; // one sweep per level
-        }
-      } else {
-        // Bullish sweep: wick below level, close above
-        if (bar.low < level.price && bar.close > level.price) {
-          const penetration = (level.price - bar.low) / level.price;
-          if (penetration < 0.0005 || penetration > 0.03) continue;
-          if (vRatio < 1.0) continue;
-
-          const closeStrength = (bar.close - bar.low) / barRange;
-          if (closeStrength < 0.3) continue;
-
-          if (level.swept) continue;
-
-          level.swept = true;
-          level.sweepIndex = i;
-          level.sweepTime = bar.time;
-
-          sweeps.push({
-            index: i,
-            time: bar.time,
-            direction: "bullish",
-            level,
-            wickExtreme: bar.low,
-            closePrice: bar.close,
-            volumeRatio: vRatio,
-          });
-          break;
-        }
-      }
-    }
-  }
-
-  // Sort by index (chronological)
-  sweeps.sort((a, b) => a.index - b.index);
-  return sweeps;
 }
 
 // ─── Source Colors ───────────────────────────────────────────────────────────
@@ -474,6 +52,7 @@ export default function LiquidityPage() {
   const isPaid = accessPlan === "pro" || accessPlan === "premium";
   const [selectedTicker, setSelectedTicker] = useState("NVDA");
   const [ohlc, setOhlc] = useState<OHLCBar[]>([]);
+  const [capturedAt, setCapturedAt] = useState<string | undefined>();
   const [loadedTicker, setLoadedTicker] = useState<string | null>(null);
   const [enabledSources, setEnabledSources] = useState<Set<SourceFilter>>(
     new Set(["EQH", "EQL", "PDH", "PDL", "PWH", "PWL", "Swing"])
@@ -494,10 +73,13 @@ export default function LiquidityPage() {
     fetch(`/api/data/chart-data?ticker=${encodeURIComponent(effectiveTicker)}`)
       .then(async (response) => response.ok ? response.json() : Promise.reject())
       .then((chart) => {
-        if (!cancelled) setOhlc(chart?.daily?.ohlc || []);
+        if (!cancelled) {
+          setOhlc(completedDailyBars(chart?.daily?.ohlc || [], chart?.daily?.captured_at));
+          setCapturedAt(chart?.daily?.captured_at);
+        }
       })
       .catch(() => {
-        if (!cancelled) setOhlc([]);
+        if (!cancelled) { setOhlc([]); setCapturedAt(undefined); }
       })
       .finally(() => {
         if (!cancelled) setLoadedTicker(effectiveTicker);
@@ -508,8 +90,10 @@ export default function LiquidityPage() {
   }, [effectiveTicker]);
 
   // Compute liquidity levels and sweeps
-  const levels = useMemo(() => buildLiquidityLevels(ohlc), [ohlc]);
-  const sweeps = useMemo(() => detectSweeps(ohlc, levels), [ohlc, levels]);
+  const liquidity = useMemo(() => analyzeLiquidity(ohlc), [ohlc]);
+  const levels = liquidity.levels;
+  const sweeps = liquidity.sweeps;
+  const validation = useMemo(() => validateLiquidityStrategy(ohlc, sweeps), [ohlc, sweeps]);
 
   // Filter levels by enabled sources
   const visibleLevels = useMemo(
@@ -522,8 +106,24 @@ export default function LiquidityPage() {
     [sweeps, enabledSources]
   );
 
-  const bullishSweeps = visibleSweeps.filter((s) => s.direction === "bullish");
-  const bearishSweeps = visibleSweeps.filter((s) => s.direction === "bearish");
+  const visibleSignals = useMemo(
+    () => validation.signals.filter((signal) => enabledSources.has(signal.level.source)),
+    [validation.signals, enabledSources]
+  );
+  const assessmentByEvent = useMemo(() => new Map(
+    validation.assessments.map(assessment => [assessment.event, assessment]),
+  ), [validation.assessments]);
+  const visiblePositiveSweeps = useMemo(() => visibleSweeps.filter(event => {
+    const assessment = assessmentByEvent.get(event);
+    return !assessment?.exclusion && assessment?.validity.status !== "valid" && assessment?.validity.bias === "positive";
+  }), [visibleSweeps, assessmentByEvent]);
+
+  const factReviews = useMemo(() => visibleSweeps.length
+    ? [...visibleSweeps].reverse().map(record => buildSweepReview(record, ohlc))
+    : [buildSweepReview(null, ohlc)], [visibleSweeps, ohlc]);
+
+  const bullishSignals = visibleSignals.filter((s) => s.direction === "bullish");
+  const bearishSignals = visibleSignals.filter((s) => s.direction === "bearish");
 
   // Count by source
   const levelCounts = useMemo(() => {
@@ -553,10 +153,12 @@ export default function LiquidityPage() {
         <div>
           <h1 className="text-3xl font-bold">Liquidity Sweep</h1>
           <p className="text-gray-600 mt-1">
-            專業級流動性掃蕩偵測 — Equal Highs/Lows、PDH/PDL/PWH/PWL、顯著 Swing
+            價格流動性水平與 Sweep 回看 — Equal Highs/Lows、前日／前週高低、已確認 Swing
           </p>
         </div>
       </div>
+
+      <LiquidityGuide />
 
       {/* Controls */}
       <div className="bg-white rounded-xl border p-4 mb-6 space-y-3">
@@ -591,10 +193,13 @@ export default function LiquidityPage() {
 
           <div className="flex items-center gap-3 ml-auto">
             <Badge className="bg-green-100 text-green-800">
-              Bullish: {bullishSweeps.length}
+              Bullish 歷史門檻信號: {bullishSignals.length}
             </Badge>
             <Badge className="bg-red-100 text-red-800">
-              Bearish: {bearishSweeps.length}
+              Bearish 歷史門檻信號: {bearishSignals.length}
+            </Badge>
+            <Badge className="bg-blue-100 text-blue-800">
+              偏正觀察: {visiblePositiveSweeps.length}
             </Badge>
           </div>
         </div>
@@ -638,13 +243,18 @@ export default function LiquidityPage() {
             ticker={effectiveTicker}
             ohlc={ohlc}
             levels={visibleLevels}
-            sweeps={visibleSweeps}
+            sweeps={visibleSignals}
+            watchSweeps={visiblePositiveSweeps}
           />
         )}
       </div>
 
       {/* Signal details */}
       <SignalMosaic locked={!isPaid}>
+        {!loading && <LiquidityValidationSummary result={validation} />}
+        {/* IndicatorFacts provides the 選擇分析紀錄 control and separates event from 後續收盤. */}
+        {!loading && <IndicatorFacts key={effectiveTicker} name="Sweep" reviews={factReviews} capturedAt={capturedAt} />}
+        {visibleSweeps.length === 0 && <p className="mb-6 text-sm text-gray-600">尚無符合條件的掃蕩；這不代表所有水平都沒有被穿越。</p>}
         {/* Liquidity Levels Table */}
         {visibleLevels.length > 0 && (
         <div className="bg-white rounded-xl border p-6 mb-6">
@@ -656,7 +266,7 @@ export default function LiquidityPage() {
                   <th className="text-left p-3">來源</th>
                   <th className="text-left p-3">方向</th>
                   <th className="text-left p-3">價位</th>
-                  <th className="text-left p-3">建立日期</th>
+                  <th className="text-left p-3">來源／確認日期</th>
                   <th className="text-left p-3">觸碰次數</th>
                   <th className="text-left p-3">狀態</th>
                 </tr>
@@ -682,7 +292,7 @@ export default function LiquidityPage() {
                       )}
                     </td>
                     <td className="p-3 font-mono font-medium">${level.price.toFixed(2)}</td>
-                    <td className="p-3 font-mono text-gray-600">{level.startTime}</td>
+                    <td className="p-3 font-mono text-gray-600">來源日期 {level.startTime}<br />確認日期 {level.confirmedTime}</td>
                     <td className="p-3">
                       {level.touches >= 2 ? (
                         <span className="font-bold text-orange-600">{level.touches}x</span>
@@ -694,7 +304,7 @@ export default function LiquidityPage() {
                       {level.swept ? (
                         <Badge className="bg-gray-100 text-gray-500">已掃蕩 ({level.sweepTime})</Badge>
                       ) : (
-                        <Badge className="bg-blue-100 text-blue-700 font-medium">有效</Badge>
+                        <Badge className="bg-blue-100 text-blue-700 font-medium">尚未掃蕩</Badge>
                       )}
                     </td>
                   </tr>
@@ -720,6 +330,7 @@ export default function LiquidityPage() {
                   <th className="text-left p-3">Wick 極值</th>
                   <th className="text-left p-3">收盤</th>
                   <th className="text-left p-3">量比</th>
+                  <th className="text-left p-3">有效性</th>
                 </tr>
               </thead>
               <tbody>
@@ -749,6 +360,7 @@ export default function LiquidityPage() {
                         {s.volumeRatio.toFixed(2)}x
                       </span>
                     </td>
+                    <td className="p-3"><ValidityBadge assessment={assessmentByEvent.get(s)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -761,6 +373,46 @@ export default function LiquidityPage() {
   );
 }
 
+function percent(value: number | null): string {
+  return value === null ? "資料不足" : `${(value * 100).toFixed(2)}%`;
+}
+
+function LiquidityValidationSummary({ result }: { result: ReturnType<typeof validateLiquidityStrategy> }) {
+  return (
+    <div className="bg-white rounded-xl border p-6 mb-6">
+      <h2 className="text-xl font-bold mb-3">固定規則回測</h2>
+      <p className="text-sm text-gray-700 mb-3">
+        下一交易日開盤進場、第五個交易日收盤出場、扣除來回 0.10% 成本。同日同方向只計一筆，多空衝突或既有持倉尚未結束時不重複進場；沒有挑選最佳參數。
+      </p>
+      <div className="space-y-3">
+        {(["bullish", "bearish"] as const).map(direction => {
+          const validation = result.currentValidityByDirection[direction];
+          const label = validation.status === "valid" ? "已通過" : validation.status === "insufficient" ? "樣本不足" : "未通過";
+          return <div key={direction} className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm border-t pt-3">
+            <div><span className="text-gray-500">方向</span><br /><strong>{direction === "bullish" ? "Bullish" : "Bearish"}</strong> <Badge className={validation.status === "valid" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>{label}</Badge>{validation.bias === "positive" && validation.status !== "valid" && <><br /><Badge className="mt-1 bg-blue-100 text-blue-800">偏正觀察（非信號）</Badge></>}</div>
+            <div><span className="text-gray-500">完成交易</span><br /><strong>{validation.sampleSize}</strong></div>
+            <div><span className="text-gray-500">平均淨報酬</span><br /><strong>{percent(validation.meanNetReturn)}</strong></div>
+            <div><span className="text-gray-500">95% 下限</span><br /><strong>{percent(validation.lowerConfidenceBound)}</strong></div>
+            <div><span className="text-gray-500">中位數</span><br /><strong>{percent(validation.medianNetReturn)}</strong></div>
+            <div><span className="text-gray-500">勝率</span><br /><strong>{percent(validation.winRate)}</strong></div>
+          </div>;
+        })}
+      </div>
+      <p className="text-xs text-gray-500 mt-3">平均淨報酬、中位數與勝率三者偏正時會標記「偏正觀察」，可搭配其他指標的同日期已完成資料做人工確認，但不會自動加分或成為信號。多空分開驗證；只有事件發生前同方向已有至少 20 筆完成交易，且當時的 95% 下限與中位數皆為正，該事件才會成為歷史門檻信號；回測事件本身不會反過來替自己背書，也不代表未來績效已獲證明。</p>
+    </div>
+  );
+}
+
+function ValidityBadge({ assessment }: { assessment?: LiquidityEventAssessment }) {
+  if (assessment?.exclusion === "direction-conflict") return <Badge className="bg-gray-100 text-gray-600">方向衝突</Badge>;
+  if (assessment?.exclusion === "overlapping-position") return <Badge className="bg-gray-100 text-gray-600">持倉重疊</Badge>;
+  if (assessment?.exclusion === "same-day-duplicate") return <Badge className="bg-gray-100 text-gray-600">同日重複</Badge>;
+  if (assessment?.validity.status === "valid") return <Badge className="bg-green-100 text-green-800">歷史門檻信號</Badge>;
+  if (assessment?.validity.bias === "positive") return <Badge className="bg-blue-100 text-blue-800">偏正觀察（非信號）</Badge>;
+  if (assessment?.validity.status === "not-valid") return <Badge className="bg-red-100 text-red-700">未通過</Badge>;
+  return <Badge className="bg-amber-100 text-amber-800">樣本不足</Badge>;
+}
+
 // ─── Chart Component ─────────────────────────────────────────────────────────
 
 interface LiquidityChartProps {
@@ -768,9 +420,10 @@ interface LiquidityChartProps {
   ohlc: OHLCBar[];
   levels: LiquidityLevel[];
   sweeps: SweepEvent[];
+  watchSweeps: SweepEvent[];
 }
 
-function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
+function LiquidityChart({ ticker, ohlc, levels, sweeps, watchSweeps }: LiquidityChartProps) {
   const times = ohlc.map((b) => b.time);
 
   // Candlestick
@@ -816,7 +469,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
       type: "line",
       xref: "x",
       yref: "y",
-      x0: ohlc[level.startIndex].time,
+      x0: ohlc[level.confirmedIndex].time,
       x1: ohlc[endIdx].time,
       y0: level.price,
       y1: level.price,
@@ -832,7 +485,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
   const annotations: Partial<Annotations>[] = levels.map((level) => {
     const color = SOURCE_COLORS[level.source]?.line || "#999";
     return {
-      x: ohlc[level.startIndex].time,
+      x: ohlc[level.confirmedIndex].time,
       y: level.price,
       xref: "x",
       yref: "y",
@@ -844,7 +497,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     };
   });
 
-  // Sweep markers
+  // Only events that passed the fixed historical threshold are signal markers.
   const bullSweeps = sweeps.filter((s) => s.direction === "bullish");
   const bearSweeps = sweeps.filter((s) => s.direction === "bearish");
 
@@ -854,11 +507,11 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     y: bullSweeps.map((s) => s.wickExtreme),
     mode: "text+markers",
     marker: { symbol: "star", size: 14, color: "#4caf50", line: { width: 1, color: "#1b5e20" } },
-    text: bullSweeps.map((s) => `SWEEP ${s.level.source}`),
+    text: bullSweeps.map((s) => `SIGNAL ${s.level.source}`),
     textposition: "bottom center",
     textfont: { size: 9, color: "#4caf50" },
-    name: "Bullish Sweep",
-    hovertemplate: "Bullish Sweep<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
+    name: "Bullish 歷史門檻信號",
+    hovertemplate: "Bullish 歷史門檻信號<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
     customdata: bullSweeps.map((s) => [s.level.source, s.level.price, s.volumeRatio]),
     xaxis: "x",
     yaxis: "y",
@@ -870,12 +523,28 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
     y: bearSweeps.map((s) => s.wickExtreme),
     mode: "text+markers",
     marker: { symbol: "star", size: 14, color: "#f44336", line: { width: 1, color: "#b71c1c" } },
-    text: bearSweeps.map((s) => `SWEEP ${s.level.source}`),
+    text: bearSweeps.map((s) => `SIGNAL ${s.level.source}`),
     textposition: "top center",
     textfont: { size: 9, color: "#f44336" },
-    name: "Bearish Sweep",
-    hovertemplate: "Bearish Sweep<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
+    name: "Bearish 歷史門檻信號",
+    hovertemplate: "Bearish 歷史門檻信號<br>Level: %{customdata[0]}<br>$%{customdata[1]:.2f}<br>Vol: %{customdata[2]:.1f}x<extra></extra>",
     customdata: bearSweeps.map((s) => [s.level.source, s.level.price, s.volumeRatio]),
+    xaxis: "x",
+    yaxis: "y",
+  };
+
+  const watchTrace: Data = {
+    type: "scatter",
+    x: watchSweeps.map(sweep => sweep.time),
+    y: watchSweeps.map(sweep => sweep.wickExtreme),
+    mode: "text+markers",
+    marker: { symbol: "diamond-open", size: 11, color: "#2563eb", line: { width: 2, color: "#2563eb" } },
+    text: watchSweeps.map(() => "WATCH"),
+    textposition: "middle right",
+    textfont: { size: 9, color: "#2563eb" },
+    name: "偏正觀察（非信號）",
+    hovertemplate: "偏正觀察（非信號）<br>Direction: %{customdata[0]}<br>Level: %{customdata[1]}<br>$%{customdata[2]:.2f}<extra></extra>",
+    customdata: watchSweeps.map(sweep => [sweep.direction, sweep.level.source, sweep.level.price]),
     xaxis: "x",
     yaxis: "y",
   };
@@ -920,7 +589,7 @@ function LiquidityChart({ ticker, ohlc, levels, sweeps }: LiquidityChartProps) {
 
   return (
     <Plot
-      data={[candlestick, bullSweepTrace, bearSweepTrace, volTrace]}
+      data={[candlestick, watchTrace, bullSweepTrace, bearSweepTrace, volTrace]}
       layout={layout}
       config={{ displayModeBar: true, responsive: true }}
       style={{ width: "100%" }}
