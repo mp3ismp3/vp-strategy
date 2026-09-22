@@ -176,6 +176,9 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/lib/macd.ts`：MACD 頁與 Indicator 內嵌頁共用的純計算函數；MACD 已確認轉折規則與 Python `core/indicators.py` 對齊，週線按交易日期的週一至週日日曆週聚合，使用 UTC 日期運算避免瀏覽器時區改變分組。測試位於 `src/__tests__/macd.test.ts`。
 - `src/lib/rvol.ts`：僅接受已完成、依日期排列的日 K；逐日回放 20 日高點突破／10 根回踩追蹤，固定突破前 ATR 容許範圍，分開保存最新日與事件日 RVOL、失效／到期狀態，不依賴策略或持久化 state。
 - `src/lib/market-bars.ts` 與 Python `core/market_bars.py`：以擷取時紐約 16:00 收盤界線判斷美股／ETF 日 K 與週 K 完成度；週 K 等週五收盤，提早收盤保守延後。前端缺少擷取時間時排除最後日 K。`export_frontend_data.py` 在下載前記錄選用 `daily.captured_at`，既有 upload/API 透傳，不改 scanner JSON schema；Python `macd_scan.py` 正式掃描傳入批次下載前時間。
+- `src/lib/rvol-review.ts`：RVOL downstream 純比較與摘要，使用同一批已完成日 K 與既有分析結果，比對價格／量能／觀察期並分開歷史事件與最新日；不改偵測器生命週期、門檻或 signals，日期／紀錄不一致時不產生結論。
+- `src/components/RvolFacts.tsx`：Indicator／MACD 主畫面的呈現元件，顯示 RVOL 自動摘要、含日期與依據的逐項比對，原始事實／規則收合；沿用 SignalMosaic 權限，不新增 API 欄位或跨指標共振判斷。
+- `src/lib/indicator-review.ts`、`fvg-review.ts` 與 `src/components/IndicatorFacts.tsx`：FVG downstream 事實比對與可切換紀錄摘要。讀取頁面既有偵測紀錄與同批已完成日 K，不改偵測門檻；FVG 以原始三根 K 棒分開結構／填補時間。FVG 單檔與 batch scan 沿用 `completedDailyBars`，圖表與明細皆排除未完成快照。
 - `src/lib/rvol-chart.ts`：日 K、日量、各日前 20 根均量共用日期軸，疊加固定突破位、突破與事件日期；原 `/macd` 與 Indicator 預設分頁以 RVOL 為主畫面，MACD 圖表僅於展開輔助區後掛載；付費才疊加突破與事件標記，兩區訊號明細各自使用既有 SignalMosaic。頁面顯示各日期 RVOL 與資料完成度，到期顯示切換只影響呈現、不改偵測結果。
 
 - `src/app/**/page.tsx`：scanner、accumulation、fusion、strategy、indicator、liquidity、FVG、MACD、account/pricing，以及個人 `/dashboard` 與 `/dashboard/[ticker]` 標的整合頁面。
