@@ -179,6 +179,8 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/lib/rvol-review.ts`：RVOL downstream 純比較與摘要，使用同一批已完成日 K 與既有分析結果，比對價格／量能／觀察期並分開歷史事件與最新日；不改偵測器生命週期、門檻或 signals，日期／紀錄不一致時不產生結論。
 - `src/components/RvolFacts.tsx`：Indicator／MACD 主畫面的呈現元件，顯示 RVOL 自動摘要、含日期與依據的逐項比對，原始事實／規則收合；沿用 SignalMosaic 權限，不新增 API 欄位或跨指標共振判斷。
 - `src/lib/indicator-review.ts`、`fvg-review.ts` 與 `src/components/IndicatorFacts.tsx`：FVG downstream 事實比對與可切換紀錄摘要。讀取頁面既有偵測紀錄與同批已完成日 K，不改偵測門檻；FVG 以原始三根 K 棒分開結構／填補時間。FVG 單檔與 batch scan 沿用 `completedDailyBars`，圖表與明細皆排除未完成快照。
+- `src/lib/liquidity.ts`：Liquidity 頁唯一的水平與 Sweep 偵測器。依已完成、按日期排序的日 K 逐根回放；PDH／PDL 隔日可用，PWH／PWL 在新週開始後可用，Swing 與 EQH／EQL 必須等右側 10 根 K 完成確認後才能偵測後續事件。事件須同時符合穿越、收盤收回、0.05%–3% 穿越幅度、收盤離掃蕩極值的距離至少占當日振幅 30%，及含事件日 20 根成交量中位數的量比 `>= 1`；每個水平最多記錄一次 Sweep。圖表只從水平確認日開始繪製，來源日另列，避免將尚未確認的結構顯示為當時可用。`src/lib/liquidity-validation.ts` 不改 detector 門檻，以固定次日開盤至第五日收盤、0.10% 來回成本及非重疊持倉逐日回測；多空分開，事件只能使用當時已完成的同方向先前交易。平均、中位數及勝率皆偏正可在表格及圖上顯示藍色非信號 `WATCH`，只有通過最低樣本與信賴下限後才成為 UI「歷史門檻信號」星號；這是歷史篩選標記，不宣稱未來績效已獲證明。`npm run backtest:liquidity` 對 `frontend_charts.json` 產生可重現報告，跨標的彙總僅為描述結果。
+- `src/lib/sweep-review.ts` 與 Liquidity page：Sweep downstream 事實比對與可切換紀錄摘要。讀取既有 Sweep 偵測紀錄與同批已完成日 K，不改 detector 門檻；分開事件量比／最新收盤，缺失水平確認時間標為資料不足，並沿用 `completedDailyBars` 排除未完成快照。
 - `src/lib/rvol-chart.ts`：日 K、日量、各日前 20 根均量共用日期軸，疊加固定突破位、突破與事件日期；原 `/macd` 與 Indicator 預設分頁以 RVOL 為主畫面，MACD 圖表僅於展開輔助區後掛載；付費才疊加突破與事件標記，兩區訊號明細各自使用既有 SignalMosaic。頁面顯示各日期 RVOL 與資料完成度，到期顯示切換只影響呈現、不改偵測結果。
 
 - `src/app/**/page.tsx`：scanner、accumulation、fusion、strategy、indicator、liquidity、FVG、MACD、account/pricing，以及個人 `/dashboard` 與 `/dashboard/[ticker]` 標的整合頁面。
