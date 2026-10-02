@@ -184,7 +184,7 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 - `src/lib/rvol-chart.ts`：日 K、日量、各日前 20 根均量共用日期軸，疊加固定突破位、突破與事件日期；原 `/macd` 與 Indicator 預設分頁以 RVOL 為主畫面，MACD 圖表僅於展開輔助區後掛載；付費才疊加突破與事件標記，兩區訊號明細各自使用既有 SignalMosaic。頁面顯示各日期 RVOL 與資料完成度，到期顯示切換只影響呈現、不改偵測結果。
 
 - `src/app/**/page.tsx`：scanner、accumulation、fusion、strategy、indicator、liquidity、FVG、MACD、account/pricing，以及個人 `/dashboard` 與 `/dashboard/[ticker]` 標的整合頁面。
-- `src/app/api/data/*`：唯一的 Web production analysis data 邊界。訪客回 `401`；Free 由 server 裁切為 7 檔與 Accumulation 非行動摘要；Pro 取得完整一般分析；Fusion 僅 Premium。Client 不得直接以 anon key 讀 analysis tables。
+- `src/app/api/data/*`：唯一的 Web production analysis data 邊界。訪客回 `401`；Free 由 server 裁切為 7 檔與 Accumulation 非行動摘要；Pro 取得完整一般分析；Fusion 僅 Premium。`src/lib/scan-data.ts` 驗證 Scanner 必填數值與位置，無效 row 回 `503`，不得以零值偽裝缺資料。Client 不得直接以 anon key 讀 analysis tables。
 - `src/app/api/user/watchlist/*`：以 NextAuth session 對應 `users.id`，透過 service role 讀寫使用者自己的 `user_watchlist_items`；新增與排序 RPC 會鎖定 user row，原子執行數量上限與順序更新。Free/Pro/Premium 上限分別為 5/30/100，Free 僅允許 Mega Cap Tech 7 檔。
 - `src/app/api/data/dashboard`、`src/app/api/data/symbol/[ticker]`：以 service role 聚合 Supabase scan/chart/accumulation rows 並建立 downstream 個人化 view；不回寫分析 state。Free 回應移除 accumulation actionable levels/triggers 與 FVG gap 價位明細。
 - `src/components/charts/FVGChart.tsx`：在已授權 FVG 明細的標的頁，以既有 chart API 的日線 OHLC 疊加未回補 FVG 色塊；`src/lib/vp-labels.ts` 將 VP machine values 轉為 UI 可讀文字，兩者皆為 downstream presentation layer。
@@ -217,7 +217,7 @@ Web entitlement boundary：未登入訪客不得讀 production data。登入 Fre
 
 ### Supabase 與 Telegram bot
 
-- `upload_to_supabase.py`：把 scan、chart、accum JSON 清理後 upsert 至 Supabase。
+- `upload_to_supabase.py`：把 scan、chart、accum JSON 清理後 upsert 至 Supabase；Scanner payload 必須先通過有限數值與位置契約驗證，避免無效結果覆蓋 production row。
 - `services/telegram-bot/bot.py`：Telegram webhook/bot commands 與 Premium-only 帳號綁定；Next.js webhook 先驗 secret header，Python/Next.js 都以同一 transaction RPC 原子完成 token claim、Premium entitlement 檢查與 bind。
 - `services/telegram-bot/notification_router.py`：讀 Supabase 訂閱者並分發 scanner/accumulation 摘要；與 bot 共用 `entitlement.py`，所有付費狀態均依週期截止時間 fail-closed，不依賴使用者再次登入網站。
 - `setup_telegram_webhook.py`：部署時設定 webhook；屬外部狀態變更，不可當一般測試執行。

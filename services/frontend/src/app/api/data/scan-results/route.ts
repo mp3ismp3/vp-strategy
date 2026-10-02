@@ -3,6 +3,7 @@ import { filterScanItemsForPlan } from "@/lib/preview-access";
 import { getServerPlan } from "@/lib/server-entitlement";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { serviceUnavailable } from "@/lib/api-response";
+import { isValidScanInfo } from "@/lib/scan-data";
 
 interface VolumeProfileFrame {
   poc?: number;
@@ -46,7 +47,11 @@ export async function GET() {
 
     // 轉換格式給前端用
     const vpData = data.vp_data || {};
-    const results = filterScanItemsForPlan(Object.entries(vpData).map(([ticker, info]) => {
+    const entries = Object.entries(vpData);
+    if (!entries.length || entries.some(([, info]) => !isValidScanInfo(info))) {
+      return serviceUnavailable("SCAN_DATA_INVALID", "Scan data is temporarily unavailable");
+    }
+    const results = filterScanItemsForPlan(entries.map(([ticker, info]) => {
       const daily = info.daily || {};
       const weekly = info.weekly || {};
       const monthly = info.monthly || {};

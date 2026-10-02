@@ -73,7 +73,15 @@ def compute_vp_multitf(df: pd.DataFrame, va_pct: float = 0.68,
         }
         Returns None if insufficient data.
     """
-    if df is None or len(df) < 60:
+    required_columns = ["Open", "High", "Low", "Close", "Volume"]
+    if (df is None or len(df) < 60
+            or not set(required_columns).issubset(df.columns)):
+        return None
+
+    numeric_bars = df[required_columns].apply(pd.to_numeric, errors="coerce")
+    valid_bars = np.isfinite(numeric_bars).all(axis=1)
+    df = df.loc[valid_bars]
+    if len(df) < 60:
         return None
 
     price = float(df["Close"].iloc[-1])

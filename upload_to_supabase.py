@@ -18,8 +18,6 @@ import math
 from pathlib import Path
 from datetime import datetime, timezone
 
-from supabase import create_client
-
 DRY_RUN = "--dry-run" in sys.argv
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -30,6 +28,8 @@ SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 def get_supabase():
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+    from supabase import create_client
+
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 
@@ -46,6 +46,38 @@ def clean_json(obj):
     return obj
 
 
+def _require_finite_number(value, path):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"Invalid scan data: {path} must be a finite number")
+
+
+def validate_scan_data(data):
+    """Reject incomplete Scanner output before it can replace production data."""
+    vp_data = data.get("vp_data")
+    if not isinstance(vp_data, dict) or not vp_data:
+        raise ValueError("Invalid scan data: vp_data must contain at least one symbol")
+
+    valid_positions = {"above_va", "inside_va", "below_va"}
+    for symbol, info in vp_data.items():
+        if not isinstance(info, dict):
+            raise ValueError(f"Invalid scan data: {symbol} must be an object")
+
+        _require_finite_number(info.get("price"), f"{symbol}.price")
+        if info["price"] <= 0:
+            raise ValueError(f"Invalid scan data: {symbol}.price must be positive")
+
+        for timeframe in ("daily", "weekly", "monthly"):
+            frame = info.get(timeframe)
+            if frame is None and timeframe != "daily":
+                continue
+            if not isinstance(frame, dict):
+                raise ValueError(f"Invalid scan data: {symbol}.{timeframe} must be an object")
+            for field in ("poc", "vah", "val", "position_pct"):
+                _require_finite_number(frame.get(field), f"{symbol}.{timeframe}.{field}")
+            if frame.get("position") not in valid_positions:
+                raise ValueError(f"Invalid scan data: {symbol}.{timeframe}.position is invalid")
+
+
 def upload_scan_data(supabase):
     """Upload scan_results.json → scan_data table."""
     scan_file = DATA_DIR / "scan_results.json"
@@ -54,6 +86,7 @@ def upload_scan_data(supabase):
         return
 
     data = json.loads(scan_file.read_text())
+    validate_scan_data(data)
     data = clean_json(data)
 
     row = {
