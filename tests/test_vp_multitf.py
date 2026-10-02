@@ -91,6 +91,13 @@ class TestComputeVpMultitf:
         result = compute_vp_multitf(df)
         assert result is None
 
+    def test_returns_none_for_empty_dataframe(self):
+        assert compute_vp_multitf(pd.DataFrame()) is None
+
+    def test_returns_none_for_missing_ohlcv_columns(self):
+        df = pd.DataFrame({"Close": [100.0] * 60})
+        assert compute_vp_multitf(df) is None
+
     def test_returns_dict_with_required_keys(self):
         df = _make_daily_df(252)
         result = compute_vp_multitf(df)
@@ -150,6 +157,19 @@ class TestComputeVpMultitf:
         df = _make_daily_df(252)
         result = compute_vp_multitf(df)
         assert result["price"] == round(float(df["Close"].iloc[-1]), 2)
+
+    def test_ignores_incomplete_trailing_bar(self):
+        df = _make_daily_df(252)
+        expected_price = round(float(df["Close"].iloc[-2]), 2)
+        df.iloc[-1, df.columns.get_indexer(["Open", "High", "Low", "Close", "Volume"])] = np.nan
+
+        result = compute_vp_multitf(df)
+
+        assert result is not None
+        assert result["price"] == expected_price
+        for tf in ["daily", "weekly", "monthly"]:
+            assert result[tf] is not None
+            assert np.isfinite(result[tf]["position_pct"])
 
     def test_none_input(self):
         result = compute_vp_multitf(None)
