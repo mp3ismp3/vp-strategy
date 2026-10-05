@@ -62,6 +62,8 @@
 5. **VAH** = Value Area 上緣（賣方壓力起始點）
 6. **VAL** = Value Area 下緣（買方支撐起始點）
 
+Scanner 會先排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 區間判斷是否觸及 VAH/VAL，並在 Telegram 與 Web Scanner 顯示「VAH 觸及」「VAL 觸及」或「VAH + VAL 觸及」、測試日期及收盤結果（收回 VA／收在 VA 外側／VAH 或 VAL 回踩守住）；同一標的的多個 timeframe 會合併顯示。這些是邊界測試提示，不代表已確認拒絕或突破；實際操作仍需自行確認風險與後續價格行為。
+
 Web 日線圖會下載 2 年資料作為交易日缺口緩衝、顯示最近 252 個交易日，右側保留較寬且高對比的 60 日 Volume Profile，並提供 3M／6M／1Y／All 快速切換。
 
 ### 多時間框架分析

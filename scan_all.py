@@ -18,6 +18,7 @@ from config import SYMBOLS, DEFAULT_CFG
 from core.data_provider import YahooProvider
 from core.market_context import fetch_market_context
 from core.vp_multitf import compute_vp_multitf
+from core.market_bars import completed_bars
 from core.auction import calc_va_migration, calc_initial_balance, detect_single_prints, detect_poor_highs_lows
 from notifications.telegram import send_telegram
 from notifications.teams import send_teams
@@ -30,7 +31,8 @@ ET = timezone(timedelta(hours=-4))
 
 def main():
     cfg = DEFAULT_CFG
-    now = datetime.now(ET)
+    captured_at = datetime.now(timezone.utc)
+    now = captured_at.astimezone(ET)
     print(f"[{now.strftime('%Y-%m-%d %H:%M')} ET] VP Multi-TF Scan — {len(SYMBOLS)} symbols...")
 
     print("  Fetching market context...")
@@ -49,13 +51,15 @@ def main():
     # Compute VP multi-TF for each symbol
     vp_results = {}
     for symbol in SYMBOLS:
-        df = data.get(symbol)
+        df = completed_bars(data.get(symbol), captured_at)
         if df is None or len(df) < 60:
             continue
-        df_1h = data_1h.get(symbol)
+        df_1h = completed_bars(data_1h.get(symbol), captured_at)
         try:
             result = compute_vp_multitf(df, cfg["va_pct"], df_1h=df_1h)
             if result:
+                result["data_as_of"] = captured_at.isoformat()
+                result["bar_complete"] = True
                 # Add auction theory elements (summary only, no histograms)
                 if df_1h is not None and len(df_1h) >= 50:
                     mig = calc_va_migration(df, df_1h=df_1h)
@@ -128,6 +132,35 @@ def _format_telegram(vp_results, market_ctx, now):
         emoji = "🟢" if vix < 15 else "🟡" if vix < 25 else "🔴"
         msg += f"{emoji} VIX: {vix:.1f} | SPY: {market_ctx.get('spy_state', '?')}\n"
     msg += "\n"
+
+    touches = {}
+    for sym, vp in vp_results.items():
+        for tf in ["daily", "weekly", "monthly"]:
+            edge = (vp.get(tf) or {}).get("va_touch")
+            if edge:
+                touches.setdefault(sym, []).append((tf, edge, vp[tf]))
+    if touches:
+        msg += "<b>🎯 VAH/VAL 觸及（最新 K 棒高低點）:</b>\n"
+        for sym, frame_touches in touches.items():
+            vp = vp_results[sym]
+            details = []
+            for tf, edge, frame in frame_touches:
+                label = {"vah": "VAH 壓力", "val": "VAL 支撐", "both": "VAH + VAL"}[edge]
+                context = {
+                    "reentered_value": "收回 VA",
+                    "closed_above_value": "收在 VA 上方",
+                    "closed_below_value": "收在 VA 下方",
+                    "retest_from_above": "VAH 回踩守住",
+                    "retest_from_below": "VAL 回踩守住",
+                    "range_test": "區間測試",
+                    "at_vah": "收在 VAH",
+                    "at_val": "收在 VAL",
+                }.get(frame.get("va_touch_context"), "待確認")
+                details.append(f"{tf.title()} {label}／{context} ({frame['vah']:.2f}/{frame['val']:.2f})")
+            dates = {frame.get("va_touch_date") for _, _, frame in frame_touches if frame.get("va_touch_date")}
+            date_label = f" [{next(iter(dates))}]" if len(dates) == 1 else ""
+            msg += f"  {sym} ${vp['price']} — {'; '.join(details)}{date_label}\n"
+        msg += "  觸及僅代表測試邊界；配合拒絕或突破回踩確認。\n\n"
 
     # Show symbols where all 3 TFs agree (strong position)
     bullish = []  # above VA on 2+ timeframes

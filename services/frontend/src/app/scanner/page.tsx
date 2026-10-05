@@ -73,12 +73,30 @@ function ScannerContent() {
     );
   }
 
-  const positionBadge = (position: string) => {
+  const vaTouchBadge = (touch?: "vah" | "val" | "both" | null) => {
+    if (!touch) return null;
+    const label = touch === "both" ? "VAH + VAL 觸及" : `${touch.toUpperCase()} 觸及`;
+    return <Badge className="bg-amber-100 text-amber-900">{label}</Badge>;
+  };
+
+  const vaTouchContext = (context?: string | null) => ({
+    reentered_value: "收回 VA",
+    closed_above_value: "收在 VA 上方",
+    closed_below_value: "收在 VA 下方",
+    retest_from_above: "VAH 回踩守住",
+    retest_from_below: "VAL 回踩守住",
+    range_test: "區間測試",
+    at_vah: "收在 VAH",
+    at_val: "收在 VAL",
+  }[context || ""] || "待確認");
+
+  const positionBadge = (level: ScanResult["daily"]) => {
+    const position = level.position;
     if (position === "above_va")
-      return <Badge className="bg-green-100 text-green-800">Above VA</Badge>;
+      return <>{<Badge className="bg-green-100 text-green-800">Above VA</Badge>} {vaTouchBadge(level.va_touch)}</>;
     if (position === "below_va")
-      return <Badge className="bg-red-100 text-red-800">Below VA</Badge>;
-    return <Badge className="bg-gray-100 text-gray-800">Inside VA</Badge>;
+      return <>{<Badge className="bg-red-100 text-red-800">Below VA</Badge>} {vaTouchBadge(level.va_touch)}</>;
+    return <><Badge className="bg-gray-100 text-gray-800">Inside VA</Badge> {vaTouchBadge(level.va_touch)}</>;
   };
 
   const FREE_SYMBOLS = SYMBOL_CATEGORIES["Mega Cap Tech"] || [];
@@ -115,6 +133,11 @@ function ScannerContent() {
           {scanTime && (
             <p className="text-xs text-gray-400 mt-1">
               Last scan: {new Date(scanTime).toLocaleString()}
+            </p>
+          )}
+          {filteredResults.length > 0 && filteredResults[0].bar_date && (
+            <p className="text-xs text-gray-400 mt-1">
+              Data through: {filteredResults[0].bar_date} (completed daily bar)
             </p>
           )}
         </div>
@@ -172,22 +195,25 @@ function ScannerContent() {
           <VPChart ticker={selectedResult.ticker} />
           <div className="flex gap-4 mt-3 text-sm">
             <div>
-              Daily: {positionBadge(selectedResult.daily.position)}{" "}
+              Daily: {positionBadge(selectedResult.daily)}{" "}
               <span className="text-gray-500">
                 {selectedResult.daily.pct_from_poc.toFixed(0)}% from POC
               </span>
+              {selectedResult.daily.va_touch_date && <div className="text-xs text-amber-800">邊界測試日：{selectedResult.daily.va_touch_date} · {vaTouchContext(selectedResult.daily.va_touch_context)}</div>}
             </div>
             <div>
-              Weekly: {positionBadge(selectedResult.weekly.position)}{" "}
+              Weekly: {positionBadge(selectedResult.weekly)}{" "}
               <span className="text-gray-500">
                 {selectedResult.weekly.pct_from_poc.toFixed(0)}% from POC
               </span>
+              {selectedResult.weekly.va_touch_date && <div className="text-xs text-amber-800">邊界測試日：{selectedResult.weekly.va_touch_date} · {vaTouchContext(selectedResult.weekly.va_touch_context)}</div>}
             </div>
             <div>
-              Monthly: {positionBadge(selectedResult.monthly.position)}{" "}
+              Monthly: {positionBadge(selectedResult.monthly)}{" "}
               <span className="text-gray-500">
                 {selectedResult.monthly.pct_from_poc.toFixed(0)}% from POC
               </span>
+              {selectedResult.monthly.va_touch_date && <div className="text-xs text-amber-800">邊界測試日：{selectedResult.monthly.va_touch_date} · {vaTouchContext(selectedResult.monthly.va_touch_context)}</div>}
             </div>
           </div>
         </div>
@@ -220,9 +246,9 @@ function ScannerContent() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-2 flex gap-1">
-                    {positionBadge(r.daily.position)}
-                    {positionBadge(r.weekly.position)}
-                    {positionBadge(r.monthly.position)}
+                    {positionBadge(r.daily)}
+                    {positionBadge(r.weekly)}
+                    {positionBadge(r.monthly)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     D:{r.daily.pct_from_poc.toFixed(0)}% W:
@@ -260,9 +286,9 @@ function ScannerContent() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-2 flex gap-1">
-                    {positionBadge(r.daily.position)}
-                    {positionBadge(r.weekly.position)}
-                    {positionBadge(r.monthly.position)}
+                    {positionBadge(r.daily)}
+                    {positionBadge(r.weekly)}
+                    {positionBadge(r.monthly)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     D:{r.daily.pct_from_poc.toFixed(0)}% W:
@@ -300,9 +326,9 @@ function ScannerContent() {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500 mt-2 flex gap-1">
-                    {positionBadge(r.daily.position)}
-                    {positionBadge(r.weekly.position)}
-                    {positionBadge(r.monthly.position)}
+                    {positionBadge(r.daily)}
+                    {positionBadge(r.weekly)}
+                    {positionBadge(r.monthly)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     D:{r.daily.pct_from_poc.toFixed(0)}% W:

@@ -19,6 +19,7 @@ import pandas as pd
 
 from config import SYMBOLS, DEFAULT_CFG
 from core.data_provider import YahooProvider
+from core.market_bars import completed_bars
 from core.vp_multitf import compute_vp_multitf, resample_to_weekly, resample_to_monthly
 
 DRY_RUN = "--dry-run" in sys.argv
@@ -77,11 +78,11 @@ def main():
     charts = {}
 
     for symbol in SYMBOLS:
-        df = data.get(symbol)
+        df = completed_bars(data.get(symbol), captured_at)
         if df is None or len(df) < 60:
             continue
 
-        df_1h = data_1h.get(symbol)
+        df_1h = completed_bars(data_1h.get(symbol), captured_at)
 
         try:
             vp = compute_vp_multitf(df, DEFAULT_CFG["va_pct"], df_1h=df_1h)

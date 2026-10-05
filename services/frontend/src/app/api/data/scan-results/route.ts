@@ -8,11 +8,15 @@ interface VolumeProfileFrame {
   poc?: number;
   position?: string;
   position_pct?: number;
+  va_touch?: "vah" | "val" | "both" | null;
+  va_touch_date?: string | null;
+  va_touch_context?: string | null;
   vah?: number;
   val?: number;
 }
 
 interface ScanInfo {
+  bar_date?: string;
   daily?: VolumeProfileFrame;
   monthly?: VolumeProfileFrame;
   price?: number;
@@ -63,12 +67,16 @@ export async function GET() {
       return {
         ticker,
         price: info.price || 0,
+        bar_date: info.bar_date || null,
         daily: {
           poc: daily.poc || 0,
           vah: daily.vah || 0,
           val: daily.val || 0,
           position: daily.position || "inside_va",
           pct_from_poc: daily.position_pct || 0,
+          va_touch: daily.va_touch || null,
+          va_touch_date: daily.va_touch_date || null,
+          va_touch_context: daily.va_touch_context || null,
         },
         weekly: {
           poc: weekly.poc || 0,
@@ -76,6 +84,9 @@ export async function GET() {
           val: weekly.val || 0,
           position: weekly.position || "inside_va",
           pct_from_poc: weekly.position_pct || 0,
+          va_touch: weekly.va_touch || null,
+          va_touch_date: weekly.va_touch_date || null,
+          va_touch_context: weekly.va_touch_context || null,
         },
         monthly: {
           poc: monthly.poc || 0,
@@ -83,6 +94,9 @@ export async function GET() {
           val: monthly.val || 0,
           position: monthly.position || "inside_va",
           pct_from_poc: monthly.position_pct || 0,
+          va_touch: monthly.va_touch || null,
+          va_touch_date: monthly.va_touch_date || null,
+          va_touch_context: monthly.va_touch_context || null,
         },
         consensus,
         suggestion: "",

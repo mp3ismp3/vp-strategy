@@ -10,6 +10,8 @@ from core.vp_multitf import (
     resample_to_monthly,
     _price_position,
     _price_position_pct,
+    _va_touch,
+    _va_touch_context,
 )
 
 
@@ -50,6 +52,29 @@ class TestResample:
 
 
 class TestPricePosition:
+    def test_latest_bar_touching_val(self):
+        assert _va_touch(89, 95, 90, 100) == "val"
+
+    def test_latest_bar_touching_vah(self):
+        assert _va_touch(98, 101, 90, 100) == "vah"
+
+    def test_latest_bar_touching_both_edges(self):
+        assert _va_touch(90, 100, 90, 100) == "both"
+
+    def test_latest_bar_not_touching_value_area_edge(self):
+        assert _va_touch(93, 97, 90, 100) is None
+
+    def test_touch_context_distinguishes_reentry_and_close_outside(self):
+        assert _va_touch_context("val", 95, 90, 100) == "reentered_value"
+        assert _va_touch_context("vah", 105, 90, 100) == "closed_above_value"
+        assert _va_touch_context("both", 95, 90, 100) == "range_test"
+
+    def test_touch_context_marks_breakout_retest_from_above(self):
+        assert _va_touch_context("vah", 103, 90, 100, previous_close=105, low=99) == "retest_from_above"
+
+    def test_touch_context_marks_breakout_retest_from_below(self):
+        assert _va_touch_context("val", 87, 90, 100, previous_close=85, high=91) == "retest_from_below"
+
     def test_above_va(self):
         assert _price_position(110, 90, 100) == "above_va"
 
@@ -109,6 +134,10 @@ class TestComputeVpMultitf:
         assert "val" in daily
         assert "position" in daily
         assert "position_pct" in daily
+        assert "va_touch" in daily
+        assert "va_touch_date" in daily
+        assert "va_touch_context" in daily
+        assert result["bar_date"] == str(df.index[-1].date())
         assert "histogram" in daily
 
     def test_vah_greater_than_val(self):
