@@ -8,6 +8,9 @@ interface VPFrame {
   val?: number;
   position?: string;
   position_pct?: number;
+  va_touch?: "vah" | "val" | "both" | null;
+  va_touch_date?: string | null;
+  va_touch_context?: string | null;
 }
 
 interface VPInfo {

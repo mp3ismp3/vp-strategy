@@ -54,6 +54,52 @@ def _price_position_pct(price, val, vah):
     return round((price - val) / (vah - val) * 100, 1)
 
 
+def _va_touch(low, high, val, vah):
+    """Return which value-area edge the latest bar touched, if any.
+
+    The latest bar is considered to touch an edge when its full range crosses
+    that edge.  This captures intraday tests even when the close moves away
+    before the scan runs.
+    """
+    touches = []
+    if low <= val <= high:
+        touches.append("val")
+    if low <= vah <= high and vah != val:
+        touches.append("vah")
+    if len(touches) == 2:
+        return "both"
+    return touches[0] if touches else None
+
+
+def _va_touch_context(touch, close, val, vah, previous_close=None,
+                      low=None, high=None):
+    """Describe the close after a value-area edge was tested.
+
+    This is an observation label, not a confirmed trading signal.
+    """
+    if touch == "both":
+        return "range_test"
+    if touch == "val":
+        if (previous_close is not None and high is not None
+                and previous_close < val <= high and close <= val):
+            return "retest_from_below"
+        if close < val:
+            return "closed_below_value"
+        if close > val:
+            return "reentered_value"
+        return "at_val"
+    if touch == "vah":
+        if (previous_close is not None and low is not None
+                and previous_close > vah >= low and close >= vah):
+            return "retest_from_above"
+        if close > vah:
+            return "closed_above_value"
+        if close < vah:
+            return "reentered_value"
+        return "at_vah"
+    return None
+
+
 def compute_vp_multitf(df: pd.DataFrame, va_pct: float = 0.68,
                         df_1h: pd.DataFrame = None) -> dict:
     """Compute Volume Profile for daily/weekly/monthly timeframes.
@@ -115,15 +161,29 @@ def compute_vp_multitf(df: pd.DataFrame, va_pct: float = 0.68,
                           return_histogram=True)
                   if len(monthly_df) >= 6 else None)
 
+    latest_high = float(df["High"].iloc[-1])
+    latest_low = float(df["Low"].iloc[-1])
+    previous_close = float(df["Close"].iloc[-2]) if len(df) > 1 else None
+    latest_date = pd.Timestamp(df.index[-1]).date().isoformat()
+
     def _build_tf(vp, source="daily"):
         if vp is None:
             return None
+        touch = _va_touch(latest_low, latest_high, vp["val"], vp["vah"])
         result = {
             "poc": round(vp["poc"], 2),
             "vah": round(vp["vah"], 2),
             "val": round(vp["val"], 2),
             "position": _price_position(price, vp["val"], vp["vah"]),
             "position_pct": _price_position_pct(price, vp["val"], vp["vah"]),
+            "va_touch": touch,
+            "va_touch_date": latest_date if touch else None,
+            "va_touch_context": _va_touch_context(
+                touch, price, vp["val"], vp["vah"],
+                previous_close=previous_close,
+                low=latest_low,
+                high=latest_high,
+            ),
             "data_source": source,
         }
         if "histogram" in vp:
@@ -139,6 +199,7 @@ def compute_vp_multitf(df: pd.DataFrame, va_pct: float = 0.68,
 
     return {
         "price": round(price, 2),
+        "bar_date": latest_date,
         "daily": _build_tf(daily_vp, daily_source),
         "weekly": _build_tf(weekly_vp, "weekly"),
         "monthly": _build_tf(monthly_vp, "monthly"),
