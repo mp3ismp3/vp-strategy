@@ -173,7 +173,7 @@ State 每個 ticker 的既有欄位是相容性契約。新增欄位必須在舊
 
 ### Fusion
 
-`fusion_report.py` 讀取 `scan_results.json` 與 `accum_state.json`，合併 macro VP direction、Wyckoff phase/triggers、red flags 與交易 levels。它是 downstream consumer，不應回寫 Scanner 或 Tracker 的計算狀態。Web 層的 trigger contract 相容 legacy string 與 `{type, date?}` object，UI 統一顯示 trigger type。
+`fusion_report.py` 讀取 `scan_results.json` 與 `accum_state.json`，合併 macro VP direction、Wyckoff phase/triggers、red flags 與交易 levels。它是 downstream consumer，不應回寫 Scanner 或 Tracker 的計算狀態。Python report 與 production Fusion API 共用 `services/frontend/src/lib/fusion-policy.json` 的信心矩陣；macro 僅在週／月 VP 一致時為 bullish/bearish。Web 層的 trigger contract 相容 legacy string 與 `{type, date?}` object，UI 統一顯示 trigger type；只有 confirmed tier、同一掃描日的新鮮 VP/Accumulation state、當日有效 Spring/LPS/SOS trigger 且無紅旗，才能標為可操作候選。星等僅供研究排序，Fusion 尚未有完整歷史入出場回放，不得宣稱已完成策略回測。
 
 ### Next.js `services/frontend/`
 

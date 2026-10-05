@@ -199,6 +199,7 @@ Next.js Web 預覽權限：
 - 登入 Free 可查看 Mega Cap Tech 7 檔即時 Scanner／Chart／Indicator，以及 Accumulation Decay Score 前 10 名摘要；摘要不包含支撐、壓力與 triggers。付費方案收錄 2026-08-23 Binance Futures metadata 中仍在交易的 137 個 Equity TradFi 永續合約基礎標的（包含 ETF），其中 92 個為新增分析標的。每檔只隸屬一個產業分類，Binance 合約身分以獨立 badge 呈現，因此不會在分類中重複。頁面與 Yahoo 資料流程不顯示 `USDT`／`USD1` 結算後綴；`BRKB` 會正規化為 `BRK-B`。
 - Pro（NT$320／月）解鎖全部標的、完整 Accumulation levels/triggers 與 Strategy Lab 信號。
 - Premium（NT$620／月）包含 Pro，另解鎖 Fusion 與 Telegram 帳號綁定／即時信號；Free 與 Pro 都不能產生 Telegram 綁定碼。歷史回顧尚未形成獨立付費功能，正式實作 server-side retention gate 前不列入方案承諾。
+- Fusion 是 VP 與 Accumulation 的研究排序層，不是獨立、已驗證的自動交易策略。只有 Accumulation 已確認、VP 與 Accumulation 為同一掃描日、且存在當日有效的 Spring／LPS／SOS trigger、沒有 Fusion 紅旗時，才會列為「已確認 Fusion 候選」；其餘一律為觀察清單。星等不單獨構成操作建議，也不提供固定部位大小。Fusion 的完整歷史入出場回放尚未實作，因此不得把星等視為已完成回測的績效宣稱。
 - 所有資料裁切與方案驗證都在 server API 執行；前端 Paywall 只負責呈現，不能作為資料安全邊界。
 - Subscriber VP 摘要會容忍新上市或資料不足標的缺少日／週／月 timeframe；缺少的 timeframe 不計入 bullish／bearish 共識，不會中斷整批 Telegram 通知。
 

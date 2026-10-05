@@ -18,42 +18,25 @@ from typing import Optional
 DATA_DIR = Path(__file__).parent / "data"
 SCAN_RESULTS = DATA_DIR / "scan_results.json"
 ACCUM_STATE = DATA_DIR / "accum_state.json"
+FUSION_POLICY = Path(__file__).parent / "services" / "frontend" / "src" / "lib" / "fusion-policy.json"
 
 
 # ─── Confidence Matrix ───────────────────────────────────────────────────────
 # Maps (phase, vp_position) → confidence level and action
 
-CONFIDENCE_MATRIX = {
-    # Phase B (Building) — 正在吸籌，等待觸發
-    ("B", "below_va"):  {"stars": 3, "label": "吸籌+低位", "action": "觀察，等 Phase C/D trigger"},
-    ("B", "inside_va"): {"stars": 2, "label": "吸籌中", "action": "正常觀察，不急進"},
-    ("B", "above_va"):  {"stars": 0, "label": "吸籌但價高", "action": "❌ 不追，等回踩"},
+def _load_confidence_matrix() -> dict:
+    """Load the policy shared with the production Fusion API."""
+    try:
+        policy = json.loads(FUSION_POLICY.read_text())
+        return {
+            tuple(key.split("|", 1)): value
+            for key, value in policy["matrix"].items()
+        }
+    except (json.JSONDecodeError, IOError, KeyError):
+        return {}
 
-    # Phase C (Spring) — 最佳入場時機
-    ("C", "below_va"):  {"stars": 5, "label": "⭐ 黃金入場區", "action": "Spring 觸發 → PILOT BUY 10-25%"},
-    ("C", "inside_va"): {"stars": 3, "label": "Spring 幅度小", "action": "可做但降 size，觀察是否回落"},
-    ("C", "above_va"):  {"stars": 0, "label": "矛盾信號", "action": "❌ Phase C 不該在 VA 上方，可能誤判"},
 
-    # Phase D (Trending) — 趨勢啟動，找回踩
-    ("D", "below_va"):  {"stars": 3, "label": "回踩好位", "action": "LPS 觸發 → ADD 25-40%"},
-    ("D", "inside_va"): {"stars": 4, "label": "LPS 入場區", "action": "回踩 VA 內，找 POC 支撐進場"},
-    ("D", "above_va"):  {"stars": 3, "label": "SOS 追蹤", "action": "突破中，用 trailing stop 跟蹤"},
-
-    # Phase E (Markup) — 已起飛
-    ("E", "below_va"):  {"stars": 0, "label": "⚠️ 假突破?", "action": "❌ 已 markup 卻跌回 → 可能失敗"},
-    ("E", "inside_va"): {"stars": 2, "label": "回踩觀察", "action": "等價格站回 VAH 再考慮"},
-    ("E", "above_va"):  {"stars": 4, "label": "趨勢確認", "action": "已在軌道上，持有或 trailing stop"},
-
-    # Phase A (Stopping) — 剛開始，太早
-    ("A", "below_va"):  {"stars": 1, "label": "初期觀察", "action": "剛停止下跌，僅觀察"},
-    ("A", "inside_va"): {"stars": 1, "label": "初期觀察", "action": "剛停止下跌，僅觀察"},
-    ("A", "above_va"):  {"stars": 0, "label": "不合理", "action": "❌ 剛止跌不該在上方"},
-
-    # UNKNOWN
-    ("UNKNOWN", "below_va"):  {"stars": 0, "label": "無結構", "action": "不符吸籌結構，忽略"},
-    ("UNKNOWN", "inside_va"): {"stars": 0, "label": "無結構", "action": "不符吸籌結構，忽略"},
-    ("UNKNOWN", "above_va"):  {"stars": 0, "label": "無結構", "action": "不符吸籌結構，忽略"},
-}
+CONFIDENCE_MATRIX = _load_confidence_matrix()
 
 
 # ─── Multi-TF Direction ──────────────────────────────────────────────────────
@@ -72,9 +55,9 @@ def _get_macro_direction(vp_data: dict) -> str:
     above = sum(1 for p in [w_pos, m_pos] if p == "above_va")
     below = sum(1 for p in [w_pos, m_pos] if p == "below_va")
 
-    if above >= 1 and below == 0:
+    if above == 2:
         return "bullish"
-    elif below >= 1 and above == 0:
+    elif below == 2:
         return "bearish"
     return "neutral"
 
@@ -143,6 +126,29 @@ def _trigger_vp_alignment(triggers_fired: list, daily_pos: str) -> list:
                 else:
                     alignments.append(f"⚠️ {trigger_name} + VP {daily_pos} = 不完全對齊")
     return alignments
+
+
+def _fresh_actionable_triggers(triggers_fired: list, scan_time: str) -> list:
+    """Return recognised triggers recorded on the VP scan calendar date only."""
+    if not isinstance(scan_time, str) or len(scan_time) < 10:
+        return []
+    scan_date = scan_time[:10]
+    trigger_types = {"SPRING", "LPS", "SOS_BREAKOUT"}
+    return [
+        trigger for trigger in triggers_fired
+        if isinstance(trigger, dict)
+        and str(trigger.get("date", ""))[:10] == scan_date
+        and str(trigger.get("type", "")).upper().replace(" ", "_") in trigger_types
+    ]
+
+
+def _is_data_fresh(scan_time: str, last_updated: str) -> bool:
+    """Require VP scan and Accumulation state from the same calendar date."""
+    return (
+        isinstance(scan_time, str) and len(scan_time) >= 10
+        and isinstance(last_updated, str) and len(last_updated) >= 10
+        and scan_time[:10] == last_updated[:10]
+    )
 
 
 # ─── Stop / Target Suggestions ───────────────────────────────────────────────
@@ -225,6 +231,7 @@ def compute_fusion_signals(scan_data: Optional[dict] = None,
 
     vp_results = scan_data.get("vp_data", {})
     market_ctx = scan_data.get("market_ctx", {})
+    scan_time = scan_data.get("scan_time", "")
 
     signals = []
 
@@ -274,6 +281,20 @@ def compute_fusion_signals(scan_data: Optional[dict] = None,
         # Trigger alignment
         triggers_fired = accum_info.get("triggers_fired", [])
         trigger_alignment = _trigger_vp_alignment(triggers_fired, daily_pos)
+        fresh_triggers = _fresh_actionable_triggers(triggers_fired, scan_time)
+        data_fresh = _is_data_fresh(scan_time, accum_info.get("last_updated", ""))
+        actionability_reasons = []
+        if tier != "confirmed":
+            actionability_reasons.append("Accumulation 尚未確認")
+        if not data_fresh:
+            actionability_reasons.append("資料不是同一掃描日")
+        if not fresh_triggers:
+            actionability_reasons.append("沒有當日有效觸發")
+        if red_flags:
+            actionability_reasons.append("存在 Fusion 紅旗")
+        if accum_info.get("failing"):
+            actionability_reasons.append("Accumulation 結構已失敗")
+        actionable = not actionability_reasons
 
         # Levels
         levels = _compute_levels(accum_info, vp_data)
@@ -294,6 +315,10 @@ def compute_fusion_signals(scan_data: Optional[dict] = None,
             "action": confidence["action"],
             "red_flags": red_flags,
             "triggers_fired": triggers_fired,
+            "fresh_triggers": fresh_triggers,
+            "data_fresh": data_fresh,
+            "actionable": actionable,
+            "actionability_reasons": actionability_reasons,
             "trigger_alignment": trigger_alignment,
             "levels": levels,
             "price": vp_data.get("price"),

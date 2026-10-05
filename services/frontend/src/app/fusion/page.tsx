@@ -21,6 +21,11 @@ interface FusionSignal {
   label: string;
   action: string;
   triggers_fired: Trigger[];
+  fresh_triggers: Trigger[];
+  red_flags: string[];
+  data_fresh: boolean;
+  actionable: boolean;
+  actionability_reasons: string[];
   price: number;
   support: number;
   resistance: number;
@@ -71,9 +76,9 @@ function FusionContent() {
     UNKNOWN: "bg-gray-100 text-gray-800",
   };
 
-  const actionable = signals.filter((s) => s.stars >= 3);
-  const watchlist = signals.filter((s) => s.stars > 0 && s.stars < 3);
-  const inactive = signals.filter((s) => s.stars <= 0);
+  const actionable = signals.filter((s) => s.actionable);
+  const watchlist = signals.filter((s) => !s.actionable && s.stars > 0);
+  const inactive = signals.filter((s) => !s.actionable && s.stars <= 0);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -81,16 +86,16 @@ function FusionContent() {
         <div>
           <h1 className="text-3xl font-bold">Fusion Analysis</h1>
           <p className="text-gray-600 mt-1">
-            VP + Accumulation 跨系統對齊 — 高信心交易機會
+            VP + Accumulation 跨系統對齊。評級用於研究排序；候選須為確認結構、同日資料且有當日有效觸發。
           </p>
         </div>
       </div>
 
-      {/* Actionable (3+ stars) */}
+      {/* Actionable */}
       {actionable.length > 0 && (
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4 text-green-800">
-            可操作信號（評級 3+）
+            已確認 Fusion 候選
           </h2>
           <div className="grid gap-4">
             {actionable.map((sig) => (
@@ -129,11 +134,11 @@ function FusionContent() {
         </div>
       )}
 
-      {/* Watchlist (1-2 stars) */}
+      {/* Watchlist */}
       {watchlist.length > 0 && (
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4 text-yellow-800">
-            觀察清單（評級 1-2）
+            觀察清單（尚未符合候選條件）
           </h2>
           <div className="overflow-x-auto bg-white rounded-xl border">
             <table className="w-full">
@@ -146,6 +151,7 @@ function FusionContent() {
                   <th className="py-2 px-4">Macro</th>
                   <th className="py-2 px-4">Label</th>
                   <th className="py-2 px-4">Action</th>
+                  <th className="py-2 px-4">限制</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,6 +166,7 @@ function FusionContent() {
                     <td className="py-2 px-4">{macroBadge(sig.macro_direction)}</td>
                     <td className="py-2 px-4 text-sm">{stripDecorativeSymbols(sig.label)}</td>
                     <td className="py-2 px-4 text-sm text-gray-600">{stripDecorativeSymbols(sig.action)}</td>
+                    <td className="py-2 px-4 text-xs text-amber-700">{sig.actionability_reasons.join("；")}</td>
                   </tr>
                 ))}
               </tbody>
