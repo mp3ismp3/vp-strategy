@@ -120,6 +120,8 @@ data/scan_results.json
 
 每個 daily/weekly/monthly VP frame 可選擇包含 `va_touch`：`vah`、`val`、`both` 或 `null`，以及 `va_touch_date`、`va_touch_context`。Scanner 與 chart export 先依 `core.market_bars.completed_bars()` 排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 判斷邊界測試；Telegram 會合併同一標的的多 timeframe 觸及。若前一根 K 棒已在 VA 外、最新 K 棒回測邊界且收在外側，`va_touch_context` 可標為 `retest_from_above` 或 `retest_from_below`；這仍是觀察描述，不是已確認的交易信號。
 
+Scanner Web UI 會以既有 `price`、`vah`、`val` 在 client-side 計算最近 Value Area 邊界與距離，舊 scan snapshots 亦可呈現，不回寫 Scanner JSON 或改變 consensus。
+
 相關輔助入口：
 
 - `pre_market.py`：依 VP 邊界距離產生盤前 watchlist。

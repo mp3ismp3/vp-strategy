@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getVpPositionLabel } from "@/lib/vp-labels";
+import { getNearestValueAreaEdge, getVpPositionLabel } from "@/lib/vp-labels";
 
 describe("VP position labels", () => {
   it.each([
@@ -21,5 +21,21 @@ describe("VP position labels", () => {
 
   it("accepts the active locale translator", () => {
     expect(getVpPositionLabel("above_va", (key) => `translated:${key}`)).toBe("translated:above");
+  });
+});
+
+describe("nearest value-area edge", () => {
+  it("selects VAH when price is closer to the upper edge", () => {
+    expect(getNearestValueAreaEdge(99, 90, 100)).toEqual({ edge: "VAH", distancePct: 1 });
+  });
+
+  it("selects VAL when price is closer to the lower edge", () => {
+    expect(getNearestValueAreaEdge(91, 90, 100)).toEqual({ edge: "VAL", distancePct: 1.1 });
+  });
+
+  it("returns no proximity for incomplete or invalid levels", () => {
+    expect(getNearestValueAreaEdge(0, 90, 100)).toBeNull();
+    expect(getNearestValueAreaEdge(100, 0, 100)).toBeNull();
+    expect(getNearestValueAreaEdge(100, 110, 100)).toBeNull();
   });
 });
