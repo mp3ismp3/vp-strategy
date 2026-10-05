@@ -64,6 +64,8 @@
 
 Scanner 會先排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 區間判斷是否觸及 VAH/VAL，並在 Telegram 與 Web Scanner 顯示「VAH 觸及」「VAL 觸及」或「VAH + VAL 觸及」、測試日期及收盤結果（收回 VA／收在 VA 外側／VAH 或 VAL 回踩守住）；同一標的的多個 timeframe 會合併顯示。這些是邊界測試提示，不代表已確認拒絕或突破；實際操作仍需自行確認風險與後續價格行為。
 
+即使尚未觸及邊界，Web Scanner 每張卡片也會以既有 price、VAH、VAL 顯示 Daily 最近的操作邊界與距離百分比；展開標的可看 Daily／Weekly／Monthly 各自最近的邊界。這是距離提示，不構成交易信號。
+
 Web 日線圖會下載 2 年資料作為交易日缺口緩衝、顯示最近 252 個交易日，右側保留較寬且高對比的 60 日 Volume Profile，並提供 3M／6M／1Y／All 快速切換。
 
 Scanner 會先排除 Yahoo 尚未完成、OHLCV 含 `NaN`／Infinity 的尾端 K 棒，再以最後一根有效收盤計算價格位置。發布到 Supabase 前會驗證 `price`、各時間框架 VP 水平、位置與百分比；無效 payload 會讓工作失敗並保留上一版資料，Web API 也會回傳暫時不可用，而不會把缺值顯示成 `$0` 或 Neutral。

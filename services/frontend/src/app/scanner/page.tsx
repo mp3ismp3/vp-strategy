@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { SYMBOL_CATEGORIES, ALL_CATEGORIES, isBinanceEquityTicker } from "@/lib/categories";
+import { getNearestValueAreaEdge } from "@/lib/vp-labels";
 import type { Plan } from "@/types/user";
 
 function ScannerContent() {
@@ -97,6 +98,11 @@ function ScannerContent() {
     if (position === "below_va")
       return <>{<Badge className="bg-red-100 text-red-800">Below VA</Badge>} {vaTouchBadge(level.va_touch)}</>;
     return <><Badge className="bg-gray-100 text-gray-800">Inside VA</Badge> {vaTouchBadge(level.va_touch)}</>;
+  };
+
+  const proximityLabel = (price: number, level: ScanResult["daily"]) => {
+    const proximity = getNearestValueAreaEdge(price, level.val, level.vah);
+    return proximity ? `最近 ${proximity.edge}：${proximity.distancePct.toFixed(1)}%` : null;
   };
 
   const FREE_SYMBOLS = SYMBOL_CATEGORIES["Mega Cap Tech"] || [];
@@ -200,6 +206,7 @@ function ScannerContent() {
               <span className="text-gray-500">
                 {selectedResult.daily.pct_from_poc.toFixed(0)}% from POC
               </span>
+              {proximityLabel(selectedResult.price, selectedResult.daily) && <div className="text-xs text-blue-800">{proximityLabel(selectedResult.price, selectedResult.daily)}</div>}
               {selectedResult.daily.va_touch_date && <div className="text-xs text-amber-800">邊界測試日：{selectedResult.daily.va_touch_date} · {vaTouchContext(selectedResult.daily.va_touch_context)}</div>}
             </div>
             <div>
@@ -207,6 +214,7 @@ function ScannerContent() {
               <span className="text-gray-500">
                 {selectedResult.weekly.pct_from_poc.toFixed(0)}% from POC
               </span>
+              {proximityLabel(selectedResult.price, selectedResult.weekly) && <div className="text-xs text-blue-800">{proximityLabel(selectedResult.price, selectedResult.weekly)}</div>}
               {selectedResult.weekly.va_touch_date && <div className="text-xs text-amber-800">邊界測試日：{selectedResult.weekly.va_touch_date} · {vaTouchContext(selectedResult.weekly.va_touch_context)}</div>}
             </div>
             <div>
@@ -214,6 +222,7 @@ function ScannerContent() {
               <span className="text-gray-500">
                 {selectedResult.monthly.pct_from_poc.toFixed(0)}% from POC
               </span>
+              {proximityLabel(selectedResult.price, selectedResult.monthly) && <div className="text-xs text-blue-800">{proximityLabel(selectedResult.price, selectedResult.monthly)}</div>}
               {selectedResult.monthly.va_touch_date && <div className="text-xs text-amber-800">邊界測試日：{selectedResult.monthly.va_touch_date} · {vaTouchContext(selectedResult.monthly.va_touch_context)}</div>}
             </div>
           </div>
@@ -256,6 +265,7 @@ function ScannerContent() {
                     {r.weekly.pct_from_poc.toFixed(0)}% M:
                     {r.monthly.pct_from_poc.toFixed(0)}%
                   </div>
+                  {proximityLabel(r.price, r.daily) && <div className="text-xs text-blue-800 mt-1">{proximityLabel(r.price, r.daily)}</div>}
                 </button>
               ))}
             </div>
@@ -296,6 +306,7 @@ function ScannerContent() {
                     {r.weekly.pct_from_poc.toFixed(0)}% M:
                     {r.monthly.pct_from_poc.toFixed(0)}%
                   </div>
+                  {proximityLabel(r.price, r.daily) && <div className="text-xs text-blue-800 mt-1">{proximityLabel(r.price, r.daily)}</div>}
                 </button>
               ))}
             </div>
@@ -336,6 +347,7 @@ function ScannerContent() {
                     {r.weekly.pct_from_poc.toFixed(0)}% M:
                     {r.monthly.pct_from_poc.toFixed(0)}%
                   </div>
+                  {proximityLabel(r.price, r.daily) && <div className="text-xs text-blue-800 mt-1">{proximityLabel(r.price, r.daily)}</div>}
                 </button>
               ))}
             </div>
