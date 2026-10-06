@@ -17,7 +17,7 @@
 ```
 ┌────────────────── VP Position Viewer ────────────────────┐
 │                                                           │
-│  YahooProvider.batch_daily(62 symbols, 1y)                │
+│  YahooProvider.batch_daily(預設觀察清單, 1y)              │
 │       ↓                                                   │
 │  calc_vp(df, lookback, 0.68)                              │
 │  → histogram-based: bin prices → find POC → expand VA     │
@@ -174,9 +174,11 @@ pip install -r requirements.txt
 ### VP 掃描
 
 ```bash
-python scan_all.py              # 掃描 62 檔 → JSON + Telegram
+python scan_all.py              # 掃描預設觀察清單（含 CPO / 矽光子）→ JSON + Telegram
 python scan_all.py --dry-run    # 只印不發
 ```
+
+預設清單另設有 **CPO / Silicon Photonics** 分組，可在 Scanner 篩選 `AAOI`、`AVGO`、`COHR`、`LITE`、`MRVL`、`MTSI` 與 `POET`。這是觀察清單與呈現分類，不改變 VP、Accumulation 或策略評分規則；CPO 題材仍須自行評估個別公司基本面與交易風險。
 
 ### 累積追蹤
 
@@ -306,7 +308,7 @@ main → 建立工作 branch → 修改/測試 → sub-agent review → commit
 ## 檔案結構
 
 ```
-config.py                            # 全域設定（62 symbols, 閾值）
+config.py                            # 全域設定（觀察清單、分類、閾值）
 core/
 ├── signal.py                        # StrategySignal schema
 ├── base_strategy.py                 # BaseStrategy ABC

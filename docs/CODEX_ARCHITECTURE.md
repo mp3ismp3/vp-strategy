@@ -40,7 +40,7 @@ vp-strategy/
 
 ### `config.py`
 
-集中管理掃描標的與經回測調校的預設值：`SYMBOLS`、`SECTOR_MAP`、`DEFAULT_CFG`、`SCORING_WEIGHTS`、`REGIME_THRESHOLDS`。`BINANCE_EQUITY_SYMBOLS` 保存已核對的 Binance Equity TradFi underlying ticker universe；結算資產後綴不進入分析 schema，新增標的仍併入共用 `SYMBOLS`，並以互斥產業分類及對應 sector benchmark 供 Scanner、Accumulation、盤前、MACD 與 backtest 共用。變更預設值、權重或門檻必須跑相關測試及 `python backtest_multi.py`。
+集中管理掃描標的與經回測調校的預設值：`SYMBOLS`、`SECTOR_MAP`、`DEFAULT_CFG`、`SCORING_WEIGHTS`、`REGIME_THRESHOLDS`。`CPO / Silicon Photonics` 是 Scanner 使用的互斥產業分類，並由 `services/frontend/src/lib/categories.ts` mirror。`BINANCE_EQUITY_SYMBOLS` 保存已核對的 Binance Equity TradFi underlying ticker universe；結算資產後綴不進入分析 schema，新增標的仍併入共用 `SYMBOLS`，並以互斥產業分類及對應 sector benchmark 供 Scanner、Accumulation、盤前、MACD 與 backtest 共用。變更預設值、權重或門檻必須跑相關測試及 `python backtest_multi.py`。
 
 ### `core/`
 

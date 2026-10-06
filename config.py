@@ -24,7 +24,7 @@ SYMBOLS = [
     # Mega Cap Tech
     "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
     # Semiconductor / AI Chips
-    "AVGO", "AMD", "INTC", "QCOM", "MU", "MRVL", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON",
+    "AMD", "INTC", "QCOM", "MU", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON",
     # AI / Cloud / Software
     "NOW", "CRWV", "PLTR", "AI", "SNOW", "DDOG", "NET", "MDB", "PANW", "CRWD", "ZS", "FTNT", "ESTC", "NTSK",
     # AI Agent 概念
@@ -38,7 +38,9 @@ SYMBOLS = [
     # AI Quantum / Robotics / Emerging
     "SERV", "IONQ", "RGTI", "QUBT",
     # AI Infra / Networking
-    "CSCO", "CIEN", "LITE",
+    "CSCO", "CIEN",
+    # CPO / Silicon Photonics
+    "AAOI", "AVGO", "COHR", "LITE", "MRVL", "MTSI", "POET",
     # AI Healthcare
     "ISRG", "VEEV", "DXCM",
     # AI Cybersecurity
@@ -59,7 +61,7 @@ BINANCE_INDUSTRY_CATEGORIES = {
     "Semiconductor / AI Chips": ["ALAB", "AXTI", "CBRS", "CRDO", "SKHY", "SNDK", "TER", "TXN", "WDC"],
     "AI / Cloud / Software": ["APP", "NBIS", "PENG", "ZM"],
     "AI Hardware / Robotics": ["BOT", "ONDS"],
-    "AI Infra / Networking": ["AAOI", "COHR", "GLW", "NOK"],
+    "AI Infra / Networking": ["GLW", "NOK"],
     "Financial / Fintech": ["BBX", "BRK-B", "BSP", "BX", "CRCL", "GS", "HOOD", "JPM", "PAYP", "PYPL", "SOFI", "V"],
     "Digital Assets / Crypto": ["BMNR", "BNC", "FWDI", "IREN", "STRC"],
     "Consumer / Media": ["BABA", "COST", "DIS", "DKNG", "EBAY", "GME", "HD", "KO", "LYTE", "NFLX", "QNTX", "RDDT", "RIVN", "SONY", "TTWO", "WEN", "WMT"],
@@ -89,14 +91,15 @@ SECTOR_ETFS = list(dict.fromkeys([
 
 SYMBOL_CATEGORIES = {
     "Mega Cap Tech": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"],
-    "Semiconductor / AI Chips": ["AVGO", "AMD", "INTC", "QCOM", "MU", "MRVL", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON"],
+    "Semiconductor / AI Chips": ["AMD", "INTC", "QCOM", "MU", "ARM", "TSM", "ASML", "AMAT", "LRCX", "KLAC", "ON"],
     "AI / Cloud / Software": ["NOW", "CRWV", "PLTR", "AI", "SNOW", "DDOG", "NET", "MDB", "PANW", "CRWD", "ZS", "FTNT", "ESTC", "NTSK"],
     "AI Agent": ["CRM", "PATH", "HUBS", "ADBE"],
     "Cloud Infrastructure": ["ORCL", "IBM", "INTU", "WDAY", "TEAM"],
     "AI Hardware / Robotics": ["DELL", "HPE", "SMCI", "VRT", "ANET"],
     "AI Power / Energy": ["VST", "CEG", "TLN", "NRG", "ETN", "PWR", "GEV", "FSLR"],
     "AI Quantum / Emerging": ["SERV", "IONQ", "RGTI", "QUBT"],
-    "AI Infra / Networking": ["CSCO", "JNPR", "CIEN", "LITE"],
+    "AI Infra / Networking": ["CSCO", "JNPR", "CIEN"],
+    "CPO / Silicon Photonics": ["AAOI", "AVGO", "COHR", "LITE", "MRVL", "MTSI", "POET"],
     "AI Healthcare": ["ISRG", "VEEV", "DXCM"],
     "AI Cybersecurity": ["S", "CYBR", "OKTA"],
     "AI Enterprise / Automation": ["MNDY", "DOCN", "TWLO", "TTD"],
@@ -131,6 +134,7 @@ SECTOR_MAP = {
     # New AI stocks
     "SERV": "XLK", "IONQ": "XLK", "RGTI": "XLK", "QUBT": "XLK",
     "CSCO": "XLK", "CIEN": "XLK", "LITE": "XLK",
+    "AAOI": "XLK", "COHR": "XLK", "MTSI": "SMH", "POET": "SMH",
     "ISRG": "XLK", "VEEV": "IGV", "DXCM": "XLK",
     "S": "IGV", "OKTA": "IGV",
     "MNDY": "IGV", "DOCN": "IGV", "TWLO": "IGV", "TTD": "IGV",

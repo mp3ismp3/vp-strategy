@@ -61,6 +61,17 @@ describe("indicator preview access", () => {
   });
 });
 
+describe("scanner categories", () => {
+  it("exposes the CPO / silicon photonics universe without duplicate categories", () => {
+    const cpoSymbols = ["AAOI", "AVGO", "COHR", "LITE", "MRVL", "MTSI", "POET"];
+
+    expect(SYMBOL_CATEGORIES["CPO / Silicon Photonics"]).toEqual(cpoSymbols);
+    for (const ticker of cpoSymbols) {
+      expect(Object.values(SYMBOL_CATEGORIES).filter((symbols) => symbols.includes(ticker))).toHaveLength(1);
+    }
+  });
+});
+
 describe("accumulation preview access", () => {
   const rows = Array.from({ length: 12 }, (_, index) => ({
     ticker: `T${index}`,

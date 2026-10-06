@@ -8,6 +8,25 @@ class TestConfig:
         missing = [s for s in SYMBOLS if s not in SECTOR_MAP]
         assert missing == [], f"Missing: {missing}"
 
+    def test_cpo_universe_is_scanned_once_with_the_right_benchmark(self):
+        cpo_symbols = {"AAOI", "AVGO", "COHR", "LITE", "MRVL", "MTSI", "POET"}
+
+        assert set(SYMBOL_CATEGORIES["CPO / Silicon Photonics"]) == cpo_symbols
+        assert cpo_symbols <= set(SYMBOLS)
+        assert {symbol: SECTOR_MAP[symbol] for symbol in cpo_symbols} == {
+            "AAOI": "XLK",
+            "AVGO": "SMH",
+            "COHR": "XLK",
+            "LITE": "XLK",
+            "MRVL": "SMH",
+            "MTSI": "SMH",
+            "POET": "SMH",
+        }
+        assert all(
+            sum(symbol in category for category in SYMBOL_CATEGORIES.values()) == 1
+            for symbol in cpo_symbols
+        )
+
     def test_binance_equity_universe_uses_underlying_tickers(self):
         assert len(BINANCE_EQUITY_SYMBOLS) == 137
         assert len(BINANCE_EQUITY_SYMBOLS) == len(set(BINANCE_EQUITY_SYMBOLS))
@@ -20,7 +39,7 @@ class TestConfig:
             symbol: sum(symbol in symbols for symbols in SYMBOL_CATEGORIES.values())
             for symbol in BINANCE_EQUITY_ADDITIONS
         }
-        assert len(BINANCE_EQUITY_ADDITIONS) == 92
+        assert len(BINANCE_EQUITY_ADDITIONS) == 90
         assert set(category_counts.values()) == {1}
         assert "Binance 美股合約" not in SYMBOL_CATEGORIES
 
