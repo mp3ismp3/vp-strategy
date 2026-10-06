@@ -118,7 +118,7 @@ data/scan_results.json
 
 `scan_results.json` 頂層契約為 `scan_time`、`market_ctx`、`total_symbols`、`vp_data`。UI 與上傳流程依賴此格式，不可任意改名或改巢狀結構。寫出前會移除 VP histogram，避免 JSON 過大。
 
-每個 daily/weekly/monthly VP frame 可選擇包含 `va_touch`：`vah`、`val`、`both` 或 `null`，以及 `va_touch_date`、`va_touch_context`。Scanner 與 chart export 先依 `core.market_bars.completed_bars()` 排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 判斷邊界測試；Telegram 會合併同一標的的多 timeframe 觸及。Scanner 卡片以同一時間框架的位置與觸及標籤為一組，並依卡片寬度換行。若前一根 K 棒已在 VA 外、最新 K 棒回測邊界且收在外側，`va_touch_context` 可標為 `retest_from_above` 或 `retest_from_below`；這仍是觀察描述，不是已確認的交易信號。
+每個 daily/weekly/monthly VP frame 可選擇包含 `va_touch`：`vah`、`val`、`both` 或 `null`，以及 `va_touch_date`、`va_touch_context`。Scanner 與 chart export 先依 `core.market_bars.completed_bars()` 排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 判斷邊界測試；Telegram 會合併同一標的的多 timeframe 觸及。Scanner 卡片的觸及摘要以同一邊界的價位中點 0.5% 為匯聚帶；帶內顯示一個 D／W／M 匯聚區，帶外維持個別週期的分散觸及，避免把重疊 profile 當作獨立 signal。若前一根 K 棒已在 VA 外、最新 K 棒回測邊界且收在外側，`va_touch_context` 可標為 `retest_from_above` 或 `retest_from_below`；這仍是觀察描述，不是已確認的交易信號。
 
 Scanner Web UI 會以既有 `price`、`vah`、`val` 在 client-side 計算最近 Value Area 邊界與距離，舊 scan snapshots 亦可呈現，不回寫 Scanner JSON 或改變 consensus。
 
