@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { StrategyGuide } from "@/components/StrategyGuide";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { SYMBOL_CATEGORIES, ALL_CATEGORIES, isBinanceEquityTicker } from "@/lib/categories";
-import { getNearestValueAreaEdge } from "@/lib/vp-labels";
+import { getNearestValueAreaEdge, summarizeValueAreaTouches } from "@/lib/vp-labels";
 import type { Plan } from "@/types/user";
 
 function ScannerContent() {
@@ -91,19 +91,25 @@ function ScannerContent() {
     at_val: "收在 VAL",
   }[context || ""] || "待確認");
 
-  const positionBadge = (level: ScanResult["daily"]) => {
+  const positionBadge = (level: ScanResult["daily"], includeTouch = true) => {
     const position = level.position;
     if (position === "above_va")
-      return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-green-100 text-green-800">Above VA</Badge>{vaTouchBadge(level.va_touch)}</span>;
+      return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-green-100 text-green-800">Above VA</Badge>{includeTouch && vaTouchBadge(level.va_touch)}</span>;
     if (position === "below_va")
-      return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-red-100 text-red-800">Below VA</Badge>{vaTouchBadge(level.va_touch)}</span>;
-    return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-gray-100 text-gray-800">Inside VA</Badge>{vaTouchBadge(level.va_touch)}</span>;
+      return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-red-100 text-red-800">Below VA</Badge>{includeTouch && vaTouchBadge(level.va_touch)}</span>;
+    return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-gray-100 text-gray-800">Inside VA</Badge>{includeTouch && vaTouchBadge(level.va_touch)}</span>;
   };
 
   const proximityLabel = (price: number, level: ScanResult["daily"]) => {
     const proximity = getNearestValueAreaEdge(price, level.val, level.vah);
     return proximity ? `最近 ${proximity.edge}：${proximity.distancePct.toFixed(1)}%` : null;
   };
+
+  const cardTouchSummaries = (result: ScanResult) => summarizeValueAreaTouches([
+    { timeframe: "D", vah: result.daily.vah, val: result.daily.val, vaTouch: result.daily.va_touch },
+    { timeframe: "W", vah: result.weekly.vah, val: result.weekly.val, vaTouch: result.weekly.va_touch },
+    { timeframe: "M", vah: result.monthly.vah, val: result.monthly.val, vaTouch: result.monthly.va_touch },
+  ]);
 
   const FREE_SYMBOLS = SYMBOL_CATEGORIES["Mega Cap Tech"] || [];
 
@@ -256,9 +262,9 @@ function ScannerContent() {
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1 text-xs text-gray-500">
-                    {positionBadge(r.daily)}
-                    {positionBadge(r.weekly)}
-                    {positionBadge(r.monthly)}
+                    {positionBadge(r.daily, false)}
+                    {positionBadge(r.weekly, false)}
+                    {positionBadge(r.monthly, false)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     D:{r.daily.pct_from_poc.toFixed(0)}% W:
@@ -266,6 +272,9 @@ function ScannerContent() {
                     {r.monthly.pct_from_poc.toFixed(0)}%
                   </div>
                   {proximityLabel(r.price, r.daily) && <div className="text-xs text-blue-800 mt-1">{proximityLabel(r.price, r.daily)}</div>}
+                  {cardTouchSummaries(r).map((summary) => (
+                    <div key={summary.edge} className="mt-1 text-xs text-amber-800">{summary.label}</div>
+                  ))}
                 </button>
               ))}
             </div>
@@ -297,9 +306,9 @@ function ScannerContent() {
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1 text-xs text-gray-500">
-                    {positionBadge(r.daily)}
-                    {positionBadge(r.weekly)}
-                    {positionBadge(r.monthly)}
+                    {positionBadge(r.daily, false)}
+                    {positionBadge(r.weekly, false)}
+                    {positionBadge(r.monthly, false)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     D:{r.daily.pct_from_poc.toFixed(0)}% W:
@@ -307,6 +316,9 @@ function ScannerContent() {
                     {r.monthly.pct_from_poc.toFixed(0)}%
                   </div>
                   {proximityLabel(r.price, r.daily) && <div className="text-xs text-blue-800 mt-1">{proximityLabel(r.price, r.daily)}</div>}
+                  {cardTouchSummaries(r).map((summary) => (
+                    <div key={summary.edge} className="mt-1 text-xs text-amber-800">{summary.label}</div>
+                  ))}
                 </button>
               ))}
             </div>
@@ -338,9 +350,9 @@ function ScannerContent() {
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1 text-xs text-gray-500">
-                    {positionBadge(r.daily)}
-                    {positionBadge(r.weekly)}
-                    {positionBadge(r.monthly)}
+                    {positionBadge(r.daily, false)}
+                    {positionBadge(r.weekly, false)}
+                    {positionBadge(r.monthly, false)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     D:{r.daily.pct_from_poc.toFixed(0)}% W:
@@ -348,6 +360,9 @@ function ScannerContent() {
                     {r.monthly.pct_from_poc.toFixed(0)}%
                   </div>
                   {proximityLabel(r.price, r.daily) && <div className="text-xs text-blue-800 mt-1">{proximityLabel(r.price, r.daily)}</div>}
+                  {cardTouchSummaries(r).map((summary) => (
+                    <div key={summary.edge} className="mt-1 text-xs text-amber-800">{summary.label}</div>
+                  ))}
                 </button>
               ))}
             </div>

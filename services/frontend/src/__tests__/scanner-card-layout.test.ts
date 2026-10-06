@@ -8,9 +8,11 @@ const scannerPage = readFileSync(
 );
 
 describe("scanner card value-area badges", () => {
-  it("keeps a VAL touch with its timeframe badge while allowing card rows to wrap", () => {
-    expect(scannerPage).toContain('`${touch.toUpperCase()} 觸及`');
+  it("summarizes card touches instead of repeating a badge for every timeframe", () => {
+    expect(scannerPage).toContain("summarizeValueAreaTouches");
+    expect(scannerPage).toContain("positionBadge(r.daily, false)");
+    expect(scannerPage).toContain("positionBadge(r.weekly, false)");
+    expect(scannerPage).toContain("positionBadge(r.monthly, false)");
     expect(scannerPage).toContain("flex flex-wrap gap-1");
-    expect(scannerPage).toContain('className="inline-flex items-center gap-1 whitespace-nowrap"');
   });
 });

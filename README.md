@@ -62,7 +62,7 @@
 5. **VAH** = Value Area 上緣（賣方壓力起始點）
 6. **VAL** = Value Area 下緣（買方支撐起始點）
 
-Scanner 會先排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 區間判斷是否觸及 VAH/VAL，並在 Telegram 與 Web Scanner 顯示「VAH 觸及」「VAL 觸及」或「VAH + VAL 觸及」、測試日期及收盤結果（收回 VA／收在 VA 外側／VAH 或 VAL 回踩守住）；同一標的的多個 timeframe 會合併顯示。卡片中的同一時間框架位置與觸及標籤會保持為一組，並會依卡片寬度換行。這些是邊界測試提示，不代表已確認拒絕或突破；實際操作仍需自行確認風險與後續價格行為。
+Scanner 會先排除擷取時尚未完成的日 K，再以最新完整日 K 的 High–Low 區間判斷是否觸及 VAH/VAL，並在 Telegram 與 Web Scanner 顯示「VAH 觸及」「VAL 觸及」或「VAH + VAL 觸及」、測試日期及收盤結果（收回 VA／收在 VA 外側／VAH 或 VAL 回踩守住）；同一標的的多個 timeframe 會合併顯示。卡片會把 D／W／M 的觸及彙總：同一邊界的價位在中點 0.5% 範圍內才標示為「匯聚」，否則列為各週期的分散觸及，不將同一根 K 的多個重疊 profile 視為獨立信號。這些是邊界測試提示，不代表已確認拒絕或突破；實際操作仍需自行確認風險與後續價格行為。
 
 即使尚未觸及邊界，Web Scanner 每張卡片也會以既有 price、VAH、VAL 顯示 Daily 最近的操作邊界與距離百分比；展開標的可看 Daily／Weekly／Monthly 各自最近的邊界。這是距離提示，不構成交易信號。
 
