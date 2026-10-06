@@ -94,10 +94,10 @@ function ScannerContent() {
   const positionBadge = (level: ScanResult["daily"]) => {
     const position = level.position;
     if (position === "above_va")
-      return <>{<Badge className="bg-green-100 text-green-800">Above VA</Badge>} {vaTouchBadge(level.va_touch)}</>;
+      return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-green-100 text-green-800">Above VA</Badge>{vaTouchBadge(level.va_touch)}</span>;
     if (position === "below_va")
-      return <>{<Badge className="bg-red-100 text-red-800">Below VA</Badge>} {vaTouchBadge(level.va_touch)}</>;
-    return <><Badge className="bg-gray-100 text-gray-800">Inside VA</Badge> {vaTouchBadge(level.va_touch)}</>;
+      return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-red-100 text-red-800">Below VA</Badge>{vaTouchBadge(level.va_touch)}</span>;
+    return <span className="inline-flex items-center gap-1 whitespace-nowrap"><Badge className="bg-gray-100 text-gray-800">Inside VA</Badge>{vaTouchBadge(level.va_touch)}</span>;
   };
 
   const proximityLabel = (price: number, level: ScanResult["daily"]) => {
@@ -255,7 +255,7 @@ function ScannerContent() {
                       ${r.price.toFixed(2)}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-2 flex gap-1">
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs text-gray-500">
                     {positionBadge(r.daily)}
                     {positionBadge(r.weekly)}
                     {positionBadge(r.monthly)}
@@ -296,7 +296,7 @@ function ScannerContent() {
                       ${r.price.toFixed(2)}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-2 flex gap-1">
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs text-gray-500">
                     {positionBadge(r.daily)}
                     {positionBadge(r.weekly)}
                     {positionBadge(r.monthly)}
@@ -337,7 +337,7 @@ function ScannerContent() {
                       ${r.price.toFixed(2)}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-2 flex gap-1">
+                  <div className="mt-2 flex flex-wrap gap-1 text-xs text-gray-500">
                     {positionBadge(r.daily)}
                     {positionBadge(r.weekly)}
                     {positionBadge(r.monthly)}
