@@ -2,10 +2,9 @@
   "GME": {
     "phase": "UNKNOWN",
     "tier": "confirmed",
-    "decay_score": 12.0,
-    "raw_score": 12,
+    "decay_score": 11.0,
+    "raw_score": 11,
     "raw_history": [
-      7,
       7,
       4,
       6,
@@ -34,15 +33,16 @@
       14,
       12,
       12,
-      12
+      12,
+      11
     ],
     "entered_date": "2026-09-01",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 17.790000915527344,
     "support_dynamic": 17.790000915527344,
     "resistance": 25.25,
     "promote_streak": 0,
-    "demote_streak": 0,
+    "demote_streak": 1,
     "failing": false,
     "fail_days": 0,
     "triggers_fired": [],
@@ -51,10 +51,10 @@
     "phase_back_count": 0
   },
   "S": {
-    "phase": "UNKNOWN",
+    "phase": "D",
     "tier": "confirmed",
-    "decay_score": 12.0,
-    "raw_score": 12,
+    "decay_score": 11.0,
+    "raw_score": 11,
     "raw_history": [
       7,
       5,
@@ -84,15 +84,16 @@
       14,
       12,
       12,
-      12
+      12,
+      11
     ],
     "entered_date": "2026-09-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 13.524999618530273,
     "support_dynamic": 21.790000915527344,
     "resistance": 26.5,
     "promote_streak": 0,
-    "demote_streak": 0,
+    "demote_streak": 1,
     "failing": false,
     "fail_days": 0,
     "triggers_fired": [
@@ -105,188 +106,11 @@
     "pending_triggers": [],
     "phase_back_count": 0
   },
-  "TSLA": {
-    "phase": "UNKNOWN",
-    "tier": "watch",
-    "decay_score": 5.78,
-    "raw_score": 2,
-    "raw_history": [
-      7,
-      6,
-      7,
-      9,
-      11,
-      11,
-      10,
-      7,
-      6,
-      6,
-      7,
-      8,
-      4,
-      5,
-      8,
-      8,
-      6,
-      8,
-      9,
-      8,
-      5,
-      2
-    ],
-    "entered_date": "2026-09-17",
-    "last_updated": "2026-10-16",
-    "support_primary": 297.3800048828125,
-    "support_dynamic": 345.8800048828125,
-    "resistance": 388.55999755859375,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [
-      {
-        "type": "SOS_BREAKOUT",
-        "date": "2026-10-03"
-      }
-    ],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
-  "INTC": {
-    "phase": "UNKNOWN",
-    "tier": "watch",
-    "decay_score": 5.95,
-    "raw_score": 4,
-    "raw_history": [
-      11,
-      9,
-      11,
-      12,
-      13,
-      13,
-      12,
-      12,
-      10,
-      8,
-      10,
-      8,
-      8,
-      6,
-      6,
-      6,
-      5,
-      1,
-      5,
-      6,
-      7,
-      4
-    ],
-    "entered_date": "2026-09-17",
-    "last_updated": "2026-10-16",
-    "support_primary": 64.47000122070312,
-    "support_dynamic": 85.13999938964844,
-    "resistance": 127.44000244140625,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
-  "HPE": {
-    "phase": "E",
-    "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
-    "raw_history": [
-      7,
-      6,
-      8,
-      7,
-      8,
-      8,
-      8,
-      6,
-      5,
-      5,
-      6,
-      7,
-      9,
-      8,
-      8,
-      9,
-      9,
-      9,
-      9,
-      8,
-      8,
-      6
-    ],
-    "entered_date": "2026-09-17",
-    "last_updated": "2026-10-16",
-    "support_primary": 25.75431889195786,
-    "support_dynamic": 54.8811870199367,
-    "resistance": 73.55999755859375,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 1
-  },
-  "ISRG": {
-    "phase": "UNKNOWN",
-    "tier": "watch",
-    "decay_score": 9.35,
-    "raw_score": 9,
-    "raw_history": [
-      8,
-      8,
-      8,
-      11,
-      10,
-      10,
-      11,
-      11,
-      11,
-      11,
-      13,
-      11,
-      10,
-      9,
-      8,
-      8,
-      9,
-      12,
-      10,
-      10,
-      11,
-      9
-    ],
-    "entered_date": "2026-09-17",
-    "last_updated": "2026-10-16",
-    "support_primary": 328.57000732421875,
-    "support_dynamic": 389.1099853515625,
-    "resistance": 416.510009765625,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
   "AAPL": {
     "phase": "D",
     "tier": "confirmed",
-    "decay_score": 14.0,
-    "raw_score": 14,
+    "decay_score": 12.0,
+    "raw_score": 12,
     "raw_history": [
       7,
       8,
@@ -308,10 +132,11 @@
       8,
       11,
       12,
-      14
+      14,
+      12
     ],
     "entered_date": "2026-09-18",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 264.59781690250213,
     "support_dynamic": 325.80999755859375,
     "resistance": 345.3399963378906,
@@ -324,100 +149,11 @@
     "pending_triggers": [],
     "phase_back_count": 0
   },
-  "NVDA": {
+  "MRVL": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
-    "raw_history": [
-      7,
-      11,
-      9,
-      11,
-      9,
-      9,
-      10,
-      10,
-      7,
-      7,
-      9,
-      10,
-      11,
-      10,
-      10,
-      8,
-      7,
-      9,
-      8,
-      6,
-      6
-    ],
-    "entered_date": "2026-09-18",
-    "last_updated": "2026-10-16",
-    "support_primary": 189.58785574691487,
-    "support_dynamic": 208.92999267578125,
-    "resistance": 243.3699951171875,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
-  "CIEN": {
-    "phase": "D",
-    "tier": "watch",
-    "decay_score": 5.0,
+    "decay_score": 5.1,
     "raw_score": 5,
-    "raw_history": [
-      8,
-      9,
-      9,
-      8,
-      9,
-      8,
-      9,
-      10,
-      11,
-      10,
-      11,
-      11,
-      11,
-      11,
-      10,
-      9,
-      8,
-      9,
-      7,
-      6,
-      5
-    ],
-    "entered_date": "2026-09-18",
-    "last_updated": "2026-10-16",
-    "support_primary": 311.6000061035156,
-    "support_dynamic": 339.3299865722656,
-    "resistance": 454.7300109863281,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [
-      {
-        "type": "SOS_BREAKOUT",
-        "date": "2026-10-07"
-      }
-    ],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 1
-  },
-  "MRVL": {
-    "phase": "A",
-    "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
     "raw_history": [
       9,
       11,
@@ -438,11 +174,12 @@
       9,
       7,
       6,
-      6
+      6,
+      5
     ],
     "entered_date": "2026-09-21",
-    "last_updated": "2026-10-16",
-    "support_primary": 133.0980834845497,
+    "last_updated": "2026-10-20",
+    "support_primary": 143.86305500180566,
     "support_dynamic": 200.57616989162244,
     "resistance": 301.2041915228062,
     "promote_streak": 0,
@@ -479,10 +216,11 @@
       5,
       3,
       2,
+      4,
       4
     ],
     "entered_date": "2026-09-21",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 1363.047238076459,
     "support_dynamic": 1572.8399658203125,
     "resistance": 1873.5,
@@ -498,8 +236,8 @@
   "PLTR": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 9.0,
-    "raw_score": 9,
+    "decay_score": 10.0,
+    "raw_score": 10,
     "raw_history": [
       7,
       11,
@@ -520,13 +258,14 @@
       12,
       12,
       10,
-      9
+      9,
+      10
     ],
     "entered_date": "2026-09-21",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 106.37000274658203,
     "support_dynamic": 164.5500030517578,
-    "resistance": 194.67999267578125,
+    "resistance": 212.94000244140625,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -561,11 +300,12 @@
       9,
       8,
       6,
+      6,
       6
     ],
     "entered_date": "2026-09-21",
-    "last_updated": "2026-10-16",
-    "support_primary": 167.24000549316406,
+    "last_updated": "2026-10-20",
+    "support_primary": 168.1999969482422,
     "support_dynamic": 251.625,
     "resistance": 401.739990234375,
     "promote_streak": 0,
@@ -587,10 +327,10 @@
     "phase_back_count": 0
   },
   "PYPL": {
-    "phase": "UNKNOWN",
+    "phase": "D",
     "tier": "confirmed",
-    "decay_score": 13.0,
-    "raw_score": 13,
+    "decay_score": 14.0,
+    "raw_score": 14,
     "raw_history": [
       7,
       7,
@@ -611,10 +351,11 @@
       11,
       13,
       12,
-      13
+      13,
+      14
     ],
     "entered_date": "2026-09-21",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 40.10095115158971,
     "support_dynamic": 51.81100082397461,
     "resistance": 55.54499816894531,
@@ -622,7 +363,12 @@
     "demote_streak": 0,
     "failing": false,
     "fail_days": 0,
-    "triggers_fired": [],
+    "triggers_fired": [
+      {
+        "type": "SOS_BREAKOUT",
+        "date": "2026-10-20"
+      }
+    ],
     "removed_reason": null,
     "pending_triggers": [],
     "phase_back_count": 0
@@ -630,8 +376,8 @@
   "TQQQ": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 5.52,
-    "raw_score": 5,
+    "decay_score": 4.69,
+    "raw_score": 2,
     "raw_history": [
       7,
       8,
@@ -652,10 +398,11 @@
       9,
       7,
       5,
-      5
+      5,
+      2
     ],
     "entered_date": "2026-09-21",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 56.580063033377456,
     "support_dynamic": 66.42156290269638,
     "resistance": 85.31999969482422,
@@ -676,8 +423,8 @@
   "ON": {
     "phase": "B",
     "tier": "watch",
-    "decay_score": 11.0,
-    "raw_score": 11,
+    "decay_score": 10.0,
+    "raw_score": 10,
     "raw_history": [
       8,
       9,
@@ -697,10 +444,11 @@
       10,
       10,
       11,
-      11
+      11,
+      10
     ],
     "entered_date": "2026-09-22",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 65.80000305175781,
     "support_dynamic": 65.80000305175781,
     "resistance": 86.91999816894531,
@@ -716,8 +464,8 @@
   "CRWD": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 8.0,
-    "raw_score": 8,
+    "decay_score": 6.8,
+    "raw_score": 6,
     "raw_history": [
       7,
       7,
@@ -737,10 +485,11 @@
       10,
       10,
       8,
-      8
+      8,
+      6
     ],
     "entered_date": "2026-09-22",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 104.25499725341797,
     "support_dynamic": 181.24000549316406,
     "resistance": 286.989990234375,
@@ -754,10 +503,10 @@
     "phase_back_count": 0
   },
   "PENG": {
-    "phase": "E",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
+    "decay_score": 4.5,
+    "raw_score": 4,
     "raw_history": [
       8,
       4,
@@ -777,11 +526,12 @@
       9,
       7,
       6,
-      6
+      6,
+      4
     ],
     "entered_date": "2026-09-22",
-    "last_updated": "2026-10-16",
-    "support_primary": 26.219999313354492,
+    "last_updated": "2026-10-20",
+    "support_primary": 26.6200008392334,
     "support_dynamic": 46.189998626708984,
     "resistance": 57.5,
     "promote_streak": 0,
@@ -816,13 +566,13 @@
     ],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 1
+    "phase_back_count": 0
   },
   "TXN": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 10.0,
-    "raw_score": 10,
+    "decay_score": 8.5,
+    "raw_score": 8,
     "raw_history": [
       7,
       7,
@@ -842,11 +592,12 @@
       11,
       12,
       10,
-      10
+      10,
+      8
     ],
     "entered_date": "2026-09-22",
-    "last_updated": "2026-10-16",
-    "support_primary": 222.39553553028315,
+    "last_updated": "2026-10-20",
+    "support_primary": 227.69138364399828,
     "support_dynamic": 248.1300048828125,
     "resistance": 298.75,
     "promote_streak": 0,
@@ -881,11 +632,12 @@
       7,
       5,
       5,
+      5,
       5
     ],
     "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
-    "support_primary": 241.1737180117162,
+    "last_updated": "2026-10-20",
+    "support_primary": 241.17373283191128,
     "support_dynamic": 265.0883866047571,
     "resistance": 352.55999755859375,
     "promote_streak": 0,
@@ -897,55 +649,11 @@
     "pending_triggers": [],
     "phase_back_count": 0
   },
-  "COIN": {
-    "phase": "UNKNOWN",
-    "tier": "watch",
-    "decay_score": 4.25,
-    "raw_score": 1,
-    "raw_history": [
-      7,
-      7,
-      7,
-      7,
-      7,
-      8,
-      6,
-      6,
-      5,
-      6,
-      5,
-      4,
-      4,
-      5,
-      6,
-      5,
-      5,
-      1
-    ],
-    "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
-    "support_primary": 139.11000061035156,
-    "support_dynamic": 161.17999267578125,
-    "resistance": 200.35000610351562,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [
-      {
-        "type": "SOS_BREAKOUT",
-        "date": "2026-10-03"
-      }
-    ],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
   "FWDI": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 5.95,
-    "raw_score": 5,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       8,
       8,
@@ -964,10 +672,11 @@
       6,
       7,
       7,
-      5
+      5,
+      6
     ],
     "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 3.4800000190734863,
     "support_dynamic": 5.760000228881836,
     "resistance": 8.640000343322754,
@@ -986,7 +695,7 @@
     "phase_back_count": 0
   },
   "NOK": {
-    "phase": "C",
+    "phase": "D",
     "tier": "watch",
     "decay_score": 4.0,
     "raw_score": 4,
@@ -1008,10 +717,11 @@
       4,
       4,
       4,
+      4,
       4
     ],
     "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 8.369999885559082,
     "support_dynamic": 9.649999618530273,
     "resistance": 10.989999771118164,
@@ -1025,10 +735,10 @@
     "phase_back_count": 0
   },
   "SMH": {
-    "phase": "A",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       13,
       14,
@@ -1047,10 +757,11 @@
       9,
       6,
       5,
-      7
+      7,
+      6
     ],
     "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 458.6499938964844,
     "support_dynamic": 537.72998046875,
     "resistance": 639.469970703125,
@@ -1064,7 +775,7 @@
     "phase_back_count": 0
   },
   "TZA": {
-    "phase": "UNKNOWN",
+    "phase": "D",
     "tier": "watch",
     "decay_score": 11.0,
     "raw_score": 11,
@@ -1086,10 +797,11 @@
       10,
       11,
       10,
+      11,
       11
     ],
     "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 35.94113246699077,
     "support_dynamic": 44.290000915527344,
     "resistance": 45.754947572977535,
@@ -1105,8 +817,8 @@
   "WDC": {
     "phase": "C",
     "tier": "watch",
-    "decay_score": 4.0,
-    "raw_score": 4,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       7,
       6,
@@ -1125,10 +837,11 @@
       6,
       4,
       4,
-      4
+      4,
+      6
     ],
     "entered_date": "2026-09-23",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 331.80999755859375,
     "support_dynamic": 407.1199951171875,
     "resistance": 475.6600036621094,
@@ -1176,10 +889,11 @@
       8,
       4,
       4,
+      5,
       5
     ],
     "entered_date": "2026-09-24",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 164.20460198877396,
     "support_dynamic": 165.88999938964844,
     "resistance": 208.67999267578125,
@@ -1192,54 +906,11 @@
     "pending_triggers": [],
     "phase_back_count": 0
   },
-  "LITE": {
-    "phase": "UNKNOWN",
-    "tier": "watch",
-    "decay_score": 4.33,
-    "raw_score": 2,
-    "raw_history": [
-      10,
-      11,
-      12,
-      11,
-      8,
-      9,
-      8,
-      10,
-      10,
-      10,
-      10,
-      9,
-      8,
-      8,
-      6,
-      5,
-      2
-    ],
-    "entered_date": "2026-09-24",
-    "last_updated": "2026-10-16",
-    "support_primary": 594.8400268554688,
-    "support_dynamic": 881.22998046875,
-    "resistance": 1143.0,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": false,
-    "fail_days": 0,
-    "triggers_fired": [
-      {
-        "type": "SOS_BREAKOUT",
-        "date": "2026-10-02"
-      }
-    ],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
   "STRC": {
-    "phase": "UNKNOWN",
+    "phase": "D",
     "tier": "confirmed",
-    "decay_score": 14.0,
-    "raw_score": 14,
+    "decay_score": 11.0,
+    "raw_score": 11,
     "raw_history": [
       12,
       10,
@@ -1257,15 +928,16 @@
       14,
       14,
       14,
-      14
+      14,
+      11
     ],
     "entered_date": "2026-09-24",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 68.28250838778114,
     "support_dynamic": 98.58330622974007,
     "resistance": 99.58000183105469,
     "promote_streak": 0,
-    "demote_streak": 0,
+    "demote_streak": 1,
     "failing": false,
     "fail_days": 0,
     "triggers_fired": [],
@@ -1276,7 +948,7 @@
   "AMAT": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 5.06,
+    "decay_score": 4.3,
     "raw_score": 4,
     "raw_history": [
       8,
@@ -1294,10 +966,11 @@
       7,
       7,
       4,
+      4,
       4
     ],
     "entered_date": "2026-09-25",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 376.1995710708158,
     "support_dynamic": 411.510009765625,
     "resistance": 547.25,
@@ -1313,8 +986,8 @@
   "JPM": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
+    "decay_score": 7.0,
+    "raw_score": 7,
     "raw_history": [
       7,
       7,
@@ -1331,10 +1004,11 @@
       6,
       3,
       5,
-      6
+      6,
+      7
     ],
     "entered_date": "2026-09-25",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 290.901699401834,
     "support_dynamic": 324.2523219854466,
     "resistance": 361.0586715329967,
@@ -1368,10 +1042,11 @@
       7,
       7,
       8,
+      9,
       9
     ],
     "entered_date": "2026-09-25",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 847.8335017278876,
     "support_dynamic": 1131.2099609375,
     "resistance": 1215.0,
@@ -1382,12 +1057,12 @@
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 0
+    "phase_back_count": 1
   },
   "STXX": {
     "phase": "C",
     "tier": "watch",
-    "decay_score": 4.5,
+    "decay_score": 4.0,
     "raw_score": 4,
     "raw_history": [
       7,
@@ -1405,10 +1080,11 @@
       5,
       6,
       6,
+      4,
       4
     ],
     "entered_date": "2026-09-25",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 21.139999389648438,
     "support_dynamic": 31.600000381469727,
     "resistance": 48.630001068115234,
@@ -1429,8 +1105,8 @@
   "XLE": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 10.0,
-    "raw_score": 10,
+    "decay_score": 11.0,
+    "raw_score": 11,
     "raw_history": [
       7,
       7,
@@ -1447,10 +1123,11 @@
       8,
       10,
       9,
-      10
+      10,
+      11
     ],
     "entered_date": "2026-09-25",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 52.309071774641296,
     "support_dynamic": 60.95000076293945,
     "resistance": 65.77900411302032,
@@ -1464,10 +1141,10 @@
     "phase_back_count": 0
   },
   "TLN": {
-    "phase": "A",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 8.0,
-    "raw_score": 8,
+    "decay_score": 7.0,
+    "raw_score": 7,
     "raw_history": [
       7,
       6,
@@ -1482,13 +1159,14 @@
       7,
       7,
       8,
-      8
+      8,
+      7
     ],
     "entered_date": "2026-09-30",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 279.7699890136719,
     "support_dynamic": 279.7699890136719,
-    "resistance": 330.635009765625,
+    "resistance": 390.5400085449219,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -1499,9 +1177,9 @@
     "phase_back_count": 0
   },
   "TWLO": {
-    "phase": "A",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 4.3,
+    "decay_score": 4.0,
     "raw_score": 4,
     "raw_history": [
       7,
@@ -1517,11 +1195,12 @@
       7,
       5,
       5,
+      4,
       4
     ],
     "entered_date": "2026-09-30",
-    "last_updated": "2026-10-16",
-    "support_primary": 137.24000549316406,
+    "last_updated": "2026-10-20",
+    "support_primary": 138.0,
     "support_dynamic": 221.86000061035156,
     "resistance": 308.3999938964844,
     "promote_streak": 0,
@@ -1539,10 +1218,10 @@
     "phase_back_count": 0
   },
   "BITO": {
-    "phase": "C",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 8.0,
+    "raw_score": 8,
     "raw_history": [
       8,
       6,
@@ -1556,10 +1235,11 @@
       8,
       6,
       8,
-      7
+      7,
+      8
     ],
     "entered_date": "2026-10-01",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 7.896772596389636,
     "support_dynamic": 11.043212960966638,
     "resistance": 11.670999526977539,
@@ -1575,8 +1255,8 @@
   "DIS": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 11.0,
-    "raw_score": 11,
+    "decay_score": 9.35,
+    "raw_score": 9,
     "raw_history": [
       7,
       7,
@@ -1590,10 +1270,11 @@
       7,
       10,
       10,
-      11
+      11,
+      9
     ],
     "entered_date": "2026-10-01",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 92.48999786376953,
     "support_dynamic": 101.1500015258789,
     "resistance": 106.58000183105469,
@@ -1607,10 +1288,10 @@
     "phase_back_count": 0
   },
   "META": {
-    "phase": "UNKNOWN",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 7.65,
-    "raw_score": 6,
+    "decay_score": 5.74,
+    "raw_score": 5,
     "raw_history": [
       11,
       11,
@@ -1623,10 +1304,11 @@
       9,
       9,
       9,
-      6
+      6,
+      5
     ],
     "entered_date": "2026-10-02",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 524.0764068649972,
     "support_dynamic": 711.6799926757812,
     "resistance": 779.8200073242188,
@@ -1656,10 +1338,11 @@
       10,
       8,
       7,
+      6,
       6
     ],
     "entered_date": "2026-10-02",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 105.11000061035156,
     "support_dynamic": 145.36000061035156,
     "resistance": 176.4199981689453,
@@ -1675,8 +1358,8 @@
   "VST": {
     "phase": "B",
     "tier": "confirmed",
-    "decay_score": 13.0,
-    "raw_score": 13,
+    "decay_score": 11.05,
+    "raw_score": 11,
     "raw_history": [
       7,
       9,
@@ -1688,15 +1371,16 @@
       10,
       12,
       12,
-      13
+      13,
+      11
     ],
     "entered_date": "2026-10-03",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 134.7899932861328,
     "support_dynamic": 134.7899932861328,
     "resistance": 168.7480010986328,
     "promote_streak": 0,
-    "demote_streak": 0,
+    "demote_streak": 1,
     "failing": false,
     "fail_days": 0,
     "triggers_fired": [
@@ -1724,8 +1408,8 @@
   "PWR": {
     "phase": "D",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
+    "decay_score": 5.0,
+    "raw_score": 5,
     "raw_history": [
       7,
       11,
@@ -1737,10 +1421,11 @@
       7,
       7,
       8,
-      6
+      6,
+      5
     ],
     "entered_date": "2026-10-03",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 554.0251276356839,
     "support_dynamic": 607.3460383017438,
     "resistance": 722.2100219726562,
@@ -1756,8 +1441,8 @@
   "GEV": {
     "phase": "D",
     "tier": "watch",
-    "decay_score": 8.0,
-    "raw_score": 8,
+    "decay_score": 9.0,
+    "raw_score": 9,
     "raw_history": [
       13,
       13,
@@ -1769,10 +1454,11 @@
       9,
       9,
       9,
-      8
+      8,
+      9
     ],
     "entered_date": "2026-10-03",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 855.5728581079641,
     "support_dynamic": 921.530029296875,
     "resistance": 1052.780029296875,
@@ -1783,7 +1469,7 @@
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 1
+    "phase_back_count": 0
   },
   "ZS": {
     "phase": "D",
@@ -1800,13 +1486,14 @@
       12,
       11,
       9,
+      8,
       8
     ],
     "entered_date": "2026-10-06",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 119.5,
     "support_dynamic": 187.67100524902344,
-    "resistance": 216.97000122070312,
+    "resistance": 237.22000122070312,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -1831,11 +1518,12 @@
       7,
       7,
       6,
+      6,
       6
     ],
     "entered_date": "2026-10-06",
-    "last_updated": "2026-10-16",
-    "support_primary": 83.9592064085727,
+    "last_updated": "2026-10-20",
+    "support_primary": 85.13027348187828,
     "support_dynamic": 104.10641399313707,
     "resistance": 118.6500015258789,
     "promote_streak": 0,
@@ -1848,10 +1536,10 @@
     "phase_back_count": 0
   },
   "COST": {
-    "phase": "UNKNOWN",
+    "phase": "B",
     "tier": "watch",
-    "decay_score": 10.0,
-    "raw_score": 10,
+    "decay_score": 9.0,
+    "raw_score": 9,
     "raw_history": [
       7,
       6,
@@ -1862,10 +1550,11 @@
       10,
       11,
       10,
-      10
+      10,
+      9
     ],
     "entered_date": "2026-10-06",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 883.0999755859375,
     "support_dynamic": 883.0999755859375,
     "resistance": 931.0900268554688,
@@ -1892,10 +1581,11 @@
       8,
       9,
       9,
+      9,
       9
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 130.85190971773952,
     "support_dynamic": 155.38430684034967,
     "resistance": 205.85000610351562,
@@ -1909,9 +1599,9 @@
     "phase_back_count": 0
   },
   "ARM": {
-    "phase": "A",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 4.33,
+    "decay_score": 4.0,
     "raw_score": 4,
     "raw_history": [
       10,
@@ -1922,11 +1612,12 @@
       5,
       6,
       5,
+      4,
       4
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
-    "support_primary": 162.72799682617188,
+    "last_updated": "2026-10-20",
+    "support_primary": 164.10000610351562,
     "support_dynamic": 279.20001220703125,
     "resistance": 336.9800109863281,
     "promote_streak": 0,
@@ -1941,8 +1632,8 @@
   "ESTC": {
     "phase": "D",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       8,
       8,
@@ -1952,13 +1643,14 @@
       8,
       8,
       8,
-      7
+      7,
+      6
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 44.310001373291016,
     "support_dynamic": 84.62000274658203,
-    "resistance": 108.0,
+    "resistance": 101.38999938964844,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -1971,8 +1663,8 @@
   "MTSI": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 9.35,
-    "raw_score": 8,
+    "decay_score": 9.0,
+    "raw_score": 9,
     "raw_history": [
       11,
       11,
@@ -1982,10 +1674,11 @@
       12,
       12,
       11,
-      8
+      8,
+      9
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 228.02000427246094,
     "support_dynamic": 235.6300048828125,
     "resistance": 353.5400085449219,
@@ -1999,10 +1692,10 @@
     "phase_back_count": 0
   },
   "VEEV": {
-    "phase": "E",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 9.0,
-    "raw_score": 9,
+    "decay_score": 8.0,
+    "raw_score": 8,
     "raw_history": [
       7,
       7,
@@ -2012,10 +1705,11 @@
       8,
       7,
       9,
-      9
+      9,
+      8
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 150.38999938964844,
     "support_dynamic": 257.8699951171875,
     "resistance": 291.3999938964844,
@@ -2034,10 +1728,10 @@
     "phase_back_count": 0
   },
   "BE": {
-    "phase": "C",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 5.0,
-    "raw_score": 5,
+    "decay_score": 4.0,
+    "raw_score": 4,
     "raw_history": [
       11,
       11,
@@ -2047,10 +1741,11 @@
       7,
       7,
       5,
-      5
+      5,
+      4
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 157.64999389648438,
     "support_dynamic": 251.3000030517578,
     "resistance": 302.35400390625,
@@ -2066,8 +1761,8 @@
   "EWZ": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 8.0,
-    "raw_score": 8,
+    "decay_score": 7.0,
+    "raw_score": 7,
     "raw_history": [
       8,
       8,
@@ -2077,10 +1772,11 @@
       9,
       10,
       8,
-      8
+      8,
+      7
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 33.21380436194237,
     "support_dynamic": 35.970001220703125,
     "resistance": 43.900001525878906,
@@ -2094,10 +1790,10 @@
     "phase_back_count": 0
   },
   "MVLL": {
-    "phase": "A",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 8.0,
-    "raw_score": 8,
+    "decay_score": 7.0,
+    "raw_score": 7,
     "raw_history": [
       11,
       10,
@@ -2107,11 +1803,12 @@
       11,
       11,
       9,
-      8
+      8,
+      7
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
-    "support_primary": 15.257332801818848,
+    "last_updated": "2026-10-20",
+    "support_primary": 15.600000381469727,
     "support_dynamic": 21.450000762939453,
     "resistance": 45.88999938964844,
     "promote_streak": 0,
@@ -2123,46 +1820,11 @@
     "pending_triggers": [],
     "phase_back_count": 0
   },
-  "SOXL": {
-    "phase": "D",
-    "tier": "watch",
-    "decay_score": 4.21,
-    "raw_score": 3,
-    "raw_history": [
-      11,
-      12,
-      12,
-      12,
-      9,
-      10,
-      6,
-      5,
-      3
-    ],
-    "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
-    "support_primary": 90.60060296847134,
-    "support_dynamic": 99.80456701490783,
-    "resistance": 169.8300018310547,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": true,
-    "fail_days": 1,
-    "triggers_fired": [
-      {
-        "type": "SOS_BREAKOUT",
-        "date": "2026-10-09"
-      }
-    ],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 1
-  },
   "SQQQ": {
-    "phase": "UNKNOWN",
+    "phase": "B",
     "tier": "watch",
-    "decay_score": 5.06,
-    "raw_score": 3,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       8,
       8,
@@ -2172,10 +1834,11 @@
       7,
       7,
       1,
-      3
+      3,
+      6
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 31.420000076293945,
     "support_dynamic": 31.420000076293945,
     "resistance": 40.8595675297379,
@@ -2191,7 +1854,7 @@
   "ZM": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 5.1,
+    "decay_score": 5.0,
     "raw_score": 5,
     "raw_history": [
       7,
@@ -2202,13 +1865,14 @@
       8,
       7,
       6,
+      5,
       5
     ],
     "entered_date": "2026-10-07",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 82.26799774169922,
     "support_dynamic": 85.37999725341797,
-    "resistance": 93.33000183105469,
+    "resistance": 99.9800033569336,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -2231,10 +1895,11 @@
       6,
       3,
       4,
+      4,
       4
     ],
     "entered_date": "2026-10-08",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 185.75,
     "support_dynamic": 269.29998779296875,
     "resistance": 370.3500061035156,
@@ -2248,10 +1913,10 @@
     "phase_back_count": 0
   },
   "ANET": {
-    "phase": "A",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 6.8,
-    "raw_score": 5,
+    "decay_score": 5.1,
+    "raw_score": 3,
     "raw_history": [
       8,
       10,
@@ -2260,10 +1925,11 @@
       8,
       8,
       8,
-      5
+      5,
+      3
     ],
     "entered_date": "2026-10-08",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 135.1300048828125,
     "support_dynamic": 186.11000061035156,
     "resistance": 217.41000366210938,
@@ -2284,7 +1950,7 @@
   "SHOP": {
     "phase": "E",
     "tier": "watch",
-    "decay_score": 6.38,
+    "decay_score": 6.0,
     "raw_score": 6,
     "raw_history": [
       8,
@@ -2294,13 +1960,14 @@
       10,
       10,
       8,
+      6,
       6
     ],
     "entered_date": "2026-10-08",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 94.0,
     "support_dynamic": 126.38999938964844,
-    "resistance": 156.49000549316406,
+    "resistance": 180.8800048828125,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -2308,7 +1975,7 @@
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 0
+    "phase_back_count": 1
   },
   "PAYP": {
     "phase": "C",
@@ -2323,10 +1990,11 @@
       7,
       5,
       5,
+      5,
       5
     ],
     "entered_date": "2026-10-08",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 12.069999694824219,
     "support_dynamic": 14.779999732971191,
     "resistance": 18.979999542236328,
@@ -2336,20 +2004,7 @@
     "fail_days": 0,
     "triggers_fired": [],
     "removed_reason": null,
-    "pending_triggers": [
-      {
-        "type": "SPRING",
-        "entry": 15.68,
-        "stop": 14.43,
-        "target": 22.43,
-        "rr": 5.4,
-        "trailing_stop": 14.86,
-        "reason": "跌破 $14.78 後收回 + 量 2.0x median",
-        "action": "PILOT BUY 10-25%",
-        "confidence_note": "SPY 在 EMA50 下方 (降低信心)",
-        "_pending_type": "SPRING"
-      }
-    ],
+    "pending_triggers": [],
     "phase_back_count": 0
   },
   "AMZN": {
@@ -2364,18 +2019,24 @@
       5,
       5,
       5,
+      5,
       5
     ],
     "entered_date": "2026-10-09",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 226.1300048828125,
     "support_dynamic": 244.72999572753906,
-    "resistance": 259.489990234375,
+    "resistance": 263.70001220703125,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
     "fail_days": 0,
-    "triggers_fired": [],
+    "triggers_fired": [
+      {
+        "type": "SOS_BREAKOUT",
+        "date": "2026-10-20"
+      }
+    ],
     "removed_reason": null,
     "pending_triggers": [],
     "phase_back_count": 0
@@ -2392,41 +2053,14 @@
       5,
       6,
       5,
+      4,
       4
     ],
     "entered_date": "2026-10-09",
-    "last_updated": "2026-10-16",
-    "support_primary": 328.5899963378906,
+    "last_updated": "2026-10-20",
+    "support_primary": 328.5799865722656,
     "support_dynamic": 343.2900085449219,
     "resistance": 380.8399963378906,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": true,
-    "fail_days": 1,
-    "triggers_fired": [],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 1
-  },
-  "AXTI": {
-    "phase": "UNKNOWN",
-    "tier": "watch",
-    "decay_score": 4.33,
-    "raw_score": 3,
-    "raw_history": [
-      9,
-      7,
-      6,
-      6,
-      6,
-      4,
-      3
-    ],
-    "entered_date": "2026-10-09",
-    "last_updated": "2026-10-16",
-    "support_primary": 36.72999954223633,
-    "support_dynamic": 52.7599983215332,
-    "resistance": 88.36000061035156,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": true,
@@ -2437,20 +2071,21 @@
     "phase_back_count": 0
   },
   "FSLR": {
-    "phase": "UNKNOWN",
+    "phase": "B",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
+    "decay_score": 5.1,
+    "raw_score": 5,
     "raw_history": [
       8,
       8,
       8,
       7,
       7,
-      6
+      6,
+      5
     ],
     "entered_date": "2026-10-10",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 168.60000610351562,
     "support_dynamic": 168.60000610351562,
     "resistance": 220.97999572753906,
@@ -2474,10 +2109,11 @@
       6,
       5,
       5,
+      5,
       5
     ],
     "entered_date": "2026-10-10",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 85.65461644227081,
     "support_dynamic": 95.11000061035156,
     "resistance": 99.9800033569336,
@@ -2488,7 +2124,7 @@
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 1
+    "phase_back_count": 0
   },
   "RDDT": {
     "phase": "UNKNOWN",
@@ -2501,10 +2137,11 @@
       4,
       4,
       6,
+      6,
       6
     ],
     "entered_date": "2026-10-10",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 135.2220001220703,
     "support_dynamic": 141.32200622558594,
     "resistance": 166.17999267578125,
@@ -2518,20 +2155,21 @@
     "phase_back_count": 0
   },
   "TBT": {
-    "phase": "D",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 5.95,
+    "raw_score": 5,
     "raw_history": [
       11,
       11,
       11,
       10,
       7,
-      7
+      7,
+      5
     ],
     "entered_date": "2026-10-10",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 33.56151297517767,
     "support_dynamic": 38.25376647394324,
     "resistance": 43.77000045776367,
@@ -2547,20 +2185,21 @@
   "AI": {
     "phase": "E",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 8.0,
+    "raw_score": 8,
     "raw_history": [
       10,
       8,
       8,
       8,
-      7
+      7,
+      8
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 7.909999847412109,
     "support_dynamic": 10.199999809265137,
-    "resistance": 11.119999885559082,
+    "resistance": 12.880000114440918,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -2573,22 +2212,23 @@
     ],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 0
+    "phase_back_count": 1
   },
   "TEAM": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 8.5,
-    "raw_score": 8,
+    "decay_score": 7.22,
+    "raw_score": 6,
     "raw_history": [
       8,
       8,
       9,
       10,
-      8
+      8,
+      6
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 65.19999694824219,
     "support_dynamic": 168.0500030517578,
     "resistance": 200.0,
@@ -2611,10 +2251,11 @@
       6,
       4,
       7,
+      8,
       8
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 62.16999816894531,
     "support_dynamic": 73.16000366210938,
     "resistance": 98.62000274658203,
@@ -2630,17 +2271,18 @@
   "APP": {
     "phase": "C",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
+    "decay_score": 4.5,
+    "raw_score": 4,
     "raw_history": [
       7,
       6,
       6,
       6,
-      6
+      6,
+      4
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 260.5899963378906,
     "support_dynamic": 266.8399963378906,
     "resistance": 338.3399963378906,
@@ -2648,32 +2290,6 @@
     "demote_streak": 0,
     "failing": false,
     "fail_days": 0,
-    "triggers_fired": [],
-    "removed_reason": null,
-    "pending_triggers": [],
-    "phase_back_count": 0
-  },
-  "BX": {
-    "phase": "C",
-    "tier": "watch",
-    "decay_score": 4.0,
-    "raw_score": 4,
-    "raw_history": [
-      7,
-      6,
-      6,
-      4,
-      4
-    ],
-    "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
-    "support_primary": 105.44000244140625,
-    "support_dynamic": 109.01000213623047,
-    "resistance": 145.77000427246094,
-    "promote_streak": 0,
-    "demote_streak": 0,
-    "failing": true,
-    "fail_days": 1,
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
@@ -2689,10 +2305,11 @@
       6,
       3,
       3,
+      6,
       6
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 28.459999084472656,
     "support_dynamic": 28.459999084472656,
     "resistance": 51.575564620501424,
@@ -2706,19 +2323,20 @@
     "phase_back_count": 0
   },
   "TER": {
-    "phase": "UNKNOWN",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 5.1,
-    "raw_score": 5,
+    "decay_score": 4.0,
+    "raw_score": 4,
     "raw_history": [
       8,
       8,
       8,
       4,
-      5
+      5,
+      4
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 296.7060348292611,
     "support_dynamic": 326.3699951171875,
     "resistance": 451.8599853515625,
@@ -2734,17 +2352,18 @@
   "UVXY": {
     "phase": "C",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       11,
       9,
       11,
       8,
-      7
+      7,
+      6
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 15.84000015258789,
     "support_dynamic": 16.549999237060547,
     "resistance": 17.940000534057617,
@@ -2756,27 +2375,18 @@
       {
         "type": "SOS_BREAKOUT",
         "date": "2026-10-16"
+      },
+      {
+        "type": "SOS_BREAKOUT",
+        "date": "2026-10-20"
       }
     ],
     "removed_reason": null,
-    "pending_triggers": [
-      {
-        "type": "SPRING",
-        "entry": 18.5,
-        "stop": 17.02,
-        "target": 18.99,
-        "rr": 0.3,
-        "trailing_stop": 17.19,
-        "reason": "跌破 $16.55 後收回 + 量 6.3x median",
-        "action": "PILOT BUY 10-25%",
-        "confidence_note": "SPY 在 EMA50 下方 (降低信心)",
-        "_pending_type": "SPRING"
-      }
-    ],
+    "pending_triggers": [],
     "phase_back_count": 0
   },
   "V": {
-    "phase": "E",
+    "phase": "UNKNOWN",
     "tier": "watch",
     "decay_score": 8.0,
     "raw_score": 8,
@@ -2785,10 +2395,11 @@
       9,
       8,
       8,
+      8,
       8
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 303.30657545190263,
     "support_dynamic": 356.75,
     "resistance": 385.57000732421875,
@@ -2802,7 +2413,7 @@
     "phase_back_count": 0
   },
   "WMT": {
-    "phase": "UNKNOWN",
+    "phase": "B",
     "tier": "watch",
     "decay_score": 10.0,
     "raw_score": 10,
@@ -2811,10 +2422,11 @@
       9,
       10,
       10,
+      10,
       10
     ],
     "entered_date": "2026-10-13",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 102.1500015258789,
     "support_dynamic": 103.38999938964844,
     "resistance": 111.2300033569336,
@@ -2830,16 +2442,17 @@
   "XYZ": {
     "phase": "B",
     "tier": "watch",
-    "decay_score": 4.3,
-    "raw_score": 2,
+    "decay_score": 4.0,
+    "raw_score": 4,
     "raw_history": [
       7,
       5,
       5,
-      2
+      2,
+      4
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 65.45999908447266,
     "support_dynamic": 72.27999877929688,
     "resistance": 86.91999816894531,
@@ -2853,17 +2466,18 @@
     "phase_back_count": 0
   },
   "AMD": {
-    "phase": "A",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 7.22,
+    "decay_score": 6.14,
     "raw_score": 4,
     "raw_history": [
       10,
       7,
+      4,
       4
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 272.0,
     "support_dynamic": 440.5,
     "resistance": 658.52001953125,
@@ -2884,13 +2498,14 @@
     "raw_history": [
       8,
       8,
+      7,
       7
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 123.5,
     "support_dynamic": 203.24000549316406,
-    "resistance": 251.99000549316406,
+    "resistance": 300.67999267578125,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -2901,17 +2516,18 @@
     "phase_back_count": 0
   },
   "MDB": {
-    "phase": "A",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 11.05,
-    "raw_score": 11,
+    "decay_score": 9.39,
+    "raw_score": 9,
     "raw_history": [
       12,
       13,
-      11
+      11,
+      9
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 240.6199951171875,
     "support_dynamic": 300.0,
     "resistance": 439.75,
@@ -2925,17 +2541,18 @@
     "phase_back_count": 0
   },
   "BNC": {
-    "phase": "A",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 6.0,
-    "raw_score": 6,
+    "decay_score": 7.0,
+    "raw_score": 7,
     "raw_history": [
       7,
       6,
-      6
+      6,
+      7
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 1.8350000381469727,
     "support_dynamic": 5.550000190734863,
     "resistance": 6.940000057220459,
@@ -2949,17 +2566,18 @@
     "phase_back_count": 0
   },
   "CRDO": {
-    "phase": "C",
+    "phase": "D",
     "tier": "watch",
-    "decay_score": 5.25,
-    "raw_score": 3,
+    "decay_score": 4.0,
+    "raw_score": 4,
     "raw_history": [
       8,
       7,
-      3
+      3,
+      4
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 148.94500732421875,
     "support_dynamic": 186.80999755859375,
     "resistance": 231.58999633789062,
@@ -2980,10 +2598,11 @@
     "raw_history": [
       8,
       11,
+      9,
       9
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 95.722783810188,
     "support_dynamic": 104.61000061035156,
     "resistance": 113.62999725341797,
@@ -2994,7 +2613,7 @@
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 0
+    "phase_back_count": 1
   },
   "SONY": {
     "phase": "E",
@@ -3004,10 +2623,11 @@
     "raw_history": [
       8,
       8,
+      8,
       8
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 19.31999969482422,
     "support_dynamic": 23.270000457763672,
     "resistance": 23.969999313354492,
@@ -3018,20 +2638,21 @@
     "triggers_fired": [],
     "removed_reason": null,
     "pending_triggers": [],
-    "phase_back_count": 0
+    "phase_back_count": 1
   },
   "WEN": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 6.8,
-    "raw_score": 6,
+    "decay_score": 10.0,
+    "raw_score": 10,
     "raw_history": [
       7,
       8,
-      6
+      6,
+      10
     ],
     "entered_date": "2026-10-14",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 5.940000057220459,
     "support_dynamic": 5.940000057220459,
     "resistance": 9.062915923622638,
@@ -3047,14 +2668,15 @@
   "ADBE": {
     "phase": "D",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 5.25,
+    "raw_score": 5,
     "raw_history": [
       7,
-      7
+      7,
+      5
     ],
     "entered_date": "2026-10-15",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 190.1199951171875,
     "support_dynamic": 227.0,
     "resistance": 248.3000030517578,
@@ -3070,15 +2692,16 @@
   "QQQ": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 5.95,
+    "decay_score": 5.06,
     "raw_score": 3,
     "raw_history": [
       7,
+      3,
       3
     ],
     "entered_date": "2026-10-15",
-    "last_updated": "2026-10-16",
-    "support_primary": 640.8372951709442,
+    "last_updated": "2026-10-20",
+    "support_primary": 640.8372343366078,
     "support_dynamic": 699.2713317325664,
     "resistance": 762.8599853515625,
     "promote_streak": 0,
@@ -3093,15 +2716,16 @@
   "DKNG": {
     "phase": "C",
     "tier": "watch",
-    "decay_score": 7.0,
-    "raw_score": 7,
+    "decay_score": 6.0,
+    "raw_score": 6,
     "raw_history": [
       7,
-      7
+      7,
+      6
     ],
     "entered_date": "2026-10-15",
-    "last_updated": "2026-10-16",
-    "support_primary": 18.389999389648438,
+    "last_updated": "2026-10-20",
+    "support_primary": 18.350000381469727,
     "support_dynamic": 18.520000457763672,
     "resistance": 25.2549991607666,
     "promote_streak": 0,
@@ -3116,13 +2740,14 @@
   "MSFT": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 10.0,
-    "raw_score": 10,
+    "decay_score": 9.0,
+    "raw_score": 9,
     "raw_history": [
-      10
+      10,
+      9
     ],
     "entered_date": "2026-10-16",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 354.762144454129,
     "support_dynamic": 486.0,
     "resistance": 517.780029296875,
@@ -3132,18 +2757,20 @@
     "fail_days": 0,
     "triggers_fired": [],
     "removed_reason": null,
-    "pending_triggers": []
+    "pending_triggers": [],
+    "phase_back_count": 0
   },
   "NTSK": {
-    "phase": "E",
+    "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 11.0,
-    "raw_score": 11,
+    "decay_score": 10.0,
+    "raw_score": 10,
     "raw_history": [
-      11
+      11,
+      10
     ],
     "entered_date": "2026-10-16",
-    "last_updated": "2026-10-16",
+    "last_updated": "2026-10-20",
     "support_primary": 8.350000381469727,
     "support_dynamic": 16.863000869750977,
     "resistance": 18.959999084472656,
@@ -3153,21 +2780,68 @@
     "fail_days": 0,
     "triggers_fired": [],
     "removed_reason": null,
-    "pending_triggers": []
+    "pending_triggers": [],
+    "phase_back_count": 0
   },
   "OKTA": {
-    "phase": "E",
+    "phase": "UNKNOWN",
     "tier": "watch",
     "decay_score": 8.0,
     "raw_score": 8,
     "raw_history": [
+      8,
       8
     ],
     "entered_date": "2026-10-16",
-    "last_updated": "2026-10-16",
-    "support_primary": 71.12999725341797,
+    "last_updated": "2026-10-20",
+    "support_primary": 72.98999786376953,
     "support_dynamic": 127.5999984741211,
-    "resistance": 174.85000610351562,
+    "resistance": 235.0,
+    "promote_streak": 0,
+    "demote_streak": 0,
+    "failing": false,
+    "fail_days": 0,
+    "triggers_fired": [],
+    "removed_reason": null,
+    "pending_triggers": [],
+    "phase_back_count": 0
+  },
+  "KO": {
+    "phase": "UNKNOWN",
+    "tier": "watch",
+    "decay_score": 8.0,
+    "raw_score": 8,
+    "raw_history": [
+      8,
+      8
+    ],
+    "entered_date": "2026-10-16",
+    "last_updated": "2026-10-20",
+    "support_primary": 73.63240093308676,
+    "support_dynamic": 85.12999725341797,
+    "resistance": 89.36000061035156,
+    "promote_streak": 0,
+    "demote_streak": 0,
+    "failing": false,
+    "fail_days": 0,
+    "triggers_fired": [],
+    "removed_reason": null,
+    "pending_triggers": [],
+    "phase_back_count": 0
+  },
+  "NOW": {
+    "phase": "B",
+    "tier": "watch",
+    "decay_score": 7.0,
+    "raw_score": 7,
+    "raw_history": [
+      7
+    ],
+    "entered_date": "2026-10-20",
+    "last_updated": "2026-10-20",
+    "support_primary": 83.58000183105469,
+    "support_dynamic": 126.75,
+    "resistance": 147.57000732421875,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
@@ -3176,19 +2850,19 @@
     "removed_reason": null,
     "pending_triggers": []
   },
-  "KO": {
+  "BRK-B": {
     "phase": "UNKNOWN",
     "tier": "watch",
-    "decay_score": 8.0,
-    "raw_score": 8,
+    "decay_score": 11.0,
+    "raw_score": 11,
     "raw_history": [
-      8
+      11
     ],
-    "entered_date": "2026-10-16",
-    "last_updated": "2026-10-16",
-    "support_primary": 73.63239331187,
-    "support_dynamic": 85.12999725341797,
-    "resistance": 89.36000061035156,
+    "entered_date": "2026-10-20",
+    "last_updated": "2026-10-20",
+    "support_primary": 464.3399963378906,
+    "support_dynamic": 495.9599914550781,
+    "resistance": 523.739990234375,
     "promote_streak": 0,
     "demote_streak": 0,
     "failing": false,
